@@ -1,21 +1,49 @@
+use std::collections::HashMap;
 use succinct::*;
 
 // kinda based on libbdsg's hashgraph
-// pub struct Graph {
-// }
 
 // TODO other than NodeId, these shouldn't actually be u64 -- they're going
 // to be bit/int vectors
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Handle(u64);
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
 pub struct NodeId(u64);
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
+pub struct Handle(u64);
+
+impl Handle {
+    pub fn as_integer(self) -> u64 {
+        let Handle(i) = self;
+        i
+    }
+
+    pub fn from_integer(i: u64) -> Self {
+        Handle(i)
+    }
+
+    pub fn unpack_number(self) -> u64 {
+        self.as_integer() >> 1
+    }
+
+    pub fn unpack_bit(self) -> bool {
+        self.as_integer() & 1 != 0
+    }
+
+    pub fn pack(node_id: NodeId, is_reverse: bool) -> Handle {
+        let NodeId(id) = node_id;
+        Handle::from_integer((id << 1) | is_reverse as u64)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Edge(u64);
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct PathHandle(u64);
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct StepHandle(u64);
+pub struct Edge(Handle, Handle);
+
+// TODO implementing paths later
+// #[derive(Debug, Clone, PartialEq, PartialOrd)]
+// pub struct PathHandle(u64);
+
+// #[derive(Debug, Clone, PartialEq, PartialOrd)]
+// pub struct StepHandle(u64);
 
 pub trait HandleGraph {
     fn has_node(&self, node_id: NodeId) -> bool;
