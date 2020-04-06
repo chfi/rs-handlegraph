@@ -5,7 +5,7 @@ use succinct::*;
 
 // TODO other than NodeId, these shouldn't actually be u64 -- they're going
 // to be bit/int vectors
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
@@ -33,6 +33,18 @@ impl Handle {
         let NodeId(id) = node_id;
         Handle::from_integer((id << 1) | is_reverse as u64)
     }
+
+    fn id(&self) -> NodeId {
+        NodeId(self.unpack_number())
+    }
+
+    fn is_reverse(&self) -> bool {
+        self.unpack_bit()
+    }
+
+    fn flip(&self) -> Self {
+        Handle(self.as_integer() ^ 1)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
@@ -48,8 +60,11 @@ pub struct Edge(Handle, Handle);
 pub trait HandleGraph {
     fn has_node(&self, node_id: NodeId) -> bool;
     fn get_handle(&self, node_id: NodeId, is_reverse: bool) -> Handle;
-    fn get_id(&self, handle: &Handle) -> NodeId;
-    fn get_is_reverse(&self, handle: &Handle) -> bool;
+
+    // fn get_id(&self, handle: &Handle) -> NodeId;
+    // fn get_is_reverse(&self, handle: &Handle) -> bool;
+
+    /*
     fn flip(&self, handle: &Handle) -> bool;
     fn get_length(&self, handle: &Handle) -> usize;
     fn get_sequence(&self, handle: &Handle) -> &str;
@@ -74,12 +89,103 @@ pub trait HandleGraph {
     fn edge_handle(&self, left: &Handle, right: &Handle) -> Edge;
 
     fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle;
+    */
+
+    // pub fn iter_edges(&self) ->
 
     // template<typename Iteratee>
     // bool follow_edges(const handle_t& handle, bool go_left, const Iteratee& iteratee) const;
 
     // template<typename Iteratee>
     // bool for_each_handle(const Iteratee& iteratee, bool parallel = false) const;
-    //   template<typename Iteratee>
-    //   bool for_each_edge(const Iteratee& iteratee, bool parallel = false) const;
+    // template<typename Iteratee>
+    // bool for_each_edge(const Iteratee& iteratee, bool parallel = false) const;
+}
+
+struct Node {
+    sequence: String,
+    left_edges: Vec<Handle>,
+    right_edges: Vec<Handle>,
+}
+
+impl Node {
+    pub fn new(sequence: &str) -> Node {
+        Node {
+            sequence: sequence.to_string(),
+            left_edges: vec![],
+            right_edges: vec![],
+        }
+    }
+}
+
+pub struct HashGraph {
+    max_id: NodeId,
+    min_id: NodeId,
+    graph: HashMap<NodeId, Node>,
+    // path_id: HashMap<String, i64>,
+    // paths: HashMap<i64, Path>,
+    // next_path_id: i64,
+}
+
+impl HashGraph {
+    pub fn new() -> HashGraph {
+        HashGraph {
+            max_id: NodeId(0),
+            min_id: NodeId(std::u64::MAX),
+            graph: HashMap::new(),
+        }
+    }
+}
+
+impl HandleGraph for HashGraph {
+    fn has_node(&self, node_id: NodeId) -> bool {
+        self.graph.contains_key(&node_id)
+    }
+
+    fn get_handle(&self, node_id: NodeId, is_reverse: bool) -> Handle {
+        Handle::pack(node_id, is_reverse)
+    }
+}
+
+impl HashGraph {
+    pub fn create_handle(&mut self, sequence: &str, node_id: NodeId) -> Handle {
+        self.graph.insert(node_id, Node::new(sequence));
+        self.max_id = std::cmp::max(self.max_id, node_id);
+        self.min_id = std::cmp::min(self.min_id, node_id);
+        self.get_handle(node_id, false)
+    }
+
+    pub fn create_edge(&mut self, left: &Handle, right: &Handle) {
+        let add_edge = {
+            let left_node = self
+                .graph
+                .get(&left.id())
+                .expect("Node doesn't exist for the given handle");
+
+            None == left_node.right_edges.iter().find(|h| *h == right)
+        };
+
+        if add_edge {
+            let left_node = self
+                .graph
+                .get_mut(&left.id())
+                .expect("Node doesn't exist for the given handle");
+            if left.is_reverse() {
+                left_node.left_edges.push(*right);
+            } else {
+                left_node.right_edges.push(*right);
+            }
+            if left != &right.flip() {
+                let right_node = self
+                    .graph
+                    .get_mut(&right.id())
+                    .expect("Node doesn't exist for the given handle");
+                if right.is_reverse() {
+                    right_node.right_edges.push(left.flip());
+                } else {
+                    right_node.left_edges.push(left.flip());
+                }
+            }
+        }
+    }
 }
