@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use succinct::*;
+use std::ops::Add;
 
 // kinda based on libbdsg's hashgraph
 
@@ -7,6 +7,15 @@ use succinct::*;
 // to be bit/int vectors
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(u64);
+
+impl Add<u64> for NodeId {
+    type Output = Self;
+
+    fn add(self, other: u64) -> Self {
+        let NodeId(i) = self;
+        NodeId(i + other)
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
 pub struct Handle(u64);
@@ -157,6 +166,9 @@ impl HashGraph {
         self.max_id = std::cmp::max(self.max_id, node_id);
         self.min_id = std::cmp::min(self.min_id, node_id);
         self.get_handle(node_id, false)
+    }
+    pub fn append_handle(&mut self, sequence: &str) -> Handle {
+        self.create_handle(sequence, self.max_id + 1)
     }
 
     pub fn create_edge(&mut self, left: &Handle, right: &Handle) {
