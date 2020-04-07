@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::handle::{Edge, Handle, NodeId};
 use crate::handlegraph::HandleGraph;
 
+#[derive(Debug, Clone)]
 struct Node {
     sequence: String,
     left_edges: Vec<Handle>,
@@ -19,6 +20,7 @@ impl Node {
     }
 }
 
+#[derive(Debug)]
 pub struct HashGraph {
     max_id: NodeId,
     min_id: NodeId,
@@ -110,5 +112,59 @@ impl HashGraph {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn can_create_handles() {
+        let mut graph = HashGraph::new();
+        let h1 = graph.append_handle("CAAATAAG");
+        let h2 = graph.append_handle("A");
+        let h3 = graph.append_handle("G");
+
+        let n1 = graph.get_node_unsafe(&h1.id());
+        let n2 = graph.get_node_unsafe(&h2.id());
+        let n3 = graph.get_node_unsafe(&h3.id());
+
+        assert_eq!(h1.id(), NodeId::from(1));
+        assert_eq!(h3.id(), NodeId::from(3));
+
+        assert_eq!(n1.sequence, "CAAATAAG");
+        assert_eq!(n2.sequence, "A");
+        assert_eq!(n3.sequence, "G");
+    }
+
+    #[test]
+    fn can_create_edges() {
+        let mut graph = HashGraph::new();
+        let h1 = graph.append_handle("CAAATAAG");
+        let h2 = graph.append_handle("A");
+        let h3 = graph.append_handle("G");
+        let h4 = graph.append_handle("TTG");
+
+        graph.create_edge(&h1, &h2);
+        graph.create_edge(&h1, &h3);
+        graph.create_edge(&h2, &h4);
+        graph.create_edge(&h3, &h4);
+
+        let n1 = graph.get_node_unsafe(&h1.id());
+        let n2 = graph.get_node_unsafe(&h2.id());
+        let n3 = graph.get_node_unsafe(&h3.id());
+        let n4 = graph.get_node_unsafe(&h4.id());
+
+        assert_eq!(true, n1.right_edges.contains(&h2));
+        assert_eq!(true, n1.right_edges.contains(&h3));
+
+        assert_eq!(true, n2.left_edges.contains(&h1.flip()));
+        assert_eq!(true, n2.right_edges.contains(&h4));
+        assert_eq!(true, n3.left_edges.contains(&h1.flip()));
+        assert_eq!(true, n3.right_edges.contains(&h4));
+
+        assert_eq!(true, n4.left_edges.contains(&h2.flip()));
+        assert_eq!(true, n4.left_edges.contains(&h3.flip()));
     }
 }
