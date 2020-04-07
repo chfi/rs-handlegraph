@@ -148,6 +148,17 @@ impl HashGraph {
             graph: HashMap::new(),
         }
     }
+
+    fn get_node(&self, node_id: &NodeId) -> Option<&Node> {
+        self.graph.get(node_id)
+    }
+
+    fn get_node_unsafe(&self, node_id: &NodeId) -> &Node {
+        self.graph.get(node_id).expect(&format!(
+            "Tried getting a node that doesn't exist, ID: {:?}",
+            node_id
+        ))
+    }
 }
 
 impl HandleGraph for HashGraph {
@@ -157,6 +168,14 @@ impl HandleGraph for HashGraph {
 
     fn get_handle(&self, node_id: NodeId, is_reverse: bool) -> Handle {
         Handle::pack(node_id, is_reverse)
+    }
+
+    fn get_sequence(&self, handle: &Handle) -> &str {
+        &self.get_node_unsafe(&handle.id()).sequence
+    }
+
+    fn get_length(&self, handle: &Handle) -> usize {
+        self.get_sequence(handle).len()
     }
 }
 
