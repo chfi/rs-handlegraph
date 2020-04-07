@@ -31,7 +31,11 @@ impl Handle {
 
     pub fn pack(node_id: NodeId, is_reverse: bool) -> Handle {
         let NodeId(id) = node_id;
-        Handle::from_integer((id << 1) | is_reverse as u64)
+        if id < (0x1 << 63) {
+            Handle::from_integer((id << 1) | is_reverse as u64)
+        } else {
+            panic!("Tried to create a handle with a node ID that filled 64 bits")
+        }
     }
 
     fn id(&self) -> NodeId {
@@ -187,5 +191,38 @@ impl HashGraph {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // Handle::pack is an isomorphism; Handle <=> (u63, bool)
+    #[test]
+    fn handle_is_isomorphism() {
+        let u: u64 = 597283742;
+        let h = Handle::pack(NodeId(u), true);
+        assert_eq!(h.unpack_number(), u);
+        assert_eq!(h.unpack_bit(), true);
+    }
+
+    // Handle::pack should panic when the provided NodeId is invalid
+    // (i.e. uses the 64th bit
+    #[test]
+    #[should_panic]
+    fn handle_pack_panic() {
+        Handle::pack(NodeId(std::u64::MAX), true);
+    }
+
+    #[test]
+    fn handle_flip() {
+        let u: u64 = 597283742;
+        let h1 = Handle::pack(NodeId(u), true);
+        let h2 = h1.flip();
+
+        assert_eq!(h1.unpack_number(), h2.unpack_number());
+        assert_eq!(h1.unpack_bit(), true);
+        assert_eq!(h2.unpack_bit(), false);
     }
 }
