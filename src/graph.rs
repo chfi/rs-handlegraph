@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use gfa::gfa::{Link, Segment, GFA};
+
 use crate::handle::{Edge, Handle, NodeId};
 use crate::handlegraph::HandleGraph;
 
@@ -37,6 +39,46 @@ impl HashGraph {
             min_id: NodeId::from(std::u64::MAX),
             graph: HashMap::new(),
         }
+    }
+
+    pub fn from_gfa(gfa: &GFA) -> HashGraph {
+        let mut graph = Self::new();
+
+        // add segments
+        for seg in gfa.segments.iter() {
+            // TODO to keep things simple for now, we assume the
+            // segment names in the GFA are all numbers
+            let id = seg.name.parse::<u64>().expect(&format!(
+                "Expected integer name in GFA, was {}\n",
+                seg.name
+            ));
+            graph.create_handle(&seg.sequence, NodeId::from(id));
+        }
+
+        for link in gfa.links.iter() {
+            // for each link in the GFA, get the corresponding handles
+            // based on segment name and orientation
+            let left_id = link
+                .from_segment
+                .parse::<u64>()
+                .expect("Expected integer name in GFA link");
+
+            let right_id = link
+                .to_segment
+                .parse::<u64>()
+                .expect("Expected integer name in GFA link");
+
+            let left =
+                Handle::pack(NodeId::from(left_id), link.from_orient.as_bool());
+            let right =
+                Handle::pack(NodeId::from(right_id), link.to_orient.as_bool());
+
+            graph.create_edge(&left, &right);
+        }
+
+        // add links
+
+        graph
     }
 
     fn get_node(&self, node_id: &NodeId) -> Option<&Node> {
