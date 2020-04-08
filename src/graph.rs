@@ -68,10 +68,12 @@ impl HashGraph {
                 .parse::<u64>()
                 .expect("Expected integer name in GFA link");
 
-            let left =
-                Handle::pack(NodeId::from(left_id), link.from_orient.as_bool());
+            let left = Handle::pack(
+                NodeId::from(left_id),
+                !link.from_orient.as_bool(),
+            );
             let right =
-                Handle::pack(NodeId::from(right_id), link.to_orient.as_bool());
+                Handle::pack(NodeId::from(right_id), !link.to_orient.as_bool());
 
             graph.create_edge(&left, &right);
         }
@@ -208,5 +210,30 @@ mod tests {
 
         assert_eq!(true, n4.left_edges.contains(&h2.flip()));
         assert_eq!(true, n4.left_edges.contains(&h3.flip()));
+    }
+
+    #[test]
+    fn construct_from_gfa() {
+        use gfa::parser::parse_gfa;
+        use std::path::PathBuf;
+
+        if let Some(gfa) = parse_gfa(&PathBuf::from("./lil.gfa")) {
+            let graph = HashGraph::from_gfa(&gfa);
+            let node_ids: Vec<_> = graph.graph.keys().collect();
+            println!("Node IDs:");
+            for id in node_ids.iter() {
+                println!("{:?}", id);
+                let node = graph.graph.get(id).unwrap();
+                let lefts: Vec<_> = node
+                    .left_edges
+                    .iter()
+                    .map(|h| graph.get_sequence(h))
+                    .collect();
+                println!("lefts: {:?}", lefts);
+                println!("{:?}", graph.graph.get(id));
+            }
+        } else {
+            panic!("Couldn't parse test GFA file!");
+        }
     }
 }
