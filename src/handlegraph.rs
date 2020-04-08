@@ -49,6 +49,14 @@ pub trait HandleGraph {
 
     fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle;
 
+    fn follow_edges<F>(&self, handle: &Handle, dir: Direction, f: F) -> bool
+    where
+        F: FnMut(&Handle) -> bool;
+
+    fn for_each_handle<F>(&self, f: F) -> bool
+    where
+        F: FnMut(&Handle) -> bool;
+
     /*
     // fn flip(&self, handle: &Handle) -> bool;
 

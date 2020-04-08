@@ -208,6 +208,44 @@ impl HandleGraph for HashGraph {
             panic!("traverse_edge_handle called with a handle that the edge didn't connect");
         }
     }
+
+    fn follow_edges<F>(&self, handle: &Handle, dir: Direction, mut f: F) -> bool
+    where
+        F: FnMut(&Handle) -> bool,
+    {
+        let node = self.get_node_unsafe(&handle.id());
+        let handles = if handle.is_reverse() != (dir == Direction::Left) {
+            &node.left_edges
+        } else {
+            &node.right_edges
+        };
+
+        for h in handles.iter() {
+            let cont = if dir == Direction::Left {
+                f(&h.flip())
+            } else {
+                f(h)
+            };
+
+            if !cont {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn for_each_handle<F>(&self, mut f: F) -> bool
+    where
+        F: FnMut(&Handle) -> bool,
+    {
+        for id in self.graph.keys() {
+            if !f(&Handle::pack(*id, false)) {
+                return false;
+            }
+        }
+
+        true
+    }
 }
 
 impl HashGraph {
