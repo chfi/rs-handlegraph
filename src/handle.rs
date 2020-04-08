@@ -64,7 +64,7 @@ impl Handle {
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
-pub struct Edge(Handle, Handle);
+pub struct Edge(pub Handle, pub Handle);
 
 #[cfg(test)]
 mod tests {

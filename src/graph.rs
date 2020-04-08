@@ -171,6 +171,43 @@ impl HandleGraph for HashGraph {
     ) -> &str {
         &self.get_node_unsafe(&handle.id()).sequence[index..index + size]
     }
+
+    fn forward(&self, handle: Handle) -> Handle {
+        if handle.is_reverse() {
+            handle.flip()
+        } else {
+            handle
+        }
+    }
+
+    fn edge_handle(&self, left: &Handle, right: &Handle) -> Edge {
+        let flipped_right = right.flip();
+        let flipped_left = left.flip();
+
+        if left > &flipped_right {
+            Edge(flipped_right, flipped_left)
+        } else if left == &flipped_right {
+            if right > &flipped_left {
+                Edge(flipped_right, flipped_left)
+            } else {
+                Edge(*left, *right)
+            }
+        } else {
+            Edge(*left, *right)
+        }
+    }
+
+    fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle {
+        let Edge(el, er) = edge;
+        if left == el {
+            *er
+        } else if left == &er.flip() {
+            el.flip()
+        } else {
+            // TODO this should be improved -- this whole function, really
+            panic!("traverse_edge_handle called with a handle that the edge didn't connect");
+        }
+    }
 }
 
 impl HashGraph {

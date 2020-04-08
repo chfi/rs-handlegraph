@@ -43,14 +43,15 @@ pub trait HandleGraph {
         size: usize,
     ) -> &str;
 
-    /*
-    // fn flip(&self, handle: &Handle) -> bool;
-
-    fn forward(&self, handle: &Handle) -> &Handle;
+    fn forward(&self, handle: Handle) -> Handle;
 
     fn edge_handle(&self, left: &Handle, right: &Handle) -> Edge;
 
     fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle;
+
+    /*
+    // fn flip(&self, handle: &Handle) -> bool;
+
     */
 
     // pub fn iter_edges(&self) ->
