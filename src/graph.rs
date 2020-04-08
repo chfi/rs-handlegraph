@@ -144,7 +144,7 @@ impl HandleGraph for HashGraph {
             .get(&left.id())
             .expect("Node doesn't exist for the given handle");
 
-        None == left_node.right_edges.iter().find(|h| *h == right)
+        None != left_node.right_edges.iter().find(|h| *h == right)
     }
 
     fn get_edge_count(&self) -> usize {
@@ -272,6 +272,13 @@ mod tests {
         assert_eq!(true, n4.left_edges.contains(&h3.flip()));
     }
 
+    fn read_test_gfa() -> HashGraph {
+        use gfa::parser::parse_gfa;
+        use std::path::PathBuf;
+
+        HashGraph::from_gfa(&parse_gfa(&PathBuf::from("./lil.gfa")).unwrap())
+    }
+
     #[test]
     fn construct_from_gfa() {
         use gfa::parser::parse_gfa;
@@ -295,5 +302,32 @@ mod tests {
         } else {
             panic!("Couldn't parse test GFA file!");
         }
+    }
+
+    #[test]
+    fn degree_is_correct() {
+        let graph = read_test_gfa();
+
+        let h1 = Handle::pack(NodeId::from(9), false);
+        let h2 = Handle::pack(NodeId::from(3), false);
+
+        assert_eq!(graph.get_degree(&h1, Direction::Right), 2);
+        assert_eq!(graph.get_degree(&h1, Direction::Left), 2);
+        assert_eq!(graph.get_degree(&h2, Direction::Right), 2);
+        assert_eq!(graph.get_degree(&h2, Direction::Left), 1);
+    }
+
+    #[test]
+    fn test_has_edge() {
+        let graph = read_test_gfa();
+
+        let h15 = Handle::from_integer(15);
+        let h18 = Handle::from_integer(18);
+        let h19 = h18.flip();
+        let h20 = Handle::from_integer(20);
+
+        assert_eq!(true, graph.has_edge(&h18, &h20));
+        assert_eq!(true, graph.has_edge(&h19, &h20));
+        assert_eq!(true, graph.has_edge(&h15, &h18));
     }
 }
