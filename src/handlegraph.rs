@@ -1,4 +1,4 @@
-use crate::handle::{Edge, Handle, NodeId};
+use crate::handle::{Direction, Edge, Handle, NodeId};
 
 // kinda based on libbdsg's hashgraph
 
@@ -22,13 +22,11 @@ pub trait HandleGraph {
     fn get_length(&self, handle: &Handle) -> usize;
     fn get_sequence(&self, handle: &Handle) -> &str;
 
-    /*
-    // fn flip(&self, handle: &Handle) -> bool;
     fn get_node_count(&self) -> usize;
     fn min_node_id(&self) -> NodeId;
     fn max_node_id(&self) -> NodeId;
 
-    fn get_degree(&self, handle: &Handle, go_left: bool) -> usize;
+    fn get_degree(&self, handle: &Handle, dir: Direction) -> usize;
 
     fn has_edge(&self, left: &Handle, right: &Handle) -> bool;
 
@@ -38,7 +36,15 @@ pub trait HandleGraph {
 
     fn get_base(&self, handle: &Handle, index: usize) -> char;
 
-    fn get_subsequence(&self, handle: &Handle, index: usize, size: usize) -> &str;
+    fn get_subsequence(
+        &self,
+        handle: &Handle,
+        index: usize,
+        size: usize,
+    ) -> &str;
+
+    /*
+    // fn flip(&self, handle: &Handle) -> bool;
 
     fn forward(&self, handle: &Handle) -> &Handle;
 

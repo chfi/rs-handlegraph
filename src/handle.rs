@@ -44,7 +44,9 @@ impl Handle {
         if id < (0x1 << 63) {
             Handle::from_integer((id << 1) | is_reverse as u64)
         } else {
-            panic!("Tried to create a handle with a node ID that filled 64 bits")
+            panic!(
+                "Tried to create a handle with a node ID that filled 64 bits"
+            )
         }
     }
 
@@ -95,4 +97,10 @@ mod tests {
         assert_eq!(h1.unpack_bit(), true);
         assert_eq!(h2.unpack_bit(), false);
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Direction {
+    Left,
+    Right,
 }

@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use gfa::gfa::{Link, Segment, GFA};
 
-use crate::handle::{Edge, Handle, NodeId};
+use crate::handle::{Direction, Edge, Handle, NodeId};
 use crate::handlegraph::HandleGraph;
 
 #[derive(Debug, Clone)]
@@ -110,6 +110,66 @@ impl HandleGraph for HashGraph {
 
     fn get_length(&self, handle: &Handle) -> usize {
         self.get_sequence(handle).len()
+    }
+
+    fn get_node_count(&self) -> usize {
+        self.graph.len()
+    }
+
+    fn min_node_id(&self) -> NodeId {
+        self.min_id
+    }
+
+    fn max_node_id(&self) -> NodeId {
+        self.max_id
+    }
+
+    fn get_degree(&self, handle: &Handle, dir: Direction) -> usize {
+        let node = self.get_node_unsafe(&handle.id());
+        if dir == Direction::Left && handle.is_reverse()
+            || dir == Direction::Right && !handle.is_reverse()
+        {
+            node.right_edges.len()
+        } else
+        // } else if dir == Direction::Left && !handle.is_reverse()
+        //     || dir == Direction::Right && handle.is_reverse()
+        {
+            node.left_edges.len()
+        }
+    }
+
+    fn has_edge(&self, left: &Handle, right: &Handle) -> bool {
+        let left_node = self
+            .graph
+            .get(&left.id())
+            .expect("Node doesn't exist for the given handle");
+
+        None == left_node.right_edges.iter().find(|h| *h == right)
+    }
+
+    fn get_edge_count(&self) -> usize {
+        self.graph
+            .iter()
+            .fold(0, |a, (_, v)| a + v.left_edges.len() + v.right_edges.len())
+    }
+
+    fn get_total_length(&self) -> usize {
+        self.graph.iter().fold(0, |a, (_, v)| a + v.sequence.len())
+    }
+
+    fn get_base(&self, handle: &Handle, index: usize) -> char {
+        char::from(
+            self.get_node_unsafe(&handle.id()).sequence.as_bytes()[index],
+        )
+    }
+
+    fn get_subsequence(
+        &self,
+        handle: &Handle,
+        index: usize,
+        size: usize,
+    ) -> &str {
+        &self.get_node_unsafe(&handle.id()).sequence[index..index + size]
     }
 }
 
