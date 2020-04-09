@@ -5,13 +5,6 @@ use crate::handle::{Direction, Edge, Handle, NodeId};
 // TODO other than NodeId, these shouldn't actually be u64 -- they're going
 // to be bit/int vectors
 
-// TODO implementing paths later
-// #[derive(Debug, Clone, PartialEq, PartialOrd)]
-// pub struct PathHandle(u64);
-
-// #[derive(Debug, Clone, PartialEq, PartialOrd)]
-// pub struct StepHandle(u64);
-
 pub trait HandleGraph {
     fn has_node(&self, node_id: NodeId) -> bool;
     fn get_handle(&self, node_id: NodeId, is_reverse: bool) -> Handle;
@@ -56,19 +49,4 @@ pub trait HandleGraph {
     fn for_each_handle<F>(&self, f: F) -> bool
     where
         F: FnMut(&Handle) -> bool;
-
-    /*
-    // fn flip(&self, handle: &Handle) -> bool;
-
-    */
-
-    // pub fn iter_edges(&self) ->
-
-    // template<typename Iteratee>
-    // bool follow_edges(const handle_t& handle, bool go_left, const Iteratee& iteratee) const;
-
-    // template<typename Iteratee>
-    // bool for_each_handle(const Iteratee& iteratee, bool parallel = false) const;
-    // template<typename Iteratee>
-    // bool for_each_edge(const Iteratee& iteratee, bool parallel = false) const;
 }
