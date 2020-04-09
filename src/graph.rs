@@ -22,6 +22,51 @@ impl Node {
     }
 }
 
+type PathId = i64;
+
+#[derive(Debug)]
+struct PathMapping<'a> {
+    handle: Handle,
+    path_id: PathId,
+    prev: Option<&'a PathMapping<'a>>,
+    next: Option<&'a PathMapping<'a>>,
+    // prev: Box<PathMapping>,
+    // next: Box<PathMapping>,
+}
+
+impl<'a> PathMapping<'a> {
+    fn new(handle: &Handle, path_id: PathId) -> Self {
+        PathMapping {
+            handle: *handle,
+            path_id,
+            prev: None,
+            next: None,
+        }
+    }
+}
+
+struct Path<'a> {
+    head: Option<&'a PathMapping<'a>>,
+    tail: Option<&'a PathMapping<'a>>,
+    count: usize,
+    path_id: PathId,
+    name: String,
+    is_circular: bool,
+}
+
+impl<'a> Path<'a> {
+    fn new(name: &str, path_id: PathId, is_circular: bool) -> Self {
+        Path {
+            name: name.to_string(),
+            path_id,
+            is_circular,
+            head: None,
+            tail: None,
+            count: 0,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct HashGraph {
     max_id: NodeId,
