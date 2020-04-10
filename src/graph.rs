@@ -4,6 +4,7 @@ use gfa::gfa::{Link, Segment, GFA};
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
 use crate::handlegraph::HandleGraph;
+use crate::pathgraph::{PathHandle, PathHandleGraph};
 
 #[derive(Debug, Clone)]
 struct Node<'a> {
@@ -337,6 +338,44 @@ impl<'a> HashGraph<'a> {
                     right_node.left_edges.push(left.flip());
                 }
             }
+        }
+    }
+}
+
+impl<'a> PathHandleGraph for HashGraph<'a> {
+    fn get_path_count(&self) -> usize {
+        self.path_id.len()
+    }
+
+    fn has_path(&self, name: &str) -> bool {
+        self.path_id.contains_key(name)
+    }
+
+    fn get_path_handle(&self, name: &str) -> Option<PathHandle> {
+        self.path_id.get(name).map(PathHandle::from)
+    }
+
+    fn get_path_name(&self, handle: &PathHandle) -> &str {
+        if let Some(p) = self.paths.get(&handle.as_int()) {
+            &p.name
+        } else {
+            panic!("Tried to look up nonexistent path:")
+        }
+    }
+
+    fn get_is_circular(&self, handle: &PathHandle) -> bool {
+        if let Some(p) = self.paths.get(&handle.as_int()) {
+            p.is_circular
+        } else {
+            panic!("Tried to look up nonexistent path:")
+        }
+    }
+
+    fn get_step_count(&self, handle: &PathHandle) -> usize {
+        if let Some(p) = self.paths.get(&handle.as_int()) {
+            p.count
+        } else {
+            panic!("Tried to look up nonexistent path:")
         }
     }
 }
