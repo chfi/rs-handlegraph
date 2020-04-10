@@ -6,18 +6,20 @@ use crate::handle::{Direction, Edge, Handle, NodeId};
 use crate::handlegraph::HandleGraph;
 
 #[derive(Debug, Clone)]
-struct Node {
+struct Node<'a> {
     sequence: String,
     left_edges: Vec<Handle>,
     right_edges: Vec<Handle>,
+    occurrences: Vec<&'a PathMapping>,
 }
 
-impl Node {
-    pub fn new(sequence: &str) -> Node {
+impl<'a> Node<'a> {
+    pub fn new(sequence: &str) -> Node<'a> {
         Node {
             sequence: sequence.to_string(),
             left_edges: vec![],
             right_edges: vec![],
+            occurrences: vec![],
         }
     }
 }
@@ -25,16 +27,14 @@ impl Node {
 type PathId = i64;
 
 #[derive(Debug)]
-struct PathMapping<'a> {
+struct PathMapping {
     handle: Handle,
     path_id: PathId,
-    prev: Option<&'a PathMapping<'a>>,
-    next: Option<&'a PathMapping<'a>>,
-    // prev: Box<PathMapping>,
-    // next: Box<PathMapping>,
+    prev: Option<Box<PathMapping>>,
+    next: Option<Box<PathMapping>>,
 }
 
-impl<'a> PathMapping<'a> {
+impl PathMapping {
     fn new(handle: &Handle, path_id: PathId) -> Self {
         PathMapping {
             handle: *handle,
@@ -45,16 +45,17 @@ impl<'a> PathMapping<'a> {
     }
 }
 
-struct Path<'a> {
-    head: Option<&'a PathMapping<'a>>,
-    tail: Option<&'a PathMapping<'a>>,
+#[derive(Debug)]
+struct Path {
+    head: Option<PathMapping>,
+    tail: Option<PathMapping>,
     count: usize,
     path_id: PathId,
     name: String,
     is_circular: bool,
 }
 
-impl<'a> Path<'a> {
+impl Path {
     fn new(name: &str, path_id: PathId, is_circular: bool) -> Self {
         Path {
             name: name.to_string(),
@@ -68,25 +69,26 @@ impl<'a> Path<'a> {
 }
 
 #[derive(Debug)]
-pub struct HashGraph {
+pub struct HashGraph<'a> {
     max_id: NodeId,
     min_id: NodeId,
-    graph: HashMap<NodeId, Node>,
-    // path_id: HashMap<String, i64>,
-    // paths: HashMap<i64, Path>,
-    // next_path_id: i64,
+    graph: HashMap<NodeId, Node<'a>>,
+    path_id: HashMap<String, i64>,
+    paths: HashMap<i64, Path>,
 }
 
-impl HashGraph {
-    pub fn new() -> HashGraph {
+impl<'a> HashGraph<'a> {
+    pub fn new() -> HashGraph<'a> {
         HashGraph {
             max_id: NodeId::from(0),
             min_id: NodeId::from(std::u64::MAX),
             graph: HashMap::new(),
+            path_id: HashMap::new(),
+            paths: HashMap::new(),
         }
     }
 
-    pub fn from_gfa(gfa: &GFA) -> HashGraph {
+    pub fn from_gfa<'b>(gfa: &'b GFA) -> HashGraph<'a> {
         let mut graph = Self::new();
 
         // add segments
@@ -140,7 +142,7 @@ impl HashGraph {
     }
 }
 
-impl HandleGraph for HashGraph {
+impl<'a> HandleGraph for HashGraph<'a> {
     fn has_node(&self, node_id: NodeId) -> bool {
         self.graph.contains_key(&node_id)
     }
@@ -293,7 +295,7 @@ impl HandleGraph for HashGraph {
     }
 }
 
-impl HashGraph {
+impl<'a> HashGraph<'a> {
     pub fn create_handle(&mut self, sequence: &str, node_id: NodeId) -> Handle {
         self.graph.insert(node_id, Node::new(sequence));
         self.max_id = std::cmp::max(self.max_id, node_id);
@@ -392,7 +394,7 @@ mod tests {
         assert_eq!(true, n4.left_edges.contains(&h3.flip()));
     }
 
-    fn read_test_gfa() -> HashGraph {
+    fn read_test_gfa() -> HashGraph<'static> {
         use gfa::parser::parse_gfa;
         use std::path::PathBuf;
 
@@ -411,12 +413,19 @@ mod tests {
             for id in node_ids.iter() {
                 println!("{:?}", id);
                 let node = graph.graph.get(id).unwrap();
+                println!("{:?}", Handle::pack(**id, false));
                 let lefts: Vec<_> = node
                     .left_edges
                     .iter()
-                    .map(|h| graph.get_sequence(h))
+                    // .map(|h| graph.get_sequence(h))
                     .collect();
                 println!("lefts: {:?}", lefts);
+                let rights: Vec<_> = node
+                    .right_edges
+                    .iter()
+                    // .map(|h| graph.get_sequence(h))
+                    .collect();
+                println!("rights: {:?}", rights);
                 println!("{:?}", graph.graph.get(id));
             }
         } else {
