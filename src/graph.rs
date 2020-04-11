@@ -400,6 +400,42 @@ impl PathHandleGraph for HashGraph {
     fn has_previous_step(&self, step: &Self::StepHandle) -> bool {
         step.1 > 0
     }
+
+    fn destroy_path(&mut self, path: &Self::PathHandle) {
+        // TODO update the occurrences in each affected node
+        self.paths.remove(&path);
+    }
+
+    fn create_path_handle(
+        &mut self,
+        name: &str,
+        is_circular: bool,
+    ) -> Self::PathHandle {
+        let path_id = self.paths.len() as i64;
+        let path = Path::new(name, path_id, is_circular);
+        self.paths.insert(path_id, path);
+        path_id
+    }
+
+    fn append_step(
+        &mut self,
+        path_id: &Self::PathHandle,
+        to_append: Handle,
+    ) -> Self::StepHandle {
+        let path: &mut Path = self.paths.get_mut(path_id).unwrap();
+        path.nodes.push(to_append);
+        (*path_id, path.nodes.len())
+    }
+
+    fn prepend_step(
+        &mut self,
+        path_id: &Self::PathHandle,
+        to_prepend: Handle,
+    ) -> Self::StepHandle {
+        let path: &mut Path = self.paths.get_mut(path_id).unwrap();
+        path.nodes.insert(0, to_prepend);
+        (*path_id, 0)
+    }
 }
 
 #[cfg(test)]

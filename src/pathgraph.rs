@@ -38,4 +38,24 @@ pub trait PathHandleGraph {
     fn has_next_step(&self, step_handle: &Self::StepHandle) -> bool;
 
     fn has_previous_step(&self, step_handle: &Self::StepHandle) -> bool;
+
+    fn destroy_path(&mut self, path: &Self::PathHandle);
+
+    fn create_path_handle(
+        &mut self,
+        name: &str,
+        is_circular: bool,
+    ) -> Self::PathHandle;
+
+    fn append_step(
+        &mut self,
+        path: &Self::PathHandle,
+        to_append: Handle,
+    ) -> Self::StepHandle;
+
+    fn prepend_step(
+        &mut self,
+        path: &Self::PathHandle,
+        to_prepend: Handle,
+    ) -> Self::StepHandle;
 }
