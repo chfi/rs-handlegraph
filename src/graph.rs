@@ -402,7 +402,15 @@ impl PathHandleGraph for HashGraph {
     }
 
     fn destroy_path(&mut self, path: &Self::PathHandle) {
-        // TODO update the occurrences in each affected node
+        let p: &Path = self.paths.get(&path).unwrap();
+
+        for (ix, handle) in p.nodes.iter().enumerate() {
+            let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
+            let step = (*path, ix);
+            // TODO need to test to make sure this works as I expect
+            node.occurrences.retain(|n| *n != step);
+        }
+        // for h in self.paths.get(&path).unwrap().
         self.paths.remove(&path);
     }
 
@@ -417,6 +425,7 @@ impl PathHandleGraph for HashGraph {
         path_id
     }
 
+    // TODO update occurrences in nodes
     fn append_step(
         &mut self,
         path_id: &Self::PathHandle,
@@ -424,7 +433,10 @@ impl PathHandleGraph for HashGraph {
     ) -> Self::StepHandle {
         let path: &mut Path = self.paths.get_mut(path_id).unwrap();
         path.nodes.push(to_append);
-        (*path_id, path.nodes.len())
+        let node: &mut Node = self.graph.get_mut(&to_append.id()).unwrap();
+        let step = (*path_id, path.nodes.len());
+        node.occurrences.push(step);
+        step
     }
 
     fn prepend_step(
@@ -434,6 +446,9 @@ impl PathHandleGraph for HashGraph {
     ) -> Self::StepHandle {
         let path: &mut Path = self.paths.get_mut(path_id).unwrap();
         path.nodes.insert(0, to_prepend);
+        let node: &mut Node = self.graph.get_mut(&to_prepend.id()).unwrap();
+        let step = (*path_id, path.nodes.len());
+        node.occurrences.push(step);
         (*path_id, 0)
     }
 }
