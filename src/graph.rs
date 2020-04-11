@@ -4,18 +4,21 @@ use gfa::gfa::{Link, Segment, GFA};
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
 use crate::handlegraph::HandleGraph;
-use crate::pathgraph::{PathHandle, PathHandleGraph};
+use crate::pathgraph::PathHandleGraph;
+
+type PathId = i64;
+type PathStep = (i64, usize);
 
 #[derive(Debug, Clone)]
-struct Node<'a> {
+struct Node {
     sequence: String,
     left_edges: Vec<Handle>,
     right_edges: Vec<Handle>,
-    occurrences: Vec<&'a PathMapping>,
+    occurrences: Vec<PathStep>,
 }
 
-impl<'a> Node<'a> {
-    pub fn new(sequence: &str) -> Node<'a> {
+impl Node {
+    pub fn new(sequence: &str) -> Node {
         Node {
             sequence: sequence.to_string(),
             left_edges: vec![],
@@ -25,35 +28,12 @@ impl<'a> Node<'a> {
     }
 }
 
-type PathId = i64;
-
-#[derive(Debug)]
-struct PathMapping {
-    handle: Handle,
-    path_id: PathId,
-    prev: Option<Box<PathMapping>>,
-    next: Option<Box<PathMapping>>,
-}
-
-impl PathMapping {
-    fn new(handle: &Handle, path_id: PathId) -> Self {
-        PathMapping {
-            handle: *handle,
-            path_id,
-            prev: None,
-            next: None,
-        }
-    }
-}
-
 #[derive(Debug)]
 struct Path {
-    head: Option<PathMapping>,
-    tail: Option<PathMapping>,
-    count: usize,
     path_id: PathId,
     name: String,
     is_circular: bool,
+    nodes: Vec<Handle>,
 }
 
 impl Path {
@@ -62,24 +42,27 @@ impl Path {
             name: name.to_string(),
             path_id,
             is_circular,
-            head: None,
-            tail: None,
-            count: 0,
+            nodes: vec![],
         }
+    }
+
+    fn lookup_step_handle(&self, step: &PathStep) -> Handle {
+        let (_, ix) = step;
+        self.nodes[*ix]
     }
 }
 
 #[derive(Debug)]
-pub struct HashGraph<'a> {
+pub struct HashGraph {
     max_id: NodeId,
     min_id: NodeId,
-    graph: HashMap<NodeId, Node<'a>>,
+    graph: HashMap<NodeId, Node>,
     path_id: HashMap<String, i64>,
     paths: HashMap<i64, Path>,
 }
 
-impl<'a> HashGraph<'a> {
-    pub fn new() -> HashGraph<'a> {
+impl HashGraph {
+    pub fn new() -> HashGraph {
         HashGraph {
             max_id: NodeId::from(0),
             min_id: NodeId::from(std::u64::MAX),
@@ -89,7 +72,7 @@ impl<'a> HashGraph<'a> {
         }
     }
 
-    pub fn from_gfa<'b>(gfa: &'b GFA) -> HashGraph<'a> {
+    pub fn from_gfa(gfa: &GFA) -> HashGraph {
         let mut graph = Self::new();
 
         // add segments
@@ -143,7 +126,7 @@ impl<'a> HashGraph<'a> {
     }
 }
 
-impl<'a> HandleGraph for HashGraph<'a> {
+impl HandleGraph for HashGraph {
     fn has_node(&self, node_id: NodeId) -> bool {
         self.graph.contains_key(&node_id)
     }
@@ -296,7 +279,7 @@ impl<'a> HandleGraph for HashGraph<'a> {
     }
 }
 
-impl<'a> HashGraph<'a> {
+impl HashGraph {
     pub fn create_handle(&mut self, sequence: &str, node_id: NodeId) -> Handle {
         self.graph.insert(node_id, Node::new(sequence));
         self.max_id = std::cmp::max(self.max_id, node_id);
@@ -342,7 +325,10 @@ impl<'a> HashGraph<'a> {
     }
 }
 
-impl<'a> PathHandleGraph for HashGraph<'a> {
+impl PathHandleGraph for HashGraph {
+    type PathHandle = PathId;
+    type StepHandle = PathStep;
+
     fn get_path_count(&self) -> usize {
         self.path_id.len()
     }
@@ -351,32 +337,68 @@ impl<'a> PathHandleGraph for HashGraph<'a> {
         self.path_id.contains_key(name)
     }
 
-    fn get_path_handle(&self, name: &str) -> Option<PathHandle> {
-        self.path_id.get(name).map(PathHandle::from)
+    fn get_path_handle(&self, name: &str) -> Option<Self::PathHandle> {
+        self.path_id.get(name).map(|i| i.clone())
     }
 
-    fn get_path_name(&self, handle: &PathHandle) -> &str {
-        if let Some(p) = self.paths.get(&handle.as_int()) {
+    fn get_path_name(&self, handle: &Self::PathHandle) -> &str {
+        if let Some(p) = self.paths.get(&handle) {
             &p.name
         } else {
             panic!("Tried to look up nonexistent path:")
         }
     }
 
-    fn get_is_circular(&self, handle: &PathHandle) -> bool {
-        if let Some(p) = self.paths.get(&handle.as_int()) {
+    fn get_is_circular(&self, handle: &Self::PathHandle) -> bool {
+        if let Some(p) = self.paths.get(&handle) {
             p.is_circular
         } else {
             panic!("Tried to look up nonexistent path:")
         }
     }
 
-    fn get_step_count(&self, handle: &PathHandle) -> usize {
-        if let Some(p) = self.paths.get(&handle.as_int()) {
-            p.count
+    fn get_step_count(&self, handle: &Self::PathHandle) -> usize {
+        if let Some(p) = self.paths.get(&handle) {
+            p.nodes.len()
         } else {
             panic!("Tried to look up nonexistent path:")
         }
+    }
+
+    fn get_handle_of_step(&self, step: &Self::StepHandle) -> Handle {
+        self.paths.get(&step.0).unwrap().lookup_step_handle(step)
+    }
+
+    fn get_path_handle_of_step(
+        &self,
+        step: &Self::StepHandle,
+    ) -> Self::PathHandle {
+        step.0
+    }
+
+    fn path_begin(&self, path: &Self::PathHandle) -> Self::StepHandle {
+        (*path, 0)
+    }
+
+    fn path_end(&self, path: &Self::PathHandle) -> Self::StepHandle {
+        (*path, self.get_step_count(path))
+    }
+
+    fn path_back(&self, path: &Self::PathHandle) -> Self::StepHandle {
+        (*path, self.get_step_count(path) - 1)
+    }
+
+    fn path_front_end(&self, path: &Self::PathHandle) -> Self::StepHandle {
+        (*path, 0) // TODO should be -1; maybe I should use Option<usize>
+    }
+
+    fn has_next_step(&self, step: &Self::StepHandle) -> bool {
+        // TODO this might be an off-by-one error
+        step.1 < self.get_step_count(&step.0)
+    }
+
+    fn has_previous_step(&self, step: &Self::StepHandle) -> bool {
+        step.1 > 0
     }
 }
 
@@ -433,7 +455,7 @@ mod tests {
         assert_eq!(true, n4.left_edges.contains(&h3.flip()));
     }
 
-    fn read_test_gfa() -> HashGraph<'static> {
+    fn read_test_gfa() -> HashGraph {
         use gfa::parser::parse_gfa;
         use std::path::PathBuf;
 
