@@ -14,7 +14,7 @@ struct Node {
     sequence: String,
     left_edges: Vec<Handle>,
     right_edges: Vec<Handle>,
-    occurrences: Vec<PathStep>,
+    occurrences: HashMap<PathId, usize>,
 }
 
 impl Node {
@@ -23,7 +23,7 @@ impl Node {
             sequence: sequence.to_string(),
             left_edges: vec![],
             right_edges: vec![],
-            occurrences: vec![],
+            occurrences: HashMap::new(),
         }
     }
 }
@@ -404,11 +404,9 @@ impl PathHandleGraph for HashGraph {
     fn destroy_path(&mut self, path: &Self::PathHandle) {
         let p: &Path = self.paths.get(&path).unwrap();
 
-        for (ix, handle) in p.nodes.iter().enumerate() {
+        for handle in p.nodes.iter() {
             let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
-            let step = (*path, ix);
-            // TODO need to test to make sure this works as I expect
-            node.occurrences.retain(|n| *n != step);
+            node.occurrences.remove(path);
         }
         // for h in self.paths.get(&path).unwrap().
         self.paths.remove(&path);
@@ -425,7 +423,6 @@ impl PathHandleGraph for HashGraph {
         path_id
     }
 
-    // TODO update occurrences in nodes
     fn append_step(
         &mut self,
         path_id: &Self::PathHandle,
@@ -435,20 +432,25 @@ impl PathHandleGraph for HashGraph {
         path.nodes.push(to_append);
         let node: &mut Node = self.graph.get_mut(&to_append.id()).unwrap();
         let step = (*path_id, path.nodes.len());
-        node.occurrences.push(step);
+        node.occurrences.insert(*path_id, 0);
         step
     }
 
+    // TODO update occurrences in nodes
     fn prepend_step(
         &mut self,
         path_id: &Self::PathHandle,
         to_prepend: Handle,
     ) -> Self::StepHandle {
         let path: &mut Path = self.paths.get_mut(path_id).unwrap();
+        // update occurrences in nodes already in the graph
+        for h in path.nodes.iter() {
+            let node: &mut Node = self.graph.get_mut(&h.id()).unwrap();
+            *node.occurrences.get_mut(path_id).unwrap() += 1;
+        }
         path.nodes.insert(0, to_prepend);
         let node: &mut Node = self.graph.get_mut(&to_prepend.id()).unwrap();
-        let step = (*path_id, path.nodes.len());
-        node.occurrences.push(step);
+        node.occurrences.insert(*path_id, path.nodes.len());
         (*path_id, 0)
     }
 }
