@@ -453,6 +453,38 @@ impl PathHandleGraph for HashGraph {
         node.occurrences.insert(*path_id, path.nodes.len());
         (*path_id, 0)
     }
+
+    fn rewrite_segment(
+        &mut self,
+        begin: &Self::StepHandle,
+        end: &Self::StepHandle,
+        new_segment: Vec<Handle>,
+    ) -> (Self::StepHandle, Self::StepHandle) {
+        // extract the index range from the begin and end handles
+        let (path_id, l) = begin;
+        let (_, r) = end;
+        let range = l..=r;
+        // get a &mut to the path's vector of handles
+        let handles: &mut Vec<Handle> =
+            &mut self.paths.get_mut(&path_id).unwrap().nodes;
+
+        let r = l + new_segment.len();
+        // replace the range of the path's handle vector with the new segment
+        handles.splice(range, new_segment);
+
+        // update occurrences
+        for (ix, handle) in
+            self.paths.get(&path_id).unwrap().nodes.iter().enumerate()
+        {
+            let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
+            node.occurrences.insert(*path_id, ix);
+        }
+
+        // return the new beginning and end step handles
+        // the start index is the same,
+        // the end index is the start index + the length of new_segment
+        (*begin, (*path_id, r))
+    }
 }
 
 #[cfg(test)]

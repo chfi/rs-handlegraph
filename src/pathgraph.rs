@@ -58,4 +58,11 @@ pub trait PathHandleGraph {
         path: &Self::PathHandle,
         to_prepend: Handle,
     ) -> Self::StepHandle;
+
+    fn rewrite_segment(
+        &mut self,
+        begin: &Self::StepHandle,
+        end: &Self::StepHandle,
+        new_segment: Vec<Handle>,
+    ) -> (Self::StepHandle, Self::StepHandle);
 }
