@@ -128,6 +128,14 @@ impl HashGraph {
         println!("");
     }
 
+    fn print_occurrences(&self) {
+        self.for_each_handle(|h| {
+            let node = self.get_node(&h.id()).unwrap();
+            println!("{} - {:?}", node.sequence, node.occurrences);
+            true
+        });
+    }
+
     fn get_node(&self, node_id: &NodeId) -> Option<&Node> {
         self.graph.get(node_id)
     }
@@ -444,9 +452,9 @@ impl PathHandleGraph for HashGraph {
     ) -> Self::StepHandle {
         let path: &mut Path = self.paths.get_mut(path_id).unwrap();
         path.nodes.push(to_append);
+        let step = (*path_id, path.nodes.len() - 1);
         let node: &mut Node = self.graph.get_mut(&to_append.id()).unwrap();
-        let step = (*path_id, path.nodes.len());
-        node.occurrences.insert(*path_id, 0);
+        node.occurrences.insert(step.0, step.1);
         step
     }
 
@@ -464,7 +472,7 @@ impl PathHandleGraph for HashGraph {
         }
         path.nodes.insert(0, to_prepend);
         let node: &mut Node = self.graph.get_mut(&to_prepend.id()).unwrap();
-        node.occurrences.insert(*path_id, path.nodes.len());
+        node.occurrences.insert(*path_id, 0);
         (*path_id, 0)
     }
 
