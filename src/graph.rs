@@ -114,6 +114,20 @@ impl HashGraph {
         graph
     }
 
+    fn print_path(&self, path_id: &PathId) {
+        let path = self.paths.get(&path_id).unwrap();
+        println!("Path\t{}", path_id);
+        for (ix, handle) in path.nodes.iter().enumerate() {
+            let node = self.get_node(&handle.id()).unwrap();
+            if ix != 0 {
+                print!(" -> ");
+            }
+            print!("{}", node.sequence);
+        }
+
+        println!("");
+    }
+
     fn get_node(&self, node_id: &NodeId) -> Option<&Node> {
         self.graph.get(node_id)
     }
@@ -604,5 +618,61 @@ mod tests {
         assert_eq!(true, graph.has_edge(&h18, &h20));
         assert_eq!(true, graph.has_edge(&h19, &h20));
         assert_eq!(true, graph.has_edge(&h15, &h18));
+    }
+
+    fn path_graph() -> HashGraph {
+        let mut graph = HashGraph::new();
+        let h1 = graph.create_handle("1", NodeId::from(1));
+        let h2 = graph.create_handle("2", NodeId::from(2));
+        let h3 = graph.create_handle("3", NodeId::from(3));
+        let h4 = graph.create_handle("4", NodeId::from(4));
+        let h5 = graph.create_handle("5", NodeId::from(5));
+        let h6 = graph.create_handle("6", NodeId::from(6));
+
+        /*
+        edges
+        1  -> 2 -> 5 -> 6
+          \-> 3 -> 4 /
+         */
+        graph.create_edge(&h1, &h2);
+        graph.create_edge(&h2, &h5);
+        graph.create_edge(&h5, &h6);
+
+        graph.create_edge(&h1, &h3);
+        graph.create_edge(&h3, &h4);
+        graph.create_edge(&h4, &h6);
+
+        graph
+    }
+
+    #[test]
+    fn append_prepend_path() {
+        let mut graph = path_graph();
+
+        let h1 = graph.get_handle(NodeId::from(1), false);
+        let h2 = graph.get_handle(NodeId::from(2), false);
+        let h3 = graph.get_handle(NodeId::from(3), false);
+        let h4 = graph.get_handle(NodeId::from(4), false);
+        let h5 = graph.get_handle(NodeId::from(5), false);
+        let h6 = graph.get_handle(NodeId::from(6), false);
+
+        // Add a path 1 -> 2 -> 5 -> 6
+
+        let p1 = graph.create_path_handle("path-1", false);
+        graph.append_step(&p1, h1);
+        graph.append_step(&p1, h2);
+        graph.append_step(&p1, h5);
+        graph.append_step(&p1, h6);
+
+        // Add another path 1 -> 3 -> 4 -> 6
+
+        let p2 = graph.create_path_handle("path-2", false);
+        graph.append_step(&p2, h1);
+        graph.append_step(&p2, h3);
+        graph.append_step(&p2, h4);
+        graph.append_step(&p2, h6);
+
+        graph.print_path(&p1);
+        graph.print_path(&p2);
     }
 }
