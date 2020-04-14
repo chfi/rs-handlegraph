@@ -86,6 +86,7 @@ impl HashGraph {
             graph.create_handle(&seg.sequence, NodeId::from(id));
         }
 
+        // add links
         for link in gfa.links.iter() {
             // for each link in the GFA, get the corresponding handles
             // based on segment name and orientation
@@ -109,7 +110,18 @@ impl HashGraph {
             graph.create_edge(&left, &right);
         }
 
-        // add links
+        // add paths
+        for path in gfa.paths.iter() {
+            let path: &gfa::gfa::Path = path;
+            let path_id = graph.create_path_handle(&path.path_name, false);
+            for segment in path.segment_names.iter() {
+                let split = segment.split_at(segment.len() - 1);
+                let id = split.0.parse::<u64>().unwrap();
+                let dir = char::from(split.1.as_bytes()[0]) == '+';
+                graph
+                    .append_step(&path_id, Handle::pack(NodeId::from(id), dir));
+            }
+        }
 
         graph
     }
@@ -682,5 +694,9 @@ mod tests {
 
         graph.print_path(&p1);
         graph.print_path(&p2);
+
+        println!("");
+
+        graph.print_occurrences();
     }
 }
