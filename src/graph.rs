@@ -498,6 +498,21 @@ impl PathHandleGraph for HashGraph {
         let (path_id, l) = begin;
         let (_, r) = end;
         let range = l..=r;
+
+        // first delete the occurrences of the nodes in the range
+        for handle in self
+            .paths
+            .get(&path_id)
+            .unwrap()
+            .nodes
+            .iter()
+            .skip(*l)
+            .take(r - l + 1)
+        {
+            let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
+            node.occurrences.remove(&path_id);
+        }
+
         // get a &mut to the path's vector of handles
         let handles: &mut Vec<Handle> =
             &mut self.paths.get_mut(&path_id).unwrap().nodes;
@@ -734,11 +749,11 @@ mod tests {
         // same
         test_node(&graph, 3, Some(&1), Some(&1));
         test_node(&graph, 5, Some(&2), None);
+        test_node(&graph, 6, Some(&3), Some(&3));
 
         test_node(&graph, 4, None, Some(&2));
 
         // At this point path 1 is 1 -> 3 -> 5 -> 6, path 2 is unmodified
-
         // Rewrite the segment 3 -> 4 in path 2 with the empty path
         graph.rewrite_segment(&p2_3, &p2_4, vec![]);
 
@@ -746,25 +761,26 @@ mod tests {
         test_node(&graph, 1, Some(&0), Some(&0));
 
         // Node 6 should have been decremented by 2 in path 2
-        test_node(&graph, 6, Some(&2), Some(&1));
+        test_node(&graph, 6, Some(&3), Some(&1));
 
-        // Nodes 3, 4 should have nothing in their path 2 occurrences
-        {
-            let n3 = graph.get_node(&NodeId::from(4)).unwrap();
-            let n4 = graph.get_node(&NodeId::from(4)).unwrap();
-            println!("node 3 path 2: {:?}", n3.occurrences.get(&p2));
-            println!("node 4 path 2: {:?}", n4.occurrences.get(&p2));
-        }
-
+        // Nodes 3, 4 should be empty in path 2
         test_node(&graph, 3, Some(&1), None);
         test_node(&graph, 4, None, None);
 
-        // Rewrite the segment 1 -> 6 in path 2 with the
+        // Rewrite the segment 1 -> 6 in path 2 with the segment
+        // 6 -> 4 -> 5 -> 3 -> 1 -> 2
+        graph.rewrite_segment(&(1, 0), &(1, 1), vec![h6, h4, h5, h3, h1, h2]);
+
+        // The path 2 occurrences should be correctly updated for all nodes
+        test_node(&graph, 1, Some(&0), Some(&4));
+        test_node(&graph, 2, None, Some(&5));
+        test_node(&graph, 3, Some(&1), Some(&3));
+        test_node(&graph, 4, None, Some(&1));
+        test_node(&graph, 5, Some(&2), Some(&2));
+        test_node(&graph, 6, Some(&3), Some(&0));
 
         graph.print_path(&p1);
         graph.print_path(&p2);
-
-        println!("");
 
         graph.print_occurrences();
     }
