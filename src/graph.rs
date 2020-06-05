@@ -7,7 +7,31 @@ use crate::handlegraph::HandleGraph;
 use crate::pathgraph::PathHandleGraph;
 
 type PathId = i64;
-type PathStep = (i64, usize);
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum PathStep {
+    Front(i64),
+    End(i64),
+    Step(i64, usize),
+}
+
+impl PathStep {
+    pub fn index(&self) -> Option<usize> {
+        if let Self::Step(_, ix) = self {
+            Some(*ix)
+        } else {
+            None
+        }
+    }
+
+    pub fn path_id(&self) -> PathId {
+        match self {
+            Self::Front(i) => *i,
+            Self::End(i) => *i,
+            Self::Step(i, _) => *i,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 struct Node {
@@ -46,9 +70,12 @@ impl Path {
         }
     }
 
-    fn lookup_step_handle(&self, step: &PathStep) -> Handle {
-        let (_, ix) = step;
-        self.nodes[*ix]
+    fn lookup_step_handle(&self, step: &PathStep) -> Option<Handle> {
+        match step {
+            PathStep::Front(_) => None,
+            PathStep::End(_) => None,
+            PathStep::Step(_, ix) => Some(self.nodes[*ix]),
+        }
     }
 }
 
@@ -399,40 +426,51 @@ impl PathHandleGraph for HashGraph {
         }
     }
 
-    fn get_handle_of_step(&self, step: &Self::StepHandle) -> Handle {
-        self.paths.get(&step.0).unwrap().lookup_step_handle(step)
+    fn get_handle_of_step(&self, step: &Self::StepHandle) -> Option<Handle> {
+        self.paths
+            .get(&step.path_id())
+            .unwrap()
+            .lookup_step_handle(step)
     }
 
     fn get_path_handle_of_step(
         &self,
         step: &Self::StepHandle,
     ) -> Self::PathHandle {
-        step.0
+        step.path_id()
     }
 
     fn path_begin(&self, path: &Self::PathHandle) -> Self::StepHandle {
-        (*path, 0)
+        PathStep::Step(*path, 0)
     }
 
     fn path_end(&self, path: &Self::PathHandle) -> Self::StepHandle {
-        (*path, self.get_step_count(path))
+        PathStep::End(*path)
     }
 
     fn path_back(&self, path: &Self::PathHandle) -> Self::StepHandle {
-        (*path, self.get_step_count(path) - 1)
+        PathStep::Step(*path, self.get_step_count(path) - 1)
     }
 
     fn path_front_end(&self, path: &Self::PathHandle) -> Self::StepHandle {
-        (*path, 0) // TODO should be -1; maybe I should use Option<usize>
+        PathStep::Front(*path)
     }
 
     fn has_next_step(&self, step: &Self::StepHandle) -> bool {
         // TODO this might be an off-by-one error
-        step.1 < self.get_step_count(&step.0)
+        if let PathStep::End(_) = step {
+            false
+        } else {
+            true
+        }
     }
 
     fn has_previous_step(&self, step: &Self::StepHandle) -> bool {
-        step.1 > 0
+        if let PathStep::Front(_) = step {
+            false
+        } else {
+            true
+        }
     }
 
     fn destroy_path(&mut self, path: &Self::PathHandle) {
@@ -467,7 +505,7 @@ impl PathHandleGraph for HashGraph {
         let step = (*path_id, path.nodes.len() - 1);
         let node: &mut Node = self.graph.get_mut(&to_append.id()).unwrap();
         node.occurrences.insert(step.0, step.1);
-        step
+        PathStep::Step(*path_id, path.nodes.len() - 1)
     }
 
     // TODO update occurrences in nodes
@@ -485,7 +523,7 @@ impl PathHandleGraph for HashGraph {
         path.nodes.insert(0, to_prepend);
         let node: &mut Node = self.graph.get_mut(&to_prepend.id()).unwrap();
         node.occurrences.insert(*path_id, 0);
-        (*path_id, 0)
+        PathStep::Step(*path_id, 0)
     }
 
     fn rewrite_segment(
@@ -495,8 +533,23 @@ impl PathHandleGraph for HashGraph {
         new_segment: Vec<Handle>,
     ) -> (Self::StepHandle, Self::StepHandle) {
         // extract the index range from the begin and end handles
-        let (path_id, l) = begin;
-        let (_, r) = end;
+
+        if begin.path_id() != end.path_id() {
+            panic!("Tried to rewrite path segment between two different paths");
+        }
+
+        let path_id = begin.path_id();
+        let path_len = self.paths.get(&path_id).unwrap().nodes.len();
+
+        let step_index = |s: &Self::StepHandle| match s {
+            PathStep::Front(_) => 0,
+            PathStep::End(_) => path_len,
+            PathStep::Step(_, i) => *i,
+        };
+
+        let l = step_index(begin);
+        let r = step_index(end);
+
         let range = l..=r;
 
         // first delete the occurrences of the nodes in the range
@@ -506,7 +559,7 @@ impl PathHandleGraph for HashGraph {
             .unwrap()
             .nodes
             .iter()
-            .skip(*l)
+            .skip(l)
             .take(r - l + 1)
         {
             let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
@@ -526,13 +579,13 @@ impl PathHandleGraph for HashGraph {
             self.paths.get(&path_id).unwrap().nodes.iter().enumerate()
         {
             let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
-            node.occurrences.insert(*path_id, ix);
+            node.occurrences.insert(path_id, ix);
         }
 
-        // return the new beginning and end step handles
-        // the start index is the same,
-        // the end index is the start index + the length of new_segment
-        (*begin, (*path_id, r))
+        // return the new beginning and end step handles: even if the
+        // input steps were Front and/or End, the output steps exist
+        // on the path
+        (PathStep::Step(path_id, l), PathStep::Step(path_id, r))
     }
 }
 
@@ -769,7 +822,11 @@ mod tests {
 
         // Rewrite the segment 1 -> 6 in path 2 with the segment
         // 6 -> 4 -> 5 -> 3 -> 1 -> 2
-        graph.rewrite_segment(&(1, 0), &(1, 1), vec![h6, h4, h5, h3, h1, h2]);
+        graph.rewrite_segment(
+            &PathStep::Step(1, 0),
+            &PathStep::Step(1, 1),
+            vec![h6, h4, h5, h3, h1, h2],
+        );
 
         // The path 2 occurrences should be correctly updated for all nodes
         test_node(&graph, 1, Some(&0), Some(&4));

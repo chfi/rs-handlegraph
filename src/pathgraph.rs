@@ -17,7 +17,10 @@ pub trait PathHandleGraph {
 
     fn get_step_count(&self, handle: &Self::PathHandle) -> usize;
 
-    fn get_handle_of_step(&self, step_handle: &Self::StepHandle) -> Handle;
+    fn get_handle_of_step(
+        &self,
+        step_handle: &Self::StepHandle,
+    ) -> Option<Handle>;
 
     fn get_path_handle_of_step(
         &self,
