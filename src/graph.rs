@@ -676,21 +676,90 @@ mod tests {
         let h5 = graph.get_handle(NodeId::from(5), false);
         let h6 = graph.get_handle(NodeId::from(6), false);
 
-        // Add a path 1 -> 2 -> 5 -> 6
+        // Add a path 3 -> 5
 
         let p1 = graph.create_path_handle("path-1", false);
-        graph.append_step(&p1, h1);
-        graph.append_step(&p1, h2);
+        graph.append_step(&p1, h3);
         graph.append_step(&p1, h5);
-        graph.append_step(&p1, h6);
 
         // Add another path 1 -> 3 -> 4 -> 6
 
         let p2 = graph.create_path_handle("path-2", false);
         graph.append_step(&p2, h1);
-        graph.append_step(&p2, h3);
-        graph.append_step(&p2, h4);
+        let p2_3 = graph.append_step(&p2, h3);
+        let p2_4 = graph.append_step(&p2, h4);
         graph.append_step(&p2, h6);
+
+        let test_node = |graph: &HashGraph,
+                         nid: u64,
+                         o1: Option<&usize>,
+                         o2: Option<&usize>| {
+            let n = graph.get_node(&NodeId::from(nid)).unwrap();
+            assert_eq!(o1, n.occurrences.get(&p1));
+            assert_eq!(o2, n.occurrences.get(&p2));
+        };
+
+        // At this point, node 3 should have two occurrences entries,
+        // index 0 for path 1, index 1 for path 2
+        test_node(&graph, 3, Some(&0), Some(&1));
+
+        // Node 1 should have only one occurrence at the start of path 2
+        test_node(&graph, 1, None, Some(&0));
+
+        // Node 6 should have only one occurrence at the end of path 2
+        test_node(&graph, 6, None, Some(&3));
+
+        // Now, append node 6 to path 1
+
+        graph.append_step(&p1, h6);
+
+        // Node 6 should also occur at the end of path 1
+        test_node(&graph, 6, Some(&2), Some(&3));
+
+        // The other nodes should be unaffected
+        test_node(&graph, 1, None, Some(&0));
+        test_node(&graph, 4, None, Some(&2));
+
+        test_node(&graph, 3, Some(&0), Some(&1));
+        test_node(&graph, 5, Some(&1), None);
+
+        // Now, prepend node 1 to path 1
+        graph.prepend_step(&p1, h1);
+
+        // Node 1 should be the first in both paths
+        test_node(&graph, 1, Some(&0), Some(&0));
+
+        // The other nodes should have had 1 added to their
+        // occurrences in path 1, while the path 2 ones should be the
+        // same
+        test_node(&graph, 3, Some(&1), Some(&1));
+        test_node(&graph, 5, Some(&2), None);
+
+        test_node(&graph, 4, None, Some(&2));
+
+        // At this point path 1 is 1 -> 3 -> 5 -> 6, path 2 is unmodified
+
+        // Rewrite the segment 3 -> 4 in path 2 with the empty path
+        graph.rewrite_segment(&p2_3, &p2_4, vec![]);
+
+        // Node 1 should be the same
+        test_node(&graph, 1, Some(&0), Some(&0));
+
+        // Node 6 should have been decremented by 2 in path 2
+        test_node(&graph, 6, Some(&2), Some(&1));
+
+        // Nodes 3, 4 should have nothing in their path 2 occurrences
+        {
+            let n3 = graph.get_node(&NodeId::from(4)).unwrap();
+            let n4 = graph.get_node(&NodeId::from(4)).unwrap();
+            println!("node 3 path 2: {:?}", n3.occurrences.get(&p2));
+            println!("node 4 path 2: {:?}", n4.occurrences.get(&p2));
+        }
+
+        test_node(&graph, 3, Some(&1), None);
+        test_node(&graph, 4, None, None);
+
+        // Rewrite the segment 1 -> 6 in path 2 with the
 
         graph.print_path(&p1);
         graph.print_path(&p2);
