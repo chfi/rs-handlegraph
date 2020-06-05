@@ -543,7 +543,7 @@ impl PathHandleGraph for HashGraph {
 
         let step_index = |s: &Self::StepHandle| match s {
             PathStep::Front(_) => 0,
-            PathStep::End(_) => path_len,
+            PathStep::End(_) => path_len - 1,
             PathStep::Step(_, i) => *i,
         };
 
@@ -835,6 +835,35 @@ mod tests {
         test_node(&graph, 4, None, Some(&1));
         test_node(&graph, 5, Some(&2), Some(&2));
         test_node(&graph, 6, Some(&3), Some(&0));
+
+        // Rewrite the segment Front(_) .. 5 in path 1 with the segment [2, 3]
+        graph.rewrite_segment(
+            &PathStep::Front(0),
+            &PathStep::Step(0, 2),
+            vec![h2, h3],
+        );
+
+        // Now path 1 is 2 -> 3 -> 6
+        test_node(&graph, 1, None, Some(&4));
+        test_node(&graph, 2, Some(&0), Some(&5));
+        test_node(&graph, 3, Some(&1), Some(&3));
+        test_node(&graph, 5, None, Some(&2));
+        test_node(&graph, 6, Some(&2), Some(&0));
+
+        // Rewrite the segment 3 .. End(_) in path 2 with the segment [1]
+        graph.rewrite_segment(
+            &PathStep::Step(1, 3),
+            &PathStep::End(1),
+            vec![h1],
+        );
+
+        // Now path 2 is 6 -> 4 -> 5 -> 1
+        test_node(&graph, 1, None, Some(&3));
+        test_node(&graph, 2, Some(&0), None);
+        test_node(&graph, 3, Some(&1), None);
+        test_node(&graph, 4, None, Some(&1));
+        test_node(&graph, 5, None, Some(&2));
+        test_node(&graph, 6, Some(&2), Some(&0));
 
         graph.print_path(&p1);
         graph.print_path(&p2);
