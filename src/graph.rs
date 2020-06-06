@@ -295,6 +295,7 @@ impl HandleGraph for HashGraph {
         true
     }
 
+    // WIP, this implementation is obviously incorrect
     fn for_each_edge<F>(&self, mut f: F) -> bool
     where
         F: FnMut(&Edge) -> bool,
@@ -707,6 +708,47 @@ mod tests {
         graph.create_edge(&h4, &h6);
 
         graph
+    }
+
+    #[test]
+    fn graph_follow_edges() {
+        let mut graph = path_graph();
+        let h1 = Handle::pack(NodeId::from(1), false);
+        let h2 = Handle::pack(NodeId::from(2), false);
+        let h3 = Handle::pack(NodeId::from(3), false);
+        let h4 = Handle::pack(NodeId::from(4), false);
+        let h5 = Handle::pack(NodeId::from(5), false);
+        let h6 = Handle::pack(NodeId::from(6), false);
+
+        // add some more edges to make things interesting
+
+        graph.create_edge(&h1, &h4);
+        graph.create_edge(&h1, &h6);
+
+        let mut h1_edges_r = vec![];
+
+        graph.follow_edges(&h1, Direction::Right, |&h| {
+            h1_edges_r.push(h);
+            true
+        });
+
+        assert_eq!(h1_edges_r, vec![h2, h3, h4, h6]);
+
+        let mut h4_edges_l = vec![];
+        let mut h4_edges_r = vec![];
+
+        graph.follow_edges(&h4, Direction::Left, |&h| {
+            h4_edges_l.push(h);
+            true
+        });
+
+        graph.follow_edges(&h4, Direction::Right, |&h| {
+            h4_edges_r.push(h);
+            true
+        });
+
+        assert_eq!(h4_edges_l, vec![h3, h1]);
+        assert_eq!(h4_edges_r, vec![h6]);
     }
 
     #[test]
