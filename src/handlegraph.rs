@@ -46,4 +46,8 @@ pub trait HandleGraph {
     fn for_each_handle<F>(&self, f: F) -> bool
     where
         F: FnMut(&Handle) -> bool;
+
+    fn for_each_edge<F>(&self, f: F) -> bool
+    where
+        F: FnMut(&Edge) -> bool;
 }

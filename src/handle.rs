@@ -67,7 +67,7 @@ impl Handle {
 pub struct Edge(pub Handle, pub Handle);
 
 impl Edge {
-    fn edge_handle(left: &Handle, right: &Handle) -> Edge {
+    pub fn edge_handle(left: &Handle, right: &Handle) -> Edge {
         let flipped_right = right.flip();
         let flipped_left = left.flip();
 

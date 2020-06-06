@@ -294,6 +294,25 @@ impl HandleGraph for HashGraph {
 
         true
     }
+
+    fn for_each_edge<F>(&self, mut f: F) -> bool
+    where
+        F: FnMut(&Edge) -> bool,
+    {
+        let handles1 = self.graph.keys().map(|k| Handle::pack(*k, false));
+
+        for left in handles1 {
+            let handles2 = self.graph.keys().map(|k| Handle::pack(*k, false));
+            for right in handles2 {
+                let edge = Edge::edge_handle(&left, &right);
+                if !f(&edge) {
+                    return false;
+                }
+            }
+        }
+
+        true
+    }
 }
 
 impl HashGraph {
