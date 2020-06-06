@@ -245,21 +245,6 @@ impl HandleGraph for HashGraph {
         self.graph.iter().fold(0, |a, (_, v)| a + v.sequence.len())
     }
 
-    fn get_base(&self, handle: &Handle, index: usize) -> char {
-        char::from(
-            self.get_node_unsafe(&handle.id()).sequence.as_bytes()[index],
-        )
-    }
-
-    fn get_subsequence(
-        &self,
-        handle: &Handle,
-        index: usize,
-        size: usize,
-    ) -> &str {
-        &self.get_node_unsafe(&handle.id()).sequence[index..index + size]
-    }
-
     fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle {
         let Edge(el, er) = edge;
         if left == el {

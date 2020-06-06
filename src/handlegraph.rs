@@ -9,7 +9,21 @@ pub trait HandleGraph {
     // fn get_is_reverse(&self, handle: &Handle) -> bool;
 
     fn get_length(&self, handle: &Handle) -> usize;
+
     fn get_sequence(&self, handle: &Handle) -> &str;
+
+    fn get_subsequence(
+        &self,
+        handle: &Handle,
+        index: usize,
+        size: usize,
+    ) -> &str {
+        &self.get_sequence(handle)[index..index + size]
+    }
+
+    fn get_base(&self, handle: &Handle, index: usize) -> char {
+        char::from(self.get_sequence(handle).as_bytes()[index])
+    }
 
     fn get_node_count(&self) -> usize;
     fn min_node_id(&self) -> NodeId;
@@ -22,15 +36,6 @@ pub trait HandleGraph {
     fn get_edge_count(&self) -> usize;
 
     fn get_total_length(&self) -> usize;
-
-    fn get_base(&self, handle: &Handle, index: usize) -> char;
-
-    fn get_subsequence(
-        &self,
-        handle: &Handle,
-        index: usize,
-        size: usize,
-    ) -> &str;
 
     fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle;
 
