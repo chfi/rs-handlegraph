@@ -29,9 +29,29 @@ pub trait HandleGraph {
     fn min_node_id(&self) -> NodeId;
     fn max_node_id(&self) -> NodeId;
 
-    fn get_degree(&self, handle: &Handle, dir: Direction) -> usize;
+    fn get_degree(&self, handle: &Handle, dir: Direction) -> usize {
+        let mut count = 0;
+        self.follow_edges(handle, dir, |_| {
+            count += 1;
+            true
+        });
 
-    fn has_edge(&self, left: &Handle, right: &Handle) -> bool;
+        count
+    }
+
+    fn has_edge(&self, left: &Handle, right: &Handle) -> bool {
+        let mut found = false;
+
+        self.follow_edges(left, Direction::Right, |h| {
+            if h == right {
+                found = true;
+                return false;
+            }
+            true
+        });
+
+        found
+    }
 
     fn get_edge_count(&self) -> usize;
 
