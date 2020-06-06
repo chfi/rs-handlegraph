@@ -2,12 +2,8 @@ use crate::handle::{Direction, Edge, Handle, NodeId};
 
 // kinda based on libbdsg's hashgraph
 
-// TODO other than NodeId, these shouldn't actually be u64 -- they're going
-// to be bit/int vectors
-
 pub trait HandleGraph {
     fn has_node(&self, node_id: NodeId) -> bool;
-    fn get_handle(&self, node_id: NodeId, is_reverse: bool) -> Handle;
 
     // fn get_id(&self, handle: &Handle) -> NodeId;
     // fn get_is_reverse(&self, handle: &Handle) -> bool;
@@ -35,10 +31,6 @@ pub trait HandleGraph {
         index: usize,
         size: usize,
     ) -> &str;
-
-    fn forward(&self, handle: Handle) -> Handle;
-
-    fn edge_handle(&self, left: &Handle, right: &Handle) -> Edge;
 
     fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle;
 

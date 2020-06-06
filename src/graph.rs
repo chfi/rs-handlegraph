@@ -192,10 +192,6 @@ impl HandleGraph for HashGraph {
         self.graph.contains_key(&node_id)
     }
 
-    fn get_handle(&self, node_id: NodeId, is_reverse: bool) -> Handle {
-        Handle::pack(node_id, is_reverse)
-    }
-
     fn get_sequence(&self, handle: &Handle) -> &str {
         &self.get_node_unsafe(&handle.id()).sequence
     }
@@ -264,31 +260,6 @@ impl HandleGraph for HashGraph {
         &self.get_node_unsafe(&handle.id()).sequence[index..index + size]
     }
 
-    fn forward(&self, handle: Handle) -> Handle {
-        if handle.is_reverse() {
-            handle.flip()
-        } else {
-            handle
-        }
-    }
-
-    fn edge_handle(&self, left: &Handle, right: &Handle) -> Edge {
-        let flipped_right = right.flip();
-        let flipped_left = left.flip();
-
-        if left > &flipped_right {
-            Edge(flipped_right, flipped_left)
-        } else if left == &flipped_right {
-            if right > &flipped_left {
-                Edge(flipped_right, flipped_left)
-            } else {
-                Edge(*left, *right)
-            }
-        } else {
-            Edge(*left, *right)
-        }
-    }
-
     fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle {
         let Edge(el, er) = edge;
         if left == el {
@@ -345,8 +316,9 @@ impl HashGraph {
         self.graph.insert(node_id, Node::new(sequence));
         self.max_id = std::cmp::max(self.max_id, node_id);
         self.min_id = std::cmp::min(self.min_id, node_id);
-        self.get_handle(node_id, false)
+        Handle::pack(node_id, false)
     }
+
     pub fn append_handle(&mut self, sequence: &str) -> Handle {
         self.create_handle(sequence, self.max_id + 1)
     }
@@ -737,12 +709,12 @@ mod tests {
     fn append_prepend_path() {
         let mut graph = path_graph();
 
-        let h1 = graph.get_handle(NodeId::from(1), false);
-        let h2 = graph.get_handle(NodeId::from(2), false);
-        let h3 = graph.get_handle(NodeId::from(3), false);
-        let h4 = graph.get_handle(NodeId::from(4), false);
-        let h5 = graph.get_handle(NodeId::from(5), false);
-        let h6 = graph.get_handle(NodeId::from(6), false);
+        let h1 = Handle::pack(NodeId::from(1), false);
+        let h2 = Handle::pack(NodeId::from(2), false);
+        let h3 = Handle::pack(NodeId::from(3), false);
+        let h4 = Handle::pack(NodeId::from(4), false);
+        let h5 = Handle::pack(NodeId::from(5), false);
+        let h6 = Handle::pack(NodeId::from(6), false);
 
         // Add a path 3 -> 5
 

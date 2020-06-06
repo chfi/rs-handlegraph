@@ -66,6 +66,25 @@ impl Handle {
 #[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub struct Edge(pub Handle, pub Handle);
 
+impl Edge {
+    fn edge_handle(left: &Handle, right: &Handle) -> Edge {
+        let flipped_right = right.flip();
+        let flipped_left = left.flip();
+
+        if left > &flipped_right {
+            Edge(flipped_right, flipped_left)
+        } else if left == &flipped_right {
+            if right > &flipped_left {
+                Edge(flipped_right, flipped_left)
+            } else {
+                Edge(*left, *right)
+            }
+        } else {
+            Edge(*left, *right)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
