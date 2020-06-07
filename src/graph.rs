@@ -314,6 +314,23 @@ impl HandleGraph for HashGraph {
 
         true
     }
+
+    fn edges_iter_impl<'a>(
+        &'a self,
+        handle: Handle,
+        dir: Direction,
+    ) -> Box<dyn FnMut() -> Option<&'a Handle> + 'a> {
+        let node = self.get_node_unsafe(&handle.id());
+        let handles = if handle.is_reverse() != (dir == Direction::Left) {
+            &node.left_edges
+        } else {
+            &node.right_edges
+        };
+
+        let mut iter = handles.iter();
+
+        Box::new(move || iter.next())
+    }
 }
 
 impl HashGraph {
@@ -751,6 +768,27 @@ mod tests {
         assert_eq!(h4_edges_r, vec![h6]);
     }
 
+    #[test]
+    fn graph_follow_edges_new() {
+        let mut graph = path_graph();
+        let h1 = Handle::pack(NodeId::from(1), false);
+        let h2 = Handle::pack(NodeId::from(2), false);
+        let h3 = Handle::pack(NodeId::from(3), false);
+        let h4 = Handle::pack(NodeId::from(4), false);
+        let h5 = Handle::pack(NodeId::from(5), false);
+        let h6 = Handle::pack(NodeId::from(6), false);
+
+        graph.create_edge(&h1, &h4);
+        graph.create_edge(&h1, &h6);
+
+        let mut fun = graph.edges_iter_impl(h1, Direction::Right);
+
+        println!("{:?}", fun());
+        println!("{:?}", fun());
+        println!("{:?}", fun());
+        println!("{:?}", fun());
+        println!("{:?}", fun());
+    }
     #[test]
     fn append_prepend_path() {
         let mut graph = path_graph();

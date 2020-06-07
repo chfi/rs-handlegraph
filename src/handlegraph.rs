@@ -59,6 +59,12 @@ pub trait HandleGraph {
 
     fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle;
 
+    fn edges_iter_impl<'a>(
+        &'a self,
+        handle: Handle,
+        dir: Direction,
+    ) -> Box<dyn FnMut() -> Option<&'a Handle> + 'a>;
+
     fn follow_edges<F>(&self, handle: &Handle, dir: Direction, f: F) -> bool
     where
         F: FnMut(&Handle) -> bool;
