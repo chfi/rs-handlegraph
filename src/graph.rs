@@ -315,11 +315,11 @@ impl HandleGraph for HashGraph {
         true
     }
 
-    fn edges_iter_impl<'a>(
+    fn handle_edges_iter_impl<'a>(
         &'a self,
         handle: Handle,
         dir: Direction,
-    ) -> Box<dyn FnMut() -> Option<&'a Handle> + 'a> {
+    ) -> Box<dyn FnMut() -> Option<Handle> + 'a> {
         let node = self.get_node_unsafe(&handle.id());
         let handles = if handle.is_reverse() != (dir == Direction::Left) {
             &node.left_edges
@@ -328,6 +328,14 @@ impl HandleGraph for HashGraph {
         };
 
         let mut iter = handles.iter();
+
+        Box::new(move || iter.next().map(|i| i.clone()))
+    }
+
+    fn handle_iter_impl<'a>(
+        &'a self,
+    ) -> Box<dyn FnMut() -> Option<Handle> + 'a> {
+        let mut iter = self.graph.keys().map(|i| Handle::pack(*i, false));
 
         Box::new(move || iter.next())
     }
@@ -781,7 +789,7 @@ mod tests {
         graph.create_edge(&h1, &h4);
         graph.create_edge(&h1, &h6);
 
-        let mut fun = graph.edges_iter_impl(h1, Direction::Right);
+        let mut fun = graph.handle_edges_iter_impl(h1, Direction::Right);
 
         println!("{:?}", fun());
         println!("{:?}", fun());
