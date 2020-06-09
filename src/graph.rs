@@ -212,49 +212,10 @@ impl HandleGraph for HashGraph {
         self.max_id
     }
 
-    fn get_degree(&self, handle: &Handle, dir: Direction) -> usize {
-        let node = self.get_node_unsafe(&handle.id());
-        if dir == Direction::Left && handle.is_reverse()
-            || dir == Direction::Right && !handle.is_reverse()
-        {
-            node.right_edges.len()
-        } else
-        // } else if dir == Direction::Left && !handle.is_reverse()
-        //     || dir == Direction::Right && handle.is_reverse()
-        {
-            node.left_edges.len()
-        }
-    }
-
-    fn has_edge(&self, left: &Handle, right: &Handle) -> bool {
-        let left_node = self
-            .graph
-            .get(&left.id())
-            .expect("Node doesn't exist for the given handle");
-
-        None != left_node.right_edges.iter().find(|h| *h == right)
-    }
-
     fn get_edge_count(&self) -> usize {
         self.graph
             .iter()
             .fold(0, |a, (_, v)| a + v.left_edges.len() + v.right_edges.len())
-    }
-
-    fn get_total_length(&self) -> usize {
-        self.graph.iter().fold(0, |a, (_, v)| a + v.sequence.len())
-    }
-
-    fn traverse_edge_handle(&self, edge: &Edge, left: &Handle) -> Handle {
-        let Edge(el, er) = edge;
-        if left == el {
-            *er
-        } else if left == &er.flip() {
-            el.flip()
-        } else {
-            // TODO this should be improved -- this whole function, really
-            panic!("traverse_edge_handle called with a handle that the edge didn't connect");
-        }
     }
 
     fn follow_edges<F>(&self, handle: &Handle, dir: Direction, mut f: F) -> bool
@@ -808,7 +769,7 @@ mod tests {
         let h5 = Handle::pack(NodeId::from(5), false);
         let h6 = Handle::pack(NodeId::from(6), false);
 
-        let iter = handle_iter(&graph, h1, Direction::Right);
+        let iter = handle_iter(&graph);
 
         let nodes: Vec<_> = vec![h1, h2, h3, h4, h5, h6]
             .into_iter()
