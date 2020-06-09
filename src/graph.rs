@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use gfa::gfa::{Link, Segment, GFA};
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
-use crate::handlegraph::HandleGraph;
+use crate::handlegraph::{handle_edges_iter, handle_iter, HandleGraph};
 use crate::pathgraph::PathHandleGraph;
 
 type PathId = i64;
@@ -777,7 +777,7 @@ mod tests {
     }
 
     #[test]
-    fn graph_follow_edges_new() {
+    fn graph_handle_edges_iter() {
         let mut graph = path_graph();
         let h1 = Handle::pack(NodeId::from(1), false);
         let h2 = Handle::pack(NodeId::from(2), false);
@@ -789,13 +789,13 @@ mod tests {
         graph.create_edge(&h1, &h4);
         graph.create_edge(&h1, &h6);
 
-        let mut fun = graph.handle_edges_iter_impl(h1, Direction::Right);
+        let mut iter = handle_edges_iter(&graph, h1, Direction::Right);
 
-        println!("{:?}", fun());
-        println!("{:?}", fun());
-        println!("{:?}", fun());
-        println!("{:?}", fun());
-        println!("{:?}", fun());
+        assert_eq!(Some(h2), iter.next());
+        assert_eq!(Some(h3), iter.next());
+        assert_eq!(Some(h4), iter.next());
+        assert_eq!(Some(h6), iter.next());
+        assert_eq!(None, iter.next());
     }
     #[test]
     fn append_prepend_path() {
