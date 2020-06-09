@@ -797,6 +797,34 @@ mod tests {
         assert_eq!(Some(h6), iter.next());
         assert_eq!(None, iter.next());
     }
+
+    #[test]
+    fn graph_handle_iter() {
+        let mut graph = path_graph();
+        let h1 = Handle::pack(NodeId::from(1), false);
+        let h2 = Handle::pack(NodeId::from(2), false);
+        let h3 = Handle::pack(NodeId::from(3), false);
+        let h4 = Handle::pack(NodeId::from(4), false);
+        let h5 = Handle::pack(NodeId::from(5), false);
+        let h6 = Handle::pack(NodeId::from(6), false);
+
+        let iter = handle_iter(&graph, h1, Direction::Right);
+
+        let nodes: Vec<_> = vec![h1, h2, h3, h4, h5, h6]
+            .into_iter()
+            .map(|x| x.id())
+            .collect();
+
+        let mut iter_nodes: Vec<NodeId> = vec![];
+
+        for h in iter {
+            iter_nodes.push(h.id())
+        }
+
+        assert!(iter_nodes.iter().all(|n| graph.get_node(n).is_some()));
+        assert!(nodes.iter().all(|n| iter_nodes.contains(n)));
+    }
+
     #[test]
     fn append_prepend_path() {
         let mut graph = path_graph();
