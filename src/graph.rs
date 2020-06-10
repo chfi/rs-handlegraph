@@ -454,6 +454,7 @@ impl PathHandleGraph for HashGraph {
     ) -> Self::PathHandle {
         let path_id = self.paths.len() as i64;
         let path = Path::new(name, path_id, is_circular);
+        self.path_id.insert(name.to_string(), path_id);
         self.paths.insert(path_id, path);
         path_id
     }
