@@ -256,24 +256,33 @@ impl HandleGraph for HashGraph {
         true
     }
 
-    // WIP, this implementation is obviously incorrect
     fn for_each_edge<F>(&self, mut f: F) -> bool
     where
         F: FnMut(&Edge) -> bool,
     {
-        let handles1 = self.graph.keys().map(|k| Handle::pack(*k, false));
+        self.for_each_handle(|handle| {
+            let mut keep_going = true;
 
-        for left in handles1 {
-            let handles2 = self.graph.keys().map(|k| Handle::pack(*k, false));
-            for right in handles2 {
-                let edge = Edge::edge_handle(&left, &right);
-                if !f(&edge) {
-                    return false;
+            self.follow_edges(handle, Direction::Right, |next| {
+                if handle.id() <= next.id() {
+                    keep_going = f(&Edge::edge_handle(handle, next));
                 }
-            }
-        }
+                keep_going
+            });
 
-        true
+            if keep_going {
+                self.follow_edges(handle, Direction::Left, |prev| {
+                    if handle.id() < prev.id()
+                        || (handle.id() == prev.id() && prev.is_reverse())
+                    {
+                        keep_going = f(&Edge::edge_handle(prev, handle));
+                    }
+                    keep_going
+                });
+            }
+
+            keep_going
+        })
     }
 
     fn handle_edges_iter_impl<'a>(
