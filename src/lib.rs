@@ -1,4 +1,4 @@
-pub mod graph;
 pub mod handle;
 pub mod handlegraph;
+pub mod hashgraph;
 pub mod pathgraph;

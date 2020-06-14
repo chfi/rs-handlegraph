@@ -1,8 +1,8 @@
-use handlegraph::graph::{HashGraph, PathId, PathStep};
 use handlegraph::handle::{Direction, Edge, Handle, NodeId};
 use handlegraph::handlegraph::{
     edges_iter, handle_edges_iter, handle_iter, HandleGraph,
 };
+use handlegraph::hashgraph::{HashGraph, PathId, PathStep};
 use handlegraph::pathgraph::PathHandleGraph;
 
 static H1: Handle = Handle::from_integer(2);
