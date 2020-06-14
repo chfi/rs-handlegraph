@@ -797,6 +797,78 @@ mod tests {
     }
 
     #[test]
+    fn graph_for_each_edge() {
+        let mut graph = path_graph();
+        let h1 = Handle::pack(NodeId::from(1), false);
+        let h2 = Handle::pack(NodeId::from(2), false);
+        let h3 = Handle::pack(NodeId::from(3), false);
+        let h4 = Handle::pack(NodeId::from(4), false);
+        let h5 = Handle::pack(NodeId::from(5), false);
+        let h6 = Handle::pack(NodeId::from(6), false);
+
+        graph.create_edge(&h1, &h4);
+        graph.create_edge(&h1, &h6);
+
+        graph.create_edge(&h4, &h2);
+        graph.create_edge(&h6, &h2);
+
+        graph.create_edge(&h3, &h5);
+
+        /* The graph looks like:
+               v--------\
+        1   -> 2 -> 5 -> 6
+        |\     ^-/--^   ^^
+        \ \     /\--   / |
+         \ \-> 3 -> 4-/  |
+          ----------^   /
+           \-----------/
+
+        Right edges:
+        1 -> [2, 3, 4, 6]
+        2 -> [5]
+        3 -> [4, 5]
+        4 -> [6]
+        5 -> [6]
+        6 -> []
+
+        Left edges:
+        4 -> [2]
+        6 -> [2]
+         */
+
+        let mut edges: Vec<_> = vec![
+            Edge::edge_handle(&h1, &h2),
+            Edge::edge_handle(&h1, &h3),
+            Edge::edge_handle(&h1, &h4),
+            Edge::edge_handle(&h1, &h6),
+            Edge::edge_handle(&h2, &h5),
+            Edge::edge_handle(&h4, &h2),
+            Edge::edge_handle(&h6, &h2),
+            Edge::edge_handle(&h3, &h4),
+            Edge::edge_handle(&h3, &h5),
+            Edge::edge_handle(&h4, &h6),
+            Edge::edge_handle(&h5, &h6),
+        ];
+
+        edges.sort();
+
+        let mut edges_found: Vec<_> = Vec::new();
+
+        graph.for_each_edge(|e| {
+            let Edge(hl, hr) = e;
+            edges_found.push(e.clone());
+            let nl = hl.id();
+            let nr = hr.id();
+            println!("{:?} -> {:?}", nl, nr);
+            true
+        });
+
+        edges_found.sort();
+
+        assert_eq!(edges, edges_found);
+    }
+
+    #[test]
     fn append_prepend_path() {
         let mut graph = path_graph();
 

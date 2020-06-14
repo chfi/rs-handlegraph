@@ -18,7 +18,7 @@ impl Add<u64> for NodeId {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq, Ord)]
 pub struct Handle(u64);
 
 impl Handle {
@@ -63,7 +63,7 @@ impl Handle {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone, PartialEq, PartialOrd, Hash, Eq, Ord)]
 pub struct Edge(pub Handle, pub Handle);
 
 impl Edge {
