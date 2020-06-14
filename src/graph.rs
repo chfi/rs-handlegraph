@@ -127,12 +127,8 @@ impl HashGraph {
                 .parse::<u64>()
                 .expect("Expected integer name in GFA link");
 
-            let left = Handle::pack(
-                NodeId::from(left_id),
-                !link.from_orient.as_bool(),
-            );
-            let right =
-                Handle::pack(NodeId::from(right_id), !link.to_orient.as_bool());
+            let left = Handle::pack(left_id, !link.from_orient.as_bool());
+            let right = Handle::pack(right_id, !link.to_orient.as_bool());
 
             graph.create_edge(&left, &right);
         }
@@ -145,8 +141,7 @@ impl HashGraph {
                 let split = segment.split_at(segment.len() - 1);
                 let id = split.0.parse::<u64>().unwrap();
                 let dir = char::from(split.1.as_bytes()[0]) == '+';
-                graph
-                    .append_step(&path_id, Handle::pack(NodeId::from(id), dir));
+                graph.append_step(&path_id, Handle::pack(id, dir));
             }
         }
 

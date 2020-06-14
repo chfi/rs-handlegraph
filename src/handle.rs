@@ -9,6 +9,12 @@ impl From<u64> for NodeId {
     }
 }
 
+impl From<NodeId> for u64 {
+    fn from(NodeId(id): NodeId) -> Self {
+        id
+    }
+}
+
 impl Add<u64> for NodeId {
     type Output = Self;
 
@@ -39,8 +45,8 @@ impl Handle {
         self.as_integer() & 1 != 0
     }
 
-    pub fn pack(node_id: NodeId, is_reverse: bool) -> Handle {
-        let NodeId(id) = node_id;
+    pub fn pack<T: Into<u64>>(id: T, is_reverse: bool) -> Handle {
+        let id: u64 = id.into();
         if id < (0x1 << 63) {
             Handle::from_integer((id << 1) | is_reverse as u64)
         } else {

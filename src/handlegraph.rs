@@ -98,20 +98,22 @@ pub trait HandleGraph {
         F: FnMut(&Edge) -> bool;
 }
 
-pub fn handle_edges_iter<'a, T>(
+pub fn handle_edges_iter<'a, T: HandleGraph>(
     graph: &'a T,
     handle: Handle,
     dir: Direction,
-) -> impl Iterator<Item = Handle> + 'a
-where
-    T: HandleGraph,
-{
+) -> impl Iterator<Item = Handle> + 'a {
     std::iter::from_fn(graph.handle_edges_iter_impl(handle, dir))
 }
 
-pub fn handle_iter<'a, T>(graph: &'a T) -> impl Iterator<Item = Handle> + 'a
-where
-    T: HandleGraph,
-{
+pub fn handle_iter<'a, T: HandleGraph>(
+    graph: &'a T,
+) -> impl Iterator<Item = Handle> + 'a {
     std::iter::from_fn(graph.handle_iter_impl())
+}
+
+pub fn edges_iter<'a, T: HandleGraph>(
+    graph: &'a T,
+) -> impl Iterator<Item = Edge> + 'a {
+    std::iter::from_fn(graph.edges_iter_impl())
 }
