@@ -6,7 +6,7 @@ use crate::handle::{Direction, Edge, Handle, NodeId};
 use crate::handlegraph::{handle_edges_iter, handle_iter, HandleGraph};
 use crate::pathgraph::PathHandleGraph;
 
-type PathId = i64;
+pub type PathId = i64;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum PathStep {
@@ -308,6 +308,42 @@ impl HandleGraph for HashGraph {
         let mut iter = self.graph.keys().map(|i| Handle::pack(*i, false));
 
         Box::new(move || iter.next())
+    }
+
+    fn edges_iter_impl<'a>(&'a self) -> Box<dyn FnMut() -> Option<Edge> + 'a> {
+        let handles = std::iter::from_fn(self.handle_iter_impl());
+
+        let neighbors = move |handle: Handle| {
+            let right_neighbors = std::iter::from_fn(
+                self.handle_edges_iter_impl(handle, Direction::Right),
+            )
+            .filter_map(move |next| {
+                if handle.id() <= next.id() {
+                    Some(Edge::edge_handle(&handle, &next))
+                } else {
+                    None
+                }
+            });
+
+            let left_neighbors = std::iter::from_fn(
+                self.handle_edges_iter_impl(handle, Direction::Left),
+            )
+            .filter_map(move |prev| {
+                if (handle.id() < prev.id())
+                    || (handle.id() == prev.id() && prev.is_reverse())
+                {
+                    Some(Edge::edge_handle(&prev, &handle))
+                } else {
+                    None
+                }
+            });
+
+            right_neighbors.chain(left_neighbors)
+        };
+
+        let mut edges = handles.map(neighbors).flatten();
+
+        Box::new(move || edges.next())
     }
 }
 
