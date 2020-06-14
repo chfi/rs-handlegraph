@@ -833,6 +833,35 @@ mod tests {
     }
 
     #[test]
+    fn graph_edges_iter() {
+        let mut graph = path_graph();
+        let h1 = Handle::pack(NodeId::from(1), false);
+        let h2 = Handle::pack(NodeId::from(2), false);
+        let h3 = Handle::pack(NodeId::from(3), false);
+        let h4 = Handle::pack(NodeId::from(4), false);
+        let h5 = Handle::pack(NodeId::from(5), false);
+        let h6 = Handle::pack(NodeId::from(6), false);
+
+        let edges_next = graph.edges_iter_impl();
+
+        let mut edges_found: Vec<_> = std::iter::from_fn(edges_next).collect();
+
+        edges_found.sort();
+
+        let mut edges: Vec<_> = vec![
+            Edge::edge_handle(&h4, &h6),
+            Edge::edge_handle(&h3, &h4),
+            Edge::edge_handle(&h1, &h2),
+            Edge::edge_handle(&h1, &h3),
+            Edge::edge_handle(&h5, &h6),
+            Edge::edge_handle(&h2, &h5),
+        ];
+        edges.sort();
+
+        assert_eq!(edges, edges_found);
+    }
+
+    #[test]
     fn graph_for_each_edge() {
         let mut graph = path_graph();
         let h1 = Handle::pack(NodeId::from(1), false);
