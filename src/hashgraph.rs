@@ -591,4 +591,29 @@ impl PathHandleGraph for HashGraph {
         // on the path
         (PathStep::Step(path_id, l), PathStep::Step(path_id, r))
     }
+
+    fn for_each_path_handle<F>(&self, mut f: F) -> bool
+    where
+        F: FnMut(&PathId) -> bool,
+    {
+        for ph in self.paths.keys() {
+            if !f(&ph) {
+                return false;
+            }
+        }
+        true
+    }
+
+    fn for_each_step_on_handle<F>(&self, handle: &Handle, mut f: F) -> bool
+    where
+        F: FnMut(&PathStep) -> bool,
+    {
+        let node: &Node = self.get_node_unsafe(&handle.id());
+        for (path, ix) in node.occurrences.iter() {
+            if !f(&PathStep::Step(*path, *ix)) {
+                return false;
+            }
+        }
+        true
+    }
 }

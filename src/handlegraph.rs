@@ -1,12 +1,7 @@
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
-// kinda based on libbdsg's hashgraph
-
 pub trait HandleGraph {
     fn has_node(&self, node_id: NodeId) -> bool;
-
-    // fn get_id(&self, handle: &Handle) -> NodeId;
-    // fn get_is_reverse(&self, handle: &Handle) -> bool;
 
     fn get_length(&self, handle: &Handle) -> usize;
 
