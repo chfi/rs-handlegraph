@@ -33,7 +33,7 @@ impl Handle {
         i
     }
 
-    pub fn from_integer(i: u64) -> Self {
+    pub const fn from_integer(i: u64) -> Self {
         Handle(i)
     }
 
