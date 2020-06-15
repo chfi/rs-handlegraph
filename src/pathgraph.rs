@@ -91,3 +91,16 @@ pub trait PathHandleGraph {
         handle: &Handle,
     ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a>;
 }
+
+pub fn paths_iter<'a, T: PathHandleGraph>(
+    graph: &'a T,
+) -> impl Iterator<Item = &'a <T as PathHandleGraph>::PathHandle> + 'a {
+    std::iter::from_fn(graph.paths_iter_impl())
+}
+
+pub fn occurrences_iter<'a, T: PathHandleGraph>(
+    graph: &'a T,
+    handle: &Handle,
+) -> impl Iterator<Item = <T as PathHandleGraph>::StepHandle> + 'a {
+    std::iter::from_fn(graph.handle_occurrences_iter(handle))
+}
