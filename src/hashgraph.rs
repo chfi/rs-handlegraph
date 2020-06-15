@@ -137,11 +137,9 @@ impl HashGraph {
         for path in gfa.paths.iter() {
             let path: &gfa::gfa::Path = path;
             let path_id = graph.create_path_handle(&path.path_name, false);
-            for segment in path.segment_names.iter() {
-                let split = segment.split_at(segment.len() - 1);
-                let id = split.0.parse::<u64>().unwrap();
-                let dir = char::from(split.1.as_bytes()[0]) == '+';
-                graph.append_step(&path_id, Handle::pack(id, dir));
+            for (name, orient) in path.segment_names.iter() {
+                let id = name.parse::<u64>().unwrap();
+                graph.append_step(&path_id, Handle::pack(id, orient.as_bool()));
             }
         }
 
