@@ -644,4 +644,37 @@ impl PathHandleGraph for HashGraph {
         }
         true
     }
+
+    fn paths_iter_impl<'a>(
+        &'a self,
+    ) -> Box<dyn FnMut() -> Option<&'a Self::PathHandle> + 'a> {
+        let mut iter = self.paths.keys();
+
+        Box::new(move || iter.next())
+    }
+
+    fn handle_occurrences_iter<'a>(
+        &'a self,
+        handle: &Handle,
+    ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a> {
+        let node: &Node = self.get_node_unsafe(&handle.id());
+
+        let mut iter =
+            node.occurrences.iter().map(|(k, v)| PathStep::Step(*k, *v));
+
+        Box::new(move || iter.next())
+    }
+}
+
+pub fn paths_iter<'a, T: PathHandleGraph>(
+    graph: &'a T,
+) -> impl Iterator<Item = &'a <T as PathHandleGraph>::PathHandle> + 'a {
+    std::iter::from_fn(graph.paths_iter_impl())
+}
+
+pub fn occurrences_iter<'a, T: PathHandleGraph>(
+    graph: &'a T,
+    handle: &Handle,
+) -> impl Iterator<Item = <T as PathHandleGraph>::StepHandle> + 'a {
+    std::iter::from_fn(graph.handle_occurrences_iter(handle))
 }

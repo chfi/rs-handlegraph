@@ -81,4 +81,13 @@ pub trait PathHandleGraph {
     fn for_each_step_on_handle<F>(&self, handle: &Handle, f: F) -> bool
     where
         F: FnMut(&Self::StepHandle) -> bool;
+
+    fn paths_iter_impl<'a>(
+        &'a self,
+    ) -> Box<dyn FnMut() -> Option<&'a Self::PathHandle> + 'a>;
+
+    fn handle_occurrences_iter<'a>(
+        &'a self,
+        handle: &Handle,
+    ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a>;
 }
