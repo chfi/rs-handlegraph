@@ -44,6 +44,11 @@ pub trait PathHandleGraph {
 
     fn destroy_path(&mut self, path: &Self::PathHandle);
 
+    fn next_step(&self, step_handle: &Self::StepHandle) -> Self::StepHandle;
+
+    fn previous_step(&self, step_handle: &Self::StepHandle)
+        -> Self::StepHandle;
+
     fn create_path_handle(
         &mut self,
         name: &str,

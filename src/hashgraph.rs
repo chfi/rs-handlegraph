@@ -476,6 +476,34 @@ impl PathHandleGraph for HashGraph {
         }
     }
 
+    fn next_step(&self, step: &Self::StepHandle) -> Self::StepHandle {
+        match step {
+            PathStep::Front(pid) => self.path_begin(pid),
+            PathStep::End(pid) => self.path_end(pid),
+            PathStep::Step(pid, ix) => {
+                if *ix < self.get_step_count(pid) - 1 {
+                    PathStep::Step(*pid, ix + 1)
+                } else {
+                    self.path_end(pid)
+                }
+            }
+        }
+    }
+
+    fn previous_step(&self, step: &Self::StepHandle) -> Self::StepHandle {
+        match step {
+            PathStep::Front(pid) => self.path_front_end(pid),
+            PathStep::End(pid) => self.path_back(pid),
+            PathStep::Step(pid, ix) => {
+                if *ix > 0 {
+                    PathStep::Step(*pid, ix - 1)
+                } else {
+                    self.path_end(pid)
+                }
+            }
+        }
+    }
+
     fn destroy_path(&mut self, path: &Self::PathHandle) {
         let p: &Path = self.paths.get(&path).unwrap();
 
