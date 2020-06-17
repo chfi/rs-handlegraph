@@ -458,20 +458,11 @@ impl PathHandleGraph for HashGraph {
     }
 
     fn has_next_step(&self, step: &Self::StepHandle) -> bool {
-        // TODO this might be an off-by-one error
-        if let PathStep::End(_) = step {
-            false
-        } else {
-            true
-        }
+        matches!(step, PathStep::End(_))
     }
 
     fn has_previous_step(&self, step: &Self::StepHandle) -> bool {
-        if let PathStep::Front(_) = step {
-            false
-        } else {
-            true
-        }
+        matches!(step, PathStep::Front(_))
     }
 
     fn next_step(&self, step: &Self::StepHandle) -> Self::StepHandle {

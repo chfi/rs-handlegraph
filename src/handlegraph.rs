@@ -25,27 +25,14 @@ pub trait HandleGraph {
     fn max_node_id(&self) -> NodeId;
 
     fn get_degree(&self, handle: &Handle, dir: Direction) -> usize {
-        let mut count = 0;
-        self.follow_edges(handle, dir, |_| {
-            count += 1;
-            true
-        });
-
-        count
+        std::iter::from_fn(self.handle_edges_iter_impl(*handle, dir))
+            .fold(0, |a, _| a + 1)
     }
 
     fn has_edge(&self, left: &Handle, right: &Handle) -> bool {
-        let mut found = false;
-
-        self.follow_edges(left, Direction::Right, |h| {
-            if h == right {
-                found = true;
-                return false;
-            }
-            true
-        });
-
-        found
+        std::iter::from_fn(self.handle_edges_iter_impl(*left, Direction::Right))
+            .find(|h| h == right)
+            .is_some()
     }
 
     fn get_edge_count(&self) -> usize;
