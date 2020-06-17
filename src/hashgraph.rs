@@ -193,6 +193,14 @@ impl HandleGraph for HashGraph {
         self.get_sequence(handle).len()
     }
 
+    fn get_degree(&self, handle: &Handle, dir: Direction) -> usize {
+        let n = self.get_node_unsafe(&handle.id());
+        match dir {
+            Direction::Right => n.right_edges.len(),
+            Direction::Left => n.left_edges.len(),
+        }
+    }
+
     fn get_node_count(&self) -> usize {
         self.graph.len()
     }
