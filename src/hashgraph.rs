@@ -4,6 +4,7 @@ use gfa::gfa::{Link, Segment, GFA};
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
 use crate::handlegraph::{handle_edges_iter, handle_iter, HandleGraph};
+use crate::mutablehandlegraph::MutableHandleGraph;
 use crate::pathgraph::PathHandleGraph;
 
 pub type PathId = i64;
@@ -130,7 +131,7 @@ impl HashGraph {
             let left = Handle::pack(left_id, !link.from_orient.as_bool());
             let right = Handle::pack(right_id, !link.to_orient.as_bool());
 
-            graph.create_edge(&left, &right);
+            graph.create_edge(&Edge(left, right));
         }
 
         // add paths
@@ -348,19 +349,22 @@ impl HandleGraph for HashGraph {
     }
 }
 
-impl HashGraph {
-    pub fn create_handle(&mut self, sequence: &str, node_id: NodeId) -> Handle {
-        self.graph.insert(node_id, Node::new(sequence));
+impl MutableHandleGraph for HashGraph {
+    fn append_handle(&mut self, sequence: &str) -> Handle {
+        self.create_handle(sequence, self.max_id + 1)
+    }
+
+    fn create_handle(&mut self, seq: &str, node_id: NodeId) -> Handle {
+        if seq.is_empty() {
+            panic!("Tried to add empty handle");
+        }
+        self.graph.insert(node_id, Node::new(seq));
         self.max_id = std::cmp::max(self.max_id, node_id);
         self.min_id = std::cmp::min(self.min_id, node_id);
         Handle::pack(node_id, false)
     }
 
-    pub fn append_handle(&mut self, sequence: &str) -> Handle {
-        self.create_handle(sequence, self.max_id + 1)
-    }
-
-    pub fn create_edge(&mut self, left: &Handle, right: &Handle) {
+    fn create_edge(&mut self, Edge(left, right): &Edge) {
         let add_edge = {
             let left_node = self
                 .graph
