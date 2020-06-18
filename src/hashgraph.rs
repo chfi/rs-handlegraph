@@ -397,6 +397,55 @@ impl MutableHandleGraph for HashGraph {
             }
         }
     }
+
+    fn divide_handle(
+        &mut self,
+        handle: &Handle,
+        offsets: Vec<usize>,
+    ) -> Vec<Handle> {
+        let mut result = vec![*handle];
+        let node_len = self.get_length(handle);
+        let sequence = self.get_sequence(handle);
+
+        let fwd_offsets: Vec<usize> = if handle.is_reverse() {
+            offsets.iter().map(|o| node_len - o).collect()
+        } else {
+            offsets
+        };
+
+        let num_offsets = fwd_offsets.len();
+        // TODO it should be possible to do this without creating new
+        // strings and collecting into a vec
+        let subseqs: Vec<String> = fwd_offsets
+            .iter()
+            .enumerate()
+            .map(|(i, o)| {
+                let len = if i + 1 < num_offsets {
+                    fwd_offsets[i + 1]
+                } else {
+                    node_len
+                } - o;
+                sequence[*o..len].to_string()
+            })
+            .collect();
+
+        for seq in subseqs {
+            let h = self.append_handle(&seq);
+            result.push(h);
+        }
+
+        // TODO move the outgoing edges to the last new segment
+
+        // TODO shrink the sequence of the starting handle
+
+        // TODO create edges between the new segments
+
+        // TODO update edges into the new segments
+
+        // TODO update paths and path occurrences
+
+        result
+    }
 }
 
 impl PathHandleGraph for HashGraph {
