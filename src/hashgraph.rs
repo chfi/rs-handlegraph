@@ -179,6 +179,10 @@ impl HashGraph {
             node_id
         ))
     }
+
+    pub fn get_node_mut(&mut self, node_id: &NodeId) -> Option<&mut Node> {
+        self.graph.get_mut(node_id)
+    }
 }
 
 impl HandleGraph for HashGraph {
@@ -434,7 +438,17 @@ impl MutableHandleGraph for HashGraph {
             result.push(h);
         }
 
-        // TODO move the outgoing edges to the last new segment
+        // move the outgoing edges to the last new segment
+        let mut tmp_rights = vec![result[1]];
+
+        let orig_node = self.get_node_mut(&handle.id()).unwrap();
+        let old_rights = &mut orig_node.right_edges;
+        std::mem::swap(old_rights, &mut tmp_rights);
+
+        let new_last = result.last().unwrap();
+        let new_rights =
+            &mut self.get_node_mut(&new_last.id()).unwrap().right_edges;
+        std::mem::swap(&mut tmp_rights, new_rights);
 
         // TODO shrink the sequence of the starting handle
 
