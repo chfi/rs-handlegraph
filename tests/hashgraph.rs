@@ -3,6 +3,7 @@ use handlegraph::handlegraph::{
     edges_iter, handle_edges_iter, handle_iter, HandleGraph,
 };
 use handlegraph::hashgraph::{HashGraph, PathId, PathStep};
+use handlegraph::mutablehandlegraph::MutableHandleGraph;
 use handlegraph::pathgraph::PathHandleGraph;
 
 static H1: Handle = Handle::from_integer(2);
@@ -39,10 +40,10 @@ fn can_create_edges() {
     let h3 = graph.append_handle("G");
     let h4 = graph.append_handle("TTG");
 
-    graph.create_edge(&h1, &h2);
-    graph.create_edge(&h1, &h3);
-    graph.create_edge(&h2, &h4);
-    graph.create_edge(&h3, &h4);
+    graph.create_edge(&Edge(h1, h2));
+    graph.create_edge(&Edge(h1, h3));
+    graph.create_edge(&Edge(h2, h4));
+    graph.create_edge(&Edge(h3, h4));
 
     let n1 = graph.get_node_unsafe(&h1.id());
     let n2 = graph.get_node_unsafe(&h2.id());
@@ -76,6 +77,9 @@ fn construct_from_gfa() {
     if let Some(gfa) = parse_gfa(&PathBuf::from("./lil.gfa")) {
         let graph = HashGraph::from_gfa(&gfa);
         let node_ids: Vec<_> = graph.graph.keys().collect();
+
+        assert_eq!(15, graph.get_node_count());
+        assert_eq!(40, graph.get_edge_count());
         println!("Node IDs:");
         for id in node_ids.iter() {
             println!("{:?}", id);
@@ -90,6 +94,26 @@ fn construct_from_gfa() {
     } else {
         panic!("Couldn't parse test GFA file!");
     }
+}
+
+#[test]
+fn fill_from_gfa_stream() {
+    use std::fs::File;
+    use std::io::prelude::*;
+    use std::io::BufReader;
+    use std::path::PathBuf;
+
+    let mut graph = HashGraph::new();
+
+    let file = File::open(&PathBuf::from("./lil.gfa")).unwrap();
+
+    let reader = BufReader::new(file);
+    let mut lines = reader.lines();
+
+    graph.fill_from_gfa_lines(&mut lines);
+
+    assert_eq!(15, graph.get_node_count());
+    assert_eq!(40, graph.get_edge_count());
 }
 
 #[test]
@@ -119,13 +143,13 @@ fn path_graph() -> HashGraph {
     1  -> 2 -> 5 -> 6
       \-> 3 -> 4 /
      */
-    graph.create_edge(&h1, &h2);
-    graph.create_edge(&h2, &h5);
-    graph.create_edge(&h5, &h6);
+    graph.create_edge(&Edge(h1, h2));
+    graph.create_edge(&Edge(h2, h5));
+    graph.create_edge(&Edge(h5, h6));
 
-    graph.create_edge(&h1, &h3);
-    graph.create_edge(&h3, &h4);
-    graph.create_edge(&h4, &h6);
+    graph.create_edge(&Edge(h1, h3));
+    graph.create_edge(&Edge(h3, h4));
+    graph.create_edge(&Edge(h4, h6));
 
     graph
 }
@@ -149,8 +173,8 @@ fn graph_follow_edges() {
 
     // add some more edges to make things interesting
 
-    graph.create_edge(&H1, &H4);
-    graph.create_edge(&H1, &H6);
+    graph.create_edge(&Edge(H1, H4));
+    graph.create_edge(&Edge(H1, H6));
 
     let mut h1_edges_r = vec![];
 
@@ -182,8 +206,8 @@ fn graph_follow_edges() {
 fn graph_handle_edges_iter() {
     let mut graph = path_graph();
 
-    graph.create_edge(&H1, &H4);
-    graph.create_edge(&H1, &H6);
+    graph.create_edge(&Edge(H1, H4));
+    graph.create_edge(&Edge(H1, H6));
 
     let mut iter = handle_edges_iter(&graph, H1, Direction::Right);
 
@@ -242,13 +266,13 @@ fn graph_edges_iter() {
 fn graph_for_each_edge() {
     let mut graph = path_graph();
 
-    graph.create_edge(&H1, &H4);
-    graph.create_edge(&H1, &H6);
+    graph.create_edge(&Edge(H1, H4));
+    graph.create_edge(&Edge(H1, H6));
 
-    graph.create_edge(&H4, &H2);
-    graph.create_edge(&H6, &H2);
+    graph.create_edge(&Edge(H4, H2));
+    graph.create_edge(&Edge(H6, H2));
 
-    graph.create_edge(&H3, &H5);
+    graph.create_edge(&Edge(H3, H5));
 
     /* The graph looks like:
            v--------\

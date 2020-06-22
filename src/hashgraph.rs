@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use gfa::gfa::{Link, Segment, GFA};
+use gfa::gfa::{Line, Link, Segment, GFA};
+use gfa::parser::parse_gfa_stream;
+use std::io::prelude::*;
+use std::io::{BufReader, Lines};
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
 use crate::handlegraph::{handle_edges_iter, handle_iter, HandleGraph};
@@ -97,6 +100,52 @@ impl HashGraph {
             graph: HashMap::new(),
             path_id: HashMap::new(),
             paths: HashMap::new(),
+        }
+    }
+
+    pub fn fill_from_gfa_lines<B: BufRead>(&mut self, lines: &mut Lines<B>) {
+        let mut gfa_lines = parse_gfa_stream(lines);
+
+        for line in gfa_lines {
+            match line {
+                Line::Segment(seg) => {
+                    let id = seg.name.parse::<u64>().expect(&format!(
+                        "Expected integer name in GFA, was {}\n",
+                        seg.name
+                    ));
+                    self.create_handle(&seg.sequence, NodeId::from(id));
+                }
+                Line::Link(link) => {
+                    let left_id = link
+                        .from_segment
+                        .parse::<u64>()
+                        .expect("Expected integer name in GFA link");
+
+                    let right_id = link
+                        .to_segment
+                        .parse::<u64>()
+                        .expect("Expected integer name in GFA link");
+
+                    let left =
+                        Handle::pack(left_id, !link.from_orient.as_bool());
+                    let right =
+                        Handle::pack(right_id, !link.to_orient.as_bool());
+
+                    self.create_edge(&Edge(left, right));
+                }
+                Line::Path(path) => {
+                    let path_id =
+                        self.create_path_handle(&path.path_name, false);
+                    for (name, orient) in path.segment_names.iter() {
+                        let id = name.parse::<u64>().unwrap();
+                        self.append_step(
+                            &path_id,
+                            Handle::pack(id, orient.as_bool()),
+                        );
+                    }
+                }
+                _ => (),
+            }
         }
     }
 

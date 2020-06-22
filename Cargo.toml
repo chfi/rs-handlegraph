@@ -8,4 +8,4 @@ edition = "2018"
 
 [dependencies]
 succinct = "0.5.2"
-gfa = "0.2.1"
+gfa = { path = "../rs-gfa" }
