@@ -103,8 +103,80 @@ impl HashGraph {
         }
     }
 
+    fn add_gfa_segment<'a, 'b>(
+        &'a mut self,
+        name_map: &'a mut HashMap<&'b str, NodeId>,
+        seg: &'b Segment,
+    ) {
+        match seg.name.parse::<u64>() {
+            Ok(id) => {
+                self.create_handle(&seg.sequence, NodeId::from(id));
+            }
+            Err(_) => {
+                let h = self.append_handle(&seg.sequence);
+                name_map.insert(&seg.name, h.id());
+            }
+        };
+    }
+
+    fn add_gfa_link(&mut self, name_map: &HashMap<&str, NodeId>, link: &Link) {
+        let get_id = |name: &str| match name.parse::<u64>() {
+            Ok(id) => NodeId::from(id),
+            Err(_) => *name_map.get(name).unwrap(),
+        };
+
+        let left_id = get_id(&link.from_segment);
+        let right_id = get_id(&link.to_segment);
+
+        let left = Handle::pack(left_id, !link.from_orient.as_bool());
+        let right = Handle::pack(right_id, !link.to_orient.as_bool());
+
+        self.create_edge(&Edge(left, right));
+    }
+
+    fn add_gfa_path(
+        &mut self,
+        name_map: &HashMap<&str, NodeId>,
+        path: &gfa::gfa::Path,
+    ) {
+        let get_id = |name: &str| match name.parse::<u64>() {
+            Ok(id) => NodeId::from(id),
+            Err(_) => *name_map.get(name).unwrap(),
+        };
+
+        let path_id = self.create_path_handle(&path.path_name, false);
+        for (name, orient) in path.segment_names.iter() {
+            let id = get_id(name);
+            self.append_step(&path_id, Handle::pack(id, orient.as_bool()));
+        }
+    }
+
+    pub fn from_gfa(gfa: &GFA) -> HashGraph {
+        let mut graph = Self::new();
+
+        let mut name_map: HashMap<&str, NodeId> = HashMap::new();
+
+        // add segments
+        gfa.segments
+            .iter()
+            .for_each(|seg| graph.add_gfa_segment(&mut name_map, seg));
+
+        // add links
+        gfa.links
+            .iter()
+            .for_each(|link| graph.add_gfa_link(&name_map, link));
+
+        // add paths
+        gfa.paths
+            .iter()
+            .for_each(|path| graph.add_gfa_path(&name_map, path));
+
+        graph
+    }
+
+    // NB/TODO: this one doesn't work with string segment names, yet
     pub fn fill_from_gfa_lines<B: BufRead>(&mut self, lines: &mut Lines<B>) {
-        let mut gfa_lines = parse_gfa_stream(lines);
+        let gfa_lines = parse_gfa_stream(lines);
 
         for line in gfa_lines {
             match line {
@@ -147,54 +219,6 @@ impl HashGraph {
                 _ => (),
             }
         }
-    }
-
-    pub fn from_gfa(gfa: &GFA) -> HashGraph {
-        let mut graph = Self::new();
-
-        let mut name_map: HashMap<&str, NodeId> = HashMap::new();
-
-        // add segments
-        for seg in gfa.segments.iter() {
-            match seg.name.parse::<u64>() {
-                Ok(id) => {
-                    graph.create_handle(&seg.sequence, NodeId::from(id));
-                }
-                Err(_) => {
-                    let h = graph.append_handle(&seg.sequence);
-                    name_map.insert(&seg.name, h.id());
-                }
-            };
-        }
-
-        let get_id = |name: &str| match name.parse::<u64>() {
-            Ok(id) => NodeId::from(id),
-            Err(_) => *name_map.get(name).unwrap(),
-        };
-
-        // add links
-        for link in gfa.links.iter() {
-            // for each link in the GFA, get the corresponding handles
-            // based on segment name and orientation
-            let left_id = get_id(&link.from_segment);
-            let right_id = get_id(&link.to_segment);
-
-            let left = Handle::pack(left_id, !link.from_orient.as_bool());
-            let right = Handle::pack(right_id, !link.to_orient.as_bool());
-
-            graph.create_edge(&Edge(left, right));
-        }
-
-        // add paths
-        for path in gfa.paths.iter() {
-            let path_id = graph.create_path_handle(&path.path_name, false);
-            for (name, orient) in path.segment_names.iter() {
-                let id = get_id(name);
-                graph.append_step(&path_id, Handle::pack(id, orient.as_bool()));
-            }
-        }
-
-        graph
     }
 
     pub fn print_path(&self, path_id: &PathId) {
