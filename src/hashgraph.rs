@@ -491,6 +491,12 @@ impl MutableHandleGraph for HashGraph {
             offsets
         };
 
+        let fwd_handle = if handle.is_reverse() {
+            handle.flip()
+        } else {
+            *handle
+        };
+
         let num_offsets = fwd_offsets.len();
         // TODO it should be possible to do this without creating new
         // strings and collecting into a vec
@@ -514,17 +520,41 @@ impl MutableHandleGraph for HashGraph {
 
         // move the outgoing edges to the last new segment
         let mut tmp_rights = vec![result[1]];
+        let orig_rights =
+            &mut self.get_node_mut(&handle.id()).unwrap().right_edges;
+        std::mem::swap(orig_rights, &mut tmp_rights);
 
-        let orig_node = self.get_node_mut(&handle.id()).unwrap();
-        let old_rights = &mut orig_node.right_edges;
-        std::mem::swap(old_rights, &mut tmp_rights);
-
-        let new_last = result.last().unwrap();
-        let new_rights =
-            &mut self.get_node_mut(&new_last.id()).unwrap().right_edges;
+        let new_rights = &mut self
+            .get_node_mut(&result.last().unwrap().id())
+            .unwrap()
+            .right_edges;
         std::mem::swap(&mut tmp_rights, new_rights);
 
-        // TODO shrink the sequence of the starting handle
+        // shrink the sequence of the starting handle
+        let orig_node = &mut self.get_node_mut(&handle.id()).unwrap();
+        orig_node.sequence = orig_node.sequence[0..fwd_offsets[0]].to_string();
+
+        // update backwards references
+        // first collect all the handles whose nodes we need to update
+        let last_neighbors: Vec<_> =
+            handle_edges_iter(self, *result.last().unwrap(), Direction::Right)
+                .collect();
+
+        // And perform the update
+        for h in last_neighbors {
+            let node = &mut self.get_node_mut(&h.id()).unwrap();
+            let neighbors = if h.is_reverse() {
+                &mut node.right_edges
+            } else {
+                &mut node.left_edges
+            };
+
+            for bwd in neighbors.iter_mut() {
+                if *bwd == fwd_handle.flip() {
+                    *bwd = result.last().unwrap().flip();
+                }
+            }
+        }
 
         // TODO create edges between the new segments
 

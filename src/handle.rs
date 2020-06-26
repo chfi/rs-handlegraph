@@ -3,6 +3,12 @@ use std::ops::Add;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(u64);
 
+impl std::fmt::Display for NodeId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", u64::from(*self))
+    }
+}
+
 impl From<u64> for NodeId {
     fn from(num: u64) -> Self {
         NodeId(num)
@@ -91,6 +97,12 @@ impl Edge {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Direction {
+    Left,
+    Right,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -122,10 +134,4 @@ mod tests {
         assert_eq!(h1.unpack_bit(), true);
         assert_eq!(h2.unpack_bit(), false);
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum Direction {
-    Left,
-    Right,
 }
