@@ -511,16 +511,18 @@ impl MutableHandleGraph for HashGraph {
         }
 
         // move the outgoing edges to the last new segment
-        let mut tmp_rights = vec![result[1]];
-        let orig_rights =
-            &mut self.get_node_mut(&handle.id()).unwrap().right_edges;
-        std::mem::swap(orig_rights, &mut tmp_rights);
+
+        // empty the existing right edges of the original node
+        let mut orig_rights = std::mem::take(
+            &mut self.get_node_mut(&handle.id()).unwrap().right_edges,
+        );
 
         let new_rights = &mut self
             .get_node_mut(&result.last().unwrap().id())
             .unwrap()
             .right_edges;
-        std::mem::swap(&mut tmp_rights, new_rights);
+        // and swap with the new right edges
+        std::mem::swap(&mut orig_rights, new_rights);
 
         // shrink the sequence of the starting handle
         let orig_node = &mut self.get_node_mut(&handle.id()).unwrap();
@@ -549,8 +551,9 @@ impl MutableHandleGraph for HashGraph {
         }
 
         // TODO create edges between the new segments
-
-        // TODO update edges into the new segments
+        for (this, next) in result.iter().zip(result.iter().skip(1)) {
+            self.create_edge(&Edge(*this, *next));
+        }
 
         // TODO update paths and path occurrences
 

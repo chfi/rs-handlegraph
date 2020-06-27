@@ -454,3 +454,25 @@ fn append_prepend_path() {
 
     graph.print_occurrences();
 }
+
+#[test]
+fn graph_divide_handle() {
+    let mut graph = HashGraph::new();
+    let h1 = graph.append_handle("ABCD");
+    let h2 = graph.append_handle("EFGHIJKLMN");
+    let h3 = graph.append_handle("OPQ");
+
+    for k in 1..=3 {
+        let node = graph.get_node_unsafe(&NodeId::from(k));
+        println!("{} - {:?}", k, node.sequence);
+    }
+
+    println!();
+
+    let hs = graph.divide_handle(&h2, vec![2, 2]);
+
+    for k in 1..=4 {
+        let node = graph.get_node_unsafe(&NodeId::from(k));
+        println!("{} - {:?}", k, node.sequence);
+    }
+}
