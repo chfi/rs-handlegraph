@@ -475,11 +475,17 @@ impl MutableHandleGraph for HashGraph {
     fn divide_handle(
         &mut self,
         handle: &Handle,
-        offsets: Vec<usize>,
+        mut offsets: Vec<usize>,
     ) -> Vec<Handle> {
         let mut result = vec![*handle];
         let node_len = self.get_length(handle);
         let sequence = self.get_sequence(handle);
+
+        let fwd_handle = handle.forward();
+
+        // Push the node length as a last offset to make constructing
+        // the ranges nicer
+        offsets.push(node_len);
 
         let fwd_offsets: Vec<usize> = if handle.is_reverse() {
             offsets.iter().map(|o| node_len - o).collect()
@@ -487,22 +493,19 @@ impl MutableHandleGraph for HashGraph {
             offsets
         };
 
-        let fwd_handle = handle.forward();
+        // staggered zip of the offsets with themselves to make the ranges
+        let ranges: Vec<_> = fwd_offsets
+            .iter()
+            .zip(fwd_offsets.iter().skip(1))
+            .map(|(&p, &n)| p..n)
+            .collect();
 
-        let num_offsets = fwd_offsets.len();
         // TODO it should be possible to do this without creating new
         // strings and collecting into a vec
-        let subseqs: Vec<String> = fwd_offsets
-            .iter()
-            .enumerate()
-            .map(|(i, o)| {
-                let len = if i + 1 < num_offsets {
-                    fwd_offsets[i + 1]
-                } else {
-                    node_len
-                } - o;
-                sequence[*o..len].to_string()
-            })
+
+        let subseqs: Vec<String> = ranges
+            .into_iter()
+            .map(|r| sequence[r].to_string())
             .collect();
 
         for seq in subseqs {
@@ -511,7 +514,6 @@ impl MutableHandleGraph for HashGraph {
         }
 
         // move the outgoing edges to the last new segment
-
         // empty the existing right edges of the original node
         let mut orig_rights = std::mem::take(
             &mut self.get_node_mut(&handle.id()).unwrap().right_edges,
@@ -550,23 +552,33 @@ impl MutableHandleGraph for HashGraph {
             }
         }
 
-        // TODO create edges between the new segments
+        // create edges between the new segments
         for (this, next) in result.iter().zip(result.iter().skip(1)) {
             self.create_edge(&Edge(*this, *next));
         }
 
-        // TODO update paths and path occurrences
+        // update paths and path occurrences
+
+        // TODO this is probably not
+        // correct, and it's silly to clone the results all the time
+        let affected_paths: Vec<(i64, usize)> = self
+            .get_node_unsafe(&handle.id())
+            .occurrences
+            .iter()
+            .map(|(k, v)| (*k, *v))
+            .collect();
+
+        for (path_id, ix) in affected_paths.into_iter() {
+            let step = PathStep::Step(path_id, ix);
+            self.rewrite_segment(&step, &step, result.clone());
+        }
 
         result
     }
 }
 
 impl HashGraph {
-    pub fn get_path(
-        &self,
-        // handle: &<Self as PathHandleGraph>::PathHandle,
-        path_id: &PathId,
-    ) -> Option<&Path> {
+    pub fn get_path(&self, path_id: &PathId) -> Option<&Path> {
         self.paths.get(path_id)
     }
 

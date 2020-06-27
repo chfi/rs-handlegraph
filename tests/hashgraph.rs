@@ -458,21 +458,47 @@ fn append_prepend_path() {
 #[test]
 fn graph_divide_handle() {
     let mut graph = HashGraph::new();
-    let h1 = graph.append_handle("ABCD");
-    let h2 = graph.append_handle("EFGHIJKLMN");
-    let h3 = graph.append_handle("OPQ");
+    graph.append_handle("ABCD");
+    graph.append_handle("EFGHIJKLMN");
+    graph.append_handle("OPQ");
 
-    for k in 1..=3 {
-        let node = graph.get_node_unsafe(&NodeId::from(k));
-        println!("{} - {:?}", k, node.sequence);
+    graph.create_edge(&Edge(H1, H2));
+    graph.create_edge(&Edge(H2, H3));
+
+    assert_eq!(graph.get_sequence(&H1), "ABCD".to_string());
+    assert_eq!(graph.get_sequence(&H2), "EFGHIJKLMN".to_string());
+    assert_eq!(graph.get_sequence(&H3), "OPQ".to_string());
+
+    assert!(graph.has_edge(&H1, &H2));
+    assert!(graph.has_edge(&H2, &H3));
+
+    let hs = graph.divide_handle(&H2, vec![3, 7, 9]);
+
+    for e in edges_iter(&graph) {
+        println!("{:?}", e);
     }
 
-    println!();
+    // The left-hand edges on the divided handle are the same
+    assert!(graph.has_edge(&H1, &H2));
+    // But the right-hand are not
+    assert!(!graph.has_edge(&H2, &H3));
 
-    let hs = graph.divide_handle(&h2, vec![2, 2]);
+    // The new handles are chained together
+    assert!(graph.has_edge(&H2, &H4));
+    assert!(graph.has_edge(&H4, &H5));
+    assert!(graph.has_edge(&H5, &H6));
+    // and the last one attaches to the correct node on its RHS
+    assert!(graph.has_edge(&H6, &H3));
 
-    for k in 1..=4 {
-        let node = graph.get_node_unsafe(&NodeId::from(k));
-        println!("{} - {:?}", k, node.sequence);
-    }
+    // The other handles are untouched
+    assert_eq!(graph.get_sequence(&H1), "ABCD".to_string());
+    assert_eq!(graph.get_sequence(&H3), "OPQ".to_string());
+
+    // The split handle has a corresponding subsequence
+    assert_eq!(graph.get_sequence(&H2), "EFG".to_string());
+
+    // The new handles are correctly constructed
+    assert_eq!(graph.get_sequence(&H4), "HIJK".to_string());
+    assert_eq!(graph.get_sequence(&H5), "LM".to_string());
+    assert_eq!(graph.get_sequence(&H6), "N".to_string());
 }
