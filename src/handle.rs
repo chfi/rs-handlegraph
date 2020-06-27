@@ -1,6 +1,7 @@
+use std::cmp::Ordering;
 use std::ops::Add;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(u64);
 
 impl std::fmt::Display for NodeId {
@@ -83,16 +84,16 @@ impl Edge {
         let flipped_right = right.flip();
         let flipped_left = left.flip();
 
-        if left > &flipped_right {
-            Edge(flipped_right, flipped_left)
-        } else if left == &flipped_right {
-            if right > &flipped_left {
-                Edge(flipped_right, flipped_left)
-            } else {
-                Edge(*left, *right)
+        match left.cmp(&flipped_right) {
+            Ordering::Greater => Edge(flipped_right, flipped_left),
+            Ordering::Equal => {
+                if right > &flipped_left {
+                    Edge(flipped_right, flipped_left)
+                } else {
+                    Edge(*left, *right)
+                }
             }
-        } else {
-            Edge(*left, *right)
+            Ordering::Less => Edge(*left, *right),
         }
     }
 }

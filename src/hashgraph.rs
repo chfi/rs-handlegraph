@@ -3,10 +3,10 @@ use std::collections::HashMap;
 use gfa::gfa::{Line, Link, Segment, GFA};
 use gfa::parser::parse_gfa_stream;
 use std::io::prelude::*;
-use std::io::{BufReader, Lines};
+use std::io::Lines;
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
-use crate::handlegraph::{handle_edges_iter, handle_iter, HandleGraph};
+use crate::handlegraph::{handle_edges_iter, HandleGraph};
 use crate::mutablehandlegraph::MutableHandleGraph;
 use crate::pathgraph::PathHandleGraph;
 
@@ -83,7 +83,7 @@ impl Path {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default, Debug)]
 pub struct HashGraph {
     pub max_id: NodeId,
     pub min_id: NodeId,
@@ -97,9 +97,7 @@ impl HashGraph {
         HashGraph {
             max_id: NodeId::from(0),
             min_id: NodeId::from(std::u64::MAX),
-            graph: HashMap::new(),
-            path_id: HashMap::new(),
-            paths: HashMap::new(),
+            ..Default::default()
         }
     }
 
@@ -181,22 +179,24 @@ impl HashGraph {
         for line in gfa_lines {
             match line {
                 Line::Segment(seg) => {
-                    let id = seg.name.parse::<u64>().expect(&format!(
-                        "Expected integer name in GFA, was {}\n",
-                        seg.name
-                    ));
+                    let id: u64 = seg.name.parse().unwrap_or_else(|_| {
+                        panic!(
+                            "Expected integer name in GFA, was {}\n",
+                            seg.name
+                        )
+                    });
                     self.create_handle(&seg.sequence, NodeId::from(id));
                 }
                 Line::Link(link) => {
-                    let left_id = link
-                        .from_segment
-                        .parse::<u64>()
-                        .expect("Expected integer name in GFA link");
+                    let left_id =
+                        link.from_segment.parse::<u64>().unwrap_or_else(|_| {
+                            panic!("Expected integer name in GFA link")
+                        });
 
-                    let right_id = link
-                        .to_segment
-                        .parse::<u64>()
-                        .expect("Expected integer name in GFA link");
+                    let right_id =
+                        link.to_segment.parse::<u64>().unwrap_or_else(|_| {
+                            panic!("Expected integer name in GFA link")
+                        });
 
                     let left =
                         Handle::pack(left_id, !link.from_orient.as_bool());
@@ -232,7 +232,7 @@ impl HashGraph {
             print!("{}", node.sequence);
         }
 
-        println!("");
+        println!();
     }
 
     pub fn print_occurrences(&self) {
@@ -248,10 +248,9 @@ impl HashGraph {
     }
 
     pub fn get_node_unsafe(&self, node_id: &NodeId) -> &Node {
-        self.graph.get(node_id).expect(&format!(
-            "Tried getting a node that doesn't exist, ID: {:?}",
-            node_id
-        ))
+        self.graph.get(node_id).unwrap_or_else(|| {
+            panic!("Tried getting a node that doesn't exist, ID: {:?}", node_id)
+        })
     }
 
     pub fn get_node_mut(&mut self, node_id: &NodeId) -> Option<&mut Node> {

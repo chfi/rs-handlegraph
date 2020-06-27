@@ -1,5 +1,4 @@
 use crate::handle::Handle;
-use std::ops::Add;
 
 pub trait PathHandleGraph {
     type PathHandle;

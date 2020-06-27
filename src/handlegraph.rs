@@ -31,8 +31,7 @@ pub trait HandleGraph {
 
     fn has_edge(&self, left: &Handle, right: &Handle) -> bool {
         std::iter::from_fn(self.handle_edges_iter_impl(*left, Direction::Right))
-            .find(|h| h == right)
-            .is_some()
+            .any(|h| h == *right)
     }
 
     fn get_edge_count(&self) -> usize;
