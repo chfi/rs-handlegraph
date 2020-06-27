@@ -302,20 +302,17 @@ impl HandleGraph for HashGraph {
         F: FnMut(&Handle) -> bool,
     {
         let node = self.get_node_unsafe(&handle.id());
-        let handles = if handle.is_reverse() != (dir == Direction::Left) {
-            &node.left_edges
-        } else {
-            &node.right_edges
+
+        let handles = match (dir, handle.is_reverse()) {
+            (Direction::Left, true) => &node.right_edges,
+            (Direction::Left, false) => &node.left_edges,
+            (Direction::Right, true) => &node.left_edges,
+            (Direction::Right, false) => &node.right_edges,
         };
 
         for h in handles.iter() {
-            let cont = if dir == Direction::Left {
-                f(&h.flip())
-            } else {
-                f(h)
-            };
-
-            if !cont {
+            let h = if dir == Direction::Left { h.flip() } else { *h };
+            if !f(&h) {
                 return false;
             }
         }
@@ -370,22 +367,22 @@ impl HandleGraph for HashGraph {
         dir: Direction,
     ) -> Box<dyn FnMut() -> Option<Handle> + 'a> {
         let node = self.get_node_unsafe(&handle.id());
-        let handles = if handle.is_reverse() != (dir == Direction::Left) {
-            &node.left_edges
-        } else {
-            &node.right_edges
+
+        let handles = match (dir, handle.is_reverse()) {
+            (Direction::Left, true) => &node.right_edges,
+            (Direction::Left, false) => &node.left_edges,
+            (Direction::Right, true) => &node.left_edges,
+            (Direction::Right, false) => &node.right_edges,
         };
 
         let mut iter = handles.iter();
-
-        Box::new(move || iter.next().map(|i| i.clone()))
+        Box::new(move || iter.next().copied())
     }
 
     fn handle_iter_impl<'a>(
         &'a self,
     ) -> Box<dyn FnMut() -> Option<Handle> + 'a> {
         let mut iter = self.graph.keys().map(|i| Handle::pack(*i, false));
-
         Box::new(move || iter.next())
     }
 
@@ -490,11 +487,7 @@ impl MutableHandleGraph for HashGraph {
             offsets
         };
 
-        let fwd_handle = if handle.is_reverse() {
-            handle.flip()
-        } else {
-            *handle
-        };
+        let fwd_handle = handle.forward();
 
         let num_offsets = fwd_offsets.len();
         // TODO it should be possible to do this without creating new
@@ -565,6 +558,22 @@ impl MutableHandleGraph for HashGraph {
     }
 }
 
+impl HashGraph {
+    pub fn get_path(
+        &self,
+        // handle: &<Self as PathHandleGraph>::PathHandle,
+        path_id: &PathId,
+    ) -> Option<&Path> {
+        self.paths.get(path_id)
+    }
+
+    pub fn get_path_unsafe(&self, path_id: &PathId) -> &Path {
+        self.paths
+            .get(path_id)
+            .unwrap_or_else(|| panic!("Tried to look up nonexistent path:"))
+    }
+}
+
 impl PathHandleGraph for HashGraph {
     type PathHandle = PathId;
     type StepHandle = PathStep;
@@ -578,37 +587,23 @@ impl PathHandleGraph for HashGraph {
     }
 
     fn get_path_handle(&self, name: &str) -> Option<Self::PathHandle> {
-        self.path_id.get(name).map(|i| i.clone())
+        self.path_id.get(name).copied()
     }
 
-    fn get_path_name(&self, handle: &Self::PathHandle) -> &str {
-        if let Some(p) = self.paths.get(&handle) {
-            &p.name
-        } else {
-            panic!("Tried to look up nonexistent path:")
-        }
+    fn get_path_name(&self, path_id: &Self::PathHandle) -> &str {
+        &self.get_path_unsafe(path_id).name
     }
 
-    fn get_is_circular(&self, handle: &Self::PathHandle) -> bool {
-        if let Some(p) = self.paths.get(&handle) {
-            p.is_circular
-        } else {
-            panic!("Tried to look up nonexistent path:")
-        }
+    fn get_is_circular(&self, path_id: &Self::PathHandle) -> bool {
+        self.get_path_unsafe(path_id).is_circular
     }
 
-    fn get_step_count(&self, handle: &Self::PathHandle) -> usize {
-        if let Some(p) = self.paths.get(&handle) {
-            p.nodes.len()
-        } else {
-            panic!("Tried to look up nonexistent path:")
-        }
+    fn get_step_count(&self, path_id: &Self::PathHandle) -> usize {
+        self.get_path_unsafe(path_id).nodes.len()
     }
 
     fn get_handle_of_step(&self, step: &Self::StepHandle) -> Option<Handle> {
-        self.paths
-            .get(&step.path_id())
-            .unwrap()
+        self.get_path_unsafe(&step.path_id())
             .lookup_step_handle(step)
     }
 
@@ -678,7 +673,6 @@ impl PathHandleGraph for HashGraph {
             let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
             node.occurrences.remove(path);
         }
-        // for h in self.paths.get(&path).unwrap().
         self.paths.remove(&path);
     }
 
@@ -707,7 +701,6 @@ impl PathHandleGraph for HashGraph {
         PathStep::Step(*path_id, path.nodes.len() - 1)
     }
 
-    // TODO update occurrences in nodes
     fn prepend_step(
         &mut self,
         path_id: &Self::PathHandle,

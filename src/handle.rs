@@ -6,7 +6,7 @@ pub struct NodeId(u64);
 
 impl std::fmt::Display for NodeId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", u64::from(*self))
+        write!(f, "{}", self.0)
     }
 }
 
@@ -17,8 +17,8 @@ impl From<u64> for NodeId {
 }
 
 impl From<NodeId> for u64 {
-    fn from(NodeId(id): NodeId) -> Self {
-        id
+    fn from(id: NodeId) -> Self {
+        id.0
     }
 }
 
@@ -26,8 +26,7 @@ impl Add<u64> for NodeId {
     type Output = Self;
 
     fn add(self, other: u64) -> Self {
-        let NodeId(i) = self;
-        NodeId(i + other)
+        NodeId(self.0 + other)
     }
 }
 
@@ -36,8 +35,7 @@ pub struct Handle(u64);
 
 impl Handle {
     pub fn as_integer(self) -> u64 {
-        let Handle(i) = self;
-        i
+        self.0
     }
 
     pub const fn from_integer(i: u64) -> Self {
@@ -63,7 +61,7 @@ impl Handle {
         }
     }
 
-    pub fn id(&self) -> NodeId {
+    pub fn id(self) -> NodeId {
         NodeId(self.unpack_number())
     }
 
@@ -71,8 +69,16 @@ impl Handle {
         self.unpack_bit()
     }
 
-    pub fn flip(&self) -> Self {
+    pub fn flip(self) -> Self {
         Handle(self.as_integer() ^ 1)
+    }
+
+    pub fn forward(self) -> Self {
+        if self.is_reverse() {
+            self.flip()
+        } else {
+            self
+        }
     }
 }
 
