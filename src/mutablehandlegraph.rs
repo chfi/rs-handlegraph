@@ -11,7 +11,7 @@ pub trait MutableHandleGraph: HandleGraph {
 
     fn divide_handle(
         &mut self,
-        handle: &Handle,
+        handle: Handle,
         offsets: Vec<usize>,
     ) -> Vec<Handle>;
 

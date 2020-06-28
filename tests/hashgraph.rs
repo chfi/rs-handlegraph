@@ -1,10 +1,8 @@
 use handlegraph::handle::{Direction, Edge, Handle, NodeId};
-use handlegraph::handlegraph::{
-    edges_iter, handle_edges_iter, handle_iter, HandleGraph,
-};
-use handlegraph::hashgraph::{HashGraph, PathId, PathStep};
+use handlegraph::handlegraph::{handle_edges_iter, handle_iter, HandleGraph};
+use handlegraph::hashgraph::{HashGraph, PathStep};
 use handlegraph::mutablehandlegraph::MutableHandleGraph;
-use handlegraph::pathgraph::{occurrences_iter, paths_iter, PathHandleGraph};
+use handlegraph::pathgraph::PathHandleGraph;
 
 static H1: Handle = Handle::from_integer(2);
 static H2: Handle = Handle::from_integer(4);
@@ -123,10 +121,10 @@ fn degree_is_correct() {
     let h1 = Handle::pack(NodeId::from(9), false);
     let h2 = Handle::pack(NodeId::from(3), false);
 
-    assert_eq!(graph.get_degree(&h1, Direction::Right), 2);
-    assert_eq!(graph.get_degree(&h1, Direction::Left), 2);
-    assert_eq!(graph.get_degree(&h2, Direction::Right), 2);
-    assert_eq!(graph.get_degree(&h2, Direction::Left), 1);
+    assert_eq!(graph.get_degree(h1, Direction::Right), 2);
+    assert_eq!(graph.get_degree(h1, Direction::Left), 2);
+    assert_eq!(graph.get_degree(h2, Direction::Right), 2);
+    assert_eq!(graph.get_degree(h2, Direction::Left), 1);
 }
 
 fn path_graph() -> HashGraph {
@@ -163,8 +161,8 @@ fn graph_has_edge() {
     let h20 = Handle::from_integer(20);
     let h21 = h20.flip();
 
-    assert!(graph.has_edge(&h18, &h20));
-    assert!(graph.has_edge(&h21, &h19));
+    assert!(graph.has_edge(h18, h20));
+    assert!(graph.has_edge(h21, h19));
 }
 
 #[test]
@@ -178,7 +176,7 @@ fn graph_follow_edges() {
 
     let mut h1_edges_r = vec![];
 
-    graph.follow_edges(&H1, Direction::Right, |&h| {
+    graph.follow_edges(H1, Direction::Right, |h| {
         h1_edges_r.push(h);
         true
     });
@@ -188,12 +186,12 @@ fn graph_follow_edges() {
     let mut h4_edges_l = vec![];
     let mut h4_edges_r = vec![];
 
-    graph.follow_edges(&H4, Direction::Left, |&h| {
+    graph.follow_edges(H4, Direction::Left, |h| {
         h4_edges_l.push(h);
         true
     });
 
-    graph.follow_edges(&H4, Direction::Right, |&h| {
+    graph.follow_edges(H4, Direction::Right, |h| {
         h4_edges_r.push(h);
         true
     });
@@ -482,12 +480,12 @@ fn graph_divide_handle() {
     graph.append_step(&path, H2);
     graph.append_step(&path, H3);
 
-    assert_eq!("ABCD".to_string(), graph.get_sequence(&H1));
-    assert_eq!("EFGHIJKLMN".to_string(), graph.get_sequence(&H2));
-    assert_eq!("OPQ".to_string(), graph.get_sequence(&H3));
+    assert_eq!("ABCD".to_string(), graph.get_sequence(H1));
+    assert_eq!("EFGHIJKLMN".to_string(), graph.get_sequence(H2));
+    assert_eq!("OPQ".to_string(), graph.get_sequence(H3));
 
-    assert!(graph.has_edge(&H1, &H2));
-    assert!(graph.has_edge(&H2, &H3));
+    assert!(graph.has_edge(H1, H2));
+    assert!(graph.has_edge(H2, H3));
 
     let handles = walk_path(&graph);
 
@@ -496,31 +494,31 @@ fn graph_divide_handle() {
 
     assert_eq!(expected_handles, handles);
 
-    graph.divide_handle(&H2, vec![3, 7, 9]);
+    graph.divide_handle(H2, vec![3, 7, 9]);
 
     // The left-hand edges on the divided handle are the same
-    assert!(graph.has_edge(&H1, &H2));
+    assert!(graph.has_edge(H1, H2));
     // But the right-hand are not
-    assert!(!graph.has_edge(&H2, &H3));
+    assert!(!graph.has_edge(H2, H3));
 
     // The new handles are chained together
-    assert!(graph.has_edge(&H2, &H4));
-    assert!(graph.has_edge(&H4, &H5));
-    assert!(graph.has_edge(&H5, &H6));
+    assert!(graph.has_edge(H2, H4));
+    assert!(graph.has_edge(H4, H5));
+    assert!(graph.has_edge(H5, H6));
     // and the last one attaches to the correct node on its RHS
-    assert!(graph.has_edge(&H6, &H3));
+    assert!(graph.has_edge(H6, H3));
 
     // The other handles are untouched
-    assert_eq!(graph.get_sequence(&H1), "ABCD".to_string());
-    assert_eq!(graph.get_sequence(&H3), "OPQ".to_string());
+    assert_eq!(graph.get_sequence(H1), "ABCD".to_string());
+    assert_eq!(graph.get_sequence(H3), "OPQ".to_string());
 
     // The split handle has a corresponding subsequence
-    assert_eq!(graph.get_sequence(&H2), "EFG".to_string());
+    assert_eq!(graph.get_sequence(H2), "EFG".to_string());
 
     // The new handles are correctly constructed
-    assert_eq!(graph.get_sequence(&H4), "HIJK".to_string());
-    assert_eq!(graph.get_sequence(&H5), "LM".to_string());
-    assert_eq!(graph.get_sequence(&H6), "N".to_string());
+    assert_eq!(graph.get_sequence(H4), "HIJK".to_string());
+    assert_eq!(graph.get_sequence(H5), "LM".to_string());
+    assert_eq!(graph.get_sequence(H6), "N".to_string());
 
     // The path is correctly updated
     let handles = walk_path(&graph);

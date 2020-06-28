@@ -263,15 +263,15 @@ impl HandleGraph for HashGraph {
         self.graph.contains_key(&node_id)
     }
 
-    fn get_sequence(&self, handle: &Handle) -> &str {
+    fn get_sequence(&self, handle: Handle) -> &str {
         &self.get_node_unsafe(&handle.id()).sequence
     }
 
-    fn get_length(&self, handle: &Handle) -> usize {
+    fn get_length(&self, handle: Handle) -> usize {
         self.get_sequence(handle).len()
     }
 
-    fn get_degree(&self, handle: &Handle, dir: Direction) -> usize {
+    fn get_degree(&self, handle: Handle, dir: Direction) -> usize {
         let n = self.get_node_unsafe(&handle.id());
         match dir {
             Direction::Right => n.right_edges.len(),
@@ -297,9 +297,9 @@ impl HandleGraph for HashGraph {
             .fold(0, |a, (_, v)| a + v.left_edges.len() + v.right_edges.len())
     }
 
-    fn follow_edges<F>(&self, handle: &Handle, dir: Direction, mut f: F) -> bool
+    fn follow_edges<F>(&self, handle: Handle, dir: Direction, mut f: F) -> bool
     where
-        F: FnMut(&Handle) -> bool,
+        F: FnMut(Handle) -> bool,
     {
         let node = self.get_node_unsafe(&handle.id());
 
@@ -312,7 +312,7 @@ impl HandleGraph for HashGraph {
 
         for h in handles.iter() {
             let h = if dir == Direction::Left { h.flip() } else { *h };
-            if !f(&h) {
+            if !f(h) {
                 return false;
             }
         }
@@ -321,10 +321,10 @@ impl HandleGraph for HashGraph {
 
     fn for_each_handle<F>(&self, mut f: F) -> bool
     where
-        F: FnMut(&Handle) -> bool,
+        F: FnMut(Handle) -> bool,
     {
         for id in self.graph.keys() {
-            if !f(&Handle::pack(*id, false)) {
+            if !f(Handle::pack(*id, false)) {
                 return false;
             }
         }
@@ -341,7 +341,7 @@ impl HandleGraph for HashGraph {
 
             self.follow_edges(handle, Direction::Right, |next| {
                 if handle.id() <= next.id() {
-                    keep_going = f(&Edge::edge_handle(handle, next));
+                    keep_going = f(&Edge::edge_handle(&handle, &next));
                 }
                 keep_going
             });
@@ -351,7 +351,7 @@ impl HandleGraph for HashGraph {
                     if handle.id() < prev.id()
                         || (handle.id() == prev.id() && prev.is_reverse())
                     {
-                        keep_going = f(&Edge::edge_handle(prev, handle));
+                        keep_going = f(&Edge::edge_handle(&prev, &handle));
                     }
                     keep_going
                 });
@@ -474,10 +474,10 @@ impl MutableHandleGraph for HashGraph {
 
     fn divide_handle(
         &mut self,
-        handle: &Handle,
+        handle: Handle,
         mut offsets: Vec<usize>,
     ) -> Vec<Handle> {
-        let mut result = vec![*handle];
+        let mut result = vec![handle];
         let node_len = self.get_length(handle);
         let sequence = self.get_sequence(handle);
 
