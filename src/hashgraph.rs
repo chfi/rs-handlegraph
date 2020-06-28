@@ -375,8 +375,14 @@ impl HandleGraph for HashGraph {
             (Direction::Right, false) => &node.right_edges,
         };
 
-        let mut iter = handles.iter();
-        Box::new(move || iter.next().copied())
+        let mut iter = handles.iter().map(move |h| {
+            if dir == Direction::Left {
+                h.flip()
+            } else {
+                *h
+            }
+        });
+        Box::new(move || iter.next())
     }
 
     fn handle_iter_impl<'a>(
