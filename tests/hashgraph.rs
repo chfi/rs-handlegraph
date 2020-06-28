@@ -4,7 +4,7 @@ use handlegraph::handlegraph::{
 };
 use handlegraph::hashgraph::{HashGraph, PathId, PathStep};
 use handlegraph::mutablehandlegraph::MutableHandleGraph;
-use handlegraph::pathgraph::PathHandleGraph;
+use handlegraph::pathgraph::{occurrences_iter, paths_iter, PathHandleGraph};
 
 static H1: Handle = Handle::from_integer(2);
 static H2: Handle = Handle::from_integer(4);
@@ -465,18 +465,38 @@ fn graph_divide_handle() {
     graph.create_edge(&Edge(H1, H2));
     graph.create_edge(&Edge(H2, H3));
 
-    assert_eq!(graph.get_sequence(&H1), "ABCD".to_string());
-    assert_eq!(graph.get_sequence(&H2), "EFGHIJKLMN".to_string());
-    assert_eq!(graph.get_sequence(&H3), "OPQ".to_string());
+    let path = graph.create_path_handle("path-1", false);
+
+    let walk_path = |graph: &HashGraph| {
+        let mut last = graph.path_front_end(&path);
+        let mut handles = vec![];
+        for _ in 0..graph.get_step_count(&path) {
+            let next = graph.next_step(&last);
+            handles.push(graph.get_handle_of_step(&next));
+            last = next;
+        }
+        handles
+    };
+
+    graph.append_step(&path, H1);
+    graph.append_step(&path, H2);
+    graph.append_step(&path, H3);
+
+    assert_eq!("ABCD".to_string(), graph.get_sequence(&H1));
+    assert_eq!("EFGHIJKLMN".to_string(), graph.get_sequence(&H2));
+    assert_eq!("OPQ".to_string(), graph.get_sequence(&H3));
 
     assert!(graph.has_edge(&H1, &H2));
     assert!(graph.has_edge(&H2, &H3));
 
-    let hs = graph.divide_handle(&H2, vec![3, 7, 9]);
+    let handles = walk_path(&graph);
 
-    for e in edges_iter(&graph) {
-        println!("{:?}", e);
-    }
+    let expected_handles: Vec<_> =
+        [H1, H2, H3].iter().map(|h| Some(*h)).collect();
+
+    assert_eq!(expected_handles, handles);
+
+    graph.divide_handle(&H2, vec![3, 7, 9]);
 
     // The left-hand edges on the divided handle are the same
     assert!(graph.has_edge(&H1, &H2));
@@ -501,4 +521,12 @@ fn graph_divide_handle() {
     assert_eq!(graph.get_sequence(&H4), "HIJK".to_string());
     assert_eq!(graph.get_sequence(&H5), "LM".to_string());
     assert_eq!(graph.get_sequence(&H6), "N".to_string());
+
+    // The path is correctly updated
+    let handles = walk_path(&graph);
+
+    let expected_handles: Vec<_> =
+        [H1, H2, H4, H5, H6, H3].iter().map(|h| Some(*h)).collect();
+
+    assert_eq!(expected_handles, handles);
 }
