@@ -166,41 +166,6 @@ fn graph_has_edge() {
 }
 
 #[test]
-fn graph_follow_edges() {
-    let mut graph = path_graph();
-
-    // add some more edges to make things interesting
-
-    graph.create_edge(&Edge(H1, H4));
-    graph.create_edge(&Edge(H1, H6));
-
-    let mut h1_edges_r = vec![];
-
-    graph.follow_edges(H1, Direction::Right, |h| {
-        h1_edges_r.push(h);
-        true
-    });
-
-    assert_eq!(h1_edges_r, vec![H2, H3, H4, H6]);
-
-    let mut h4_edges_l = vec![];
-    let mut h4_edges_r = vec![];
-
-    graph.follow_edges(H4, Direction::Left, |h| {
-        h4_edges_l.push(h);
-        true
-    });
-
-    graph.follow_edges(H4, Direction::Right, |h| {
-        h4_edges_r.push(h);
-        true
-    });
-
-    assert_eq!(h4_edges_l, vec![H3, H1]);
-    assert_eq!(h4_edges_r, vec![H6]);
-}
-
-#[test]
 fn graph_handle_edges_iter() {
     let mut graph = path_graph();
 
@@ -241,29 +206,6 @@ fn graph_handle_iter() {
 fn graph_edges_iter() {
     let mut graph = path_graph();
 
-    let edges_next = graph.edges_iter_impl();
-
-    let mut edges_found: Vec<_> = std::iter::from_fn(edges_next).collect();
-
-    edges_found.sort();
-
-    let mut edges: Vec<_> = vec![
-        Edge::edge_handle(&H4, &H6),
-        Edge::edge_handle(&H3, &H4),
-        Edge::edge_handle(&H1, &H2),
-        Edge::edge_handle(&H1, &H3),
-        Edge::edge_handle(&H5, &H6),
-        Edge::edge_handle(&H2, &H5),
-    ];
-    edges.sort();
-
-    assert_eq!(edges, edges_found);
-}
-
-#[test]
-fn graph_for_each_edge() {
-    let mut graph = path_graph();
-
     graph.create_edge(&Edge(H1, H4));
     graph.create_edge(&Edge(H1, H6));
 
@@ -272,27 +214,11 @@ fn graph_for_each_edge() {
 
     graph.create_edge(&Edge(H3, H5));
 
-    /* The graph looks like:
-           v--------\
-    1   -> 2 -> 5 -> 6
-    |\     ^-/--^   ^^
-    \ \     /\--   / |
-     \ \-> 3 -> 4-/  |
-      ----------^   /
-       \-----------/
+    let edges_next = graph.edges_iter_impl();
 
-    Right edges:
-    1 -> [2, 3, 4, 6]
-    2 -> [5]
-    3 -> [4, 5]
-    4 -> [6]
-    5 -> [6]
-    6 -> []
+    let mut edges_found: Vec<_> = std::iter::from_fn(edges_next).collect();
 
-    Left edges:
-    4 -> [2]
-    6 -> [2]
-     */
+    edges_found.sort();
 
     let mut edges: Vec<_> = vec![
         Edge::edge_handle(&H1, &H2),
@@ -309,19 +235,6 @@ fn graph_for_each_edge() {
     ];
 
     edges.sort();
-
-    let mut edges_found: Vec<_> = Vec::new();
-
-    graph.for_each_edge(|e| {
-        let Edge(hl, hr) = e;
-        edges_found.push(e.clone());
-        let nl = hl.id();
-        let nr = hr.id();
-        println!("{:?} -> {:?}", nl, nr);
-        true
-    });
-
-    edges_found.sort();
 
     assert_eq!(edges, edges_found);
 }

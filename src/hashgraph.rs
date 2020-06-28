@@ -6,7 +6,7 @@ use std::io::prelude::*;
 use std::io::Lines;
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
-use crate::handlegraph::{handle_edges_iter, HandleGraph};
+use crate::handlegraph::{handle_edges_iter, handle_iter, HandleGraph};
 use crate::mutablehandlegraph::MutableHandleGraph;
 use crate::pathgraph::PathHandleGraph;
 
@@ -236,10 +236,9 @@ impl HashGraph {
     }
 
     pub fn print_occurrences(&self) {
-        self.for_each_handle(|h| {
+        handle_iter(self).for_each(|h| {
             let node = self.get_node(&h.id()).unwrap();
             println!("{} - {:?}", node.sequence, node.occurrences);
-            true
         });
     }
 
@@ -295,70 +294,6 @@ impl HandleGraph for HashGraph {
         self.graph
             .iter()
             .fold(0, |a, (_, v)| a + v.left_edges.len() + v.right_edges.len())
-    }
-
-    fn follow_edges<F>(&self, handle: Handle, dir: Direction, mut f: F) -> bool
-    where
-        F: FnMut(Handle) -> bool,
-    {
-        let node = self.get_node_unsafe(&handle.id());
-
-        let handles = match (dir, handle.is_reverse()) {
-            (Direction::Left, true) => &node.right_edges,
-            (Direction::Left, false) => &node.left_edges,
-            (Direction::Right, true) => &node.left_edges,
-            (Direction::Right, false) => &node.right_edges,
-        };
-
-        for h in handles.iter() {
-            let h = if dir == Direction::Left { h.flip() } else { *h };
-            if !f(h) {
-                return false;
-            }
-        }
-        true
-    }
-
-    fn for_each_handle<F>(&self, mut f: F) -> bool
-    where
-        F: FnMut(Handle) -> bool,
-    {
-        for id in self.graph.keys() {
-            if !f(Handle::pack(*id, false)) {
-                return false;
-            }
-        }
-
-        true
-    }
-
-    fn for_each_edge<F>(&self, mut f: F) -> bool
-    where
-        F: FnMut(&Edge) -> bool,
-    {
-        self.for_each_handle(|handle| {
-            let mut keep_going = true;
-
-            self.follow_edges(handle, Direction::Right, |next| {
-                if handle.id() <= next.id() {
-                    keep_going = f(&Edge::edge_handle(&handle, &next));
-                }
-                keep_going
-            });
-
-            if keep_going {
-                self.follow_edges(handle, Direction::Left, |prev| {
-                    if handle.id() < prev.id()
-                        || (handle.id() == prev.id() && prev.is_reverse())
-                    {
-                        keep_going = f(&Edge::edge_handle(&prev, &handle));
-                    }
-                    keep_going
-                });
-            }
-
-            keep_going
-        })
     }
 
     fn handle_edges_iter_impl<'a>(
@@ -799,31 +734,6 @@ impl PathHandleGraph for HashGraph {
         // input steps were Front and/or End, the output steps exist
         // on the path
         (PathStep::Step(path_id, l), PathStep::Step(path_id, r))
-    }
-
-    fn for_each_path_handle<F>(&self, mut f: F) -> bool
-    where
-        F: FnMut(&PathId) -> bool,
-    {
-        for ph in self.paths.keys() {
-            if !f(&ph) {
-                return false;
-            }
-        }
-        true
-    }
-
-    fn for_each_step_on_handle<F>(&self, handle: &Handle, mut f: F) -> bool
-    where
-        F: FnMut(&PathStep) -> bool,
-    {
-        let node: &Node = self.get_node_unsafe(&handle.id());
-        for (path, ix) in node.occurrences.iter() {
-            if !f(&PathStep::Step(*path, *ix)) {
-                return false;
-            }
-        }
-        true
     }
 
     fn paths_iter_impl<'a>(

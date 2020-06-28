@@ -1,4 +1,4 @@
-use crate::handle::{Direction, Edge, Handle, NodeId};
+use crate::handle::{Edge, Handle, NodeId};
 
 use crate::handlegraph::HandleGraph;
 
