@@ -85,7 +85,7 @@ pub fn reverse_complement_char(c: u8) -> u8 {
 }
 
 pub fn reverse_complement(seq: &str) -> String {
-    let mut seq_bytes = seq.as_bytes();
+    let seq_bytes = seq.as_bytes();
 
     let mut rev_seq: Vec<_> = seq_bytes
         .into_iter()

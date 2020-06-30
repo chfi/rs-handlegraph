@@ -262,15 +262,15 @@ impl HandleGraph for HashGraph {
         self.graph.contains_key(&node_id)
     }
 
-    fn get_sequence(&self, handle: Handle) -> &str {
+    fn sequence(&self, handle: Handle) -> &str {
         &self.get_node_unsafe(&handle.id()).sequence
     }
 
-    fn get_length(&self, handle: Handle) -> usize {
-        self.get_sequence(handle).len()
+    fn length(&self, handle: Handle) -> usize {
+        self.sequence(handle).len()
     }
 
-    fn get_degree(&self, handle: Handle, dir: Direction) -> usize {
+    fn degree(&self, handle: Handle, dir: Direction) -> usize {
         let n = self.get_node_unsafe(&handle.id());
         match dir {
             Direction::Right => n.right_edges.len(),
@@ -278,7 +278,7 @@ impl HandleGraph for HashGraph {
         }
     }
 
-    fn get_node_count(&self) -> usize {
+    fn node_count(&self) -> usize {
         self.graph.len()
     }
 
@@ -290,7 +290,7 @@ impl HandleGraph for HashGraph {
         self.max_id
     }
 
-    fn get_edge_count(&self) -> usize {
+    fn edge_count(&self) -> usize {
         self.graph
             .iter()
             .fold(0, |a, (_, v)| a + v.left_edges.len() + v.right_edges.len())
@@ -419,8 +419,8 @@ impl MutableHandleGraph for HashGraph {
         mut offsets: Vec<usize>,
     ) -> Vec<Handle> {
         let mut result = vec![handle];
-        let node_len = self.get_length(handle);
-        let sequence = self.get_sequence(handle);
+        let node_len = self.length(handle);
+        let sequence = self.sequence(handle);
 
         let fwd_handle = handle.forward();
 
@@ -534,7 +534,7 @@ impl PathHandleGraph for HashGraph {
     type PathHandle = PathId;
     type StepHandle = PathStep;
 
-    fn get_path_count(&self) -> usize {
+    fn path_count(&self) -> usize {
         self.path_id.len()
     }
 
@@ -542,31 +542,28 @@ impl PathHandleGraph for HashGraph {
         self.path_id.contains_key(name)
     }
 
-    fn get_path_handle(&self, name: &str) -> Option<Self::PathHandle> {
+    fn name_to_path_handle(&self, name: &str) -> Option<Self::PathHandle> {
         self.path_id.get(name).copied()
     }
 
-    fn get_path_name(&self, path_id: &Self::PathHandle) -> &str {
+    fn path_handle_to_name(&self, path_id: &Self::PathHandle) -> &str {
         &self.get_path_unsafe(path_id).name
     }
 
-    fn get_is_circular(&self, path_id: &Self::PathHandle) -> bool {
+    fn is_circular(&self, path_id: &Self::PathHandle) -> bool {
         self.get_path_unsafe(path_id).is_circular
     }
 
-    fn get_step_count(&self, path_id: &Self::PathHandle) -> usize {
+    fn step_count(&self, path_id: &Self::PathHandle) -> usize {
         self.get_path_unsafe(path_id).nodes.len()
     }
 
-    fn get_handle_of_step(&self, step: &Self::StepHandle) -> Option<Handle> {
+    fn handle_of_step(&self, step: &Self::StepHandle) -> Option<Handle> {
         self.get_path_unsafe(&step.path_id())
             .lookup_step_handle(step)
     }
 
-    fn get_path_handle_of_step(
-        &self,
-        step: &Self::StepHandle,
-    ) -> Self::PathHandle {
+    fn path_handle_of_step(&self, step: &Self::StepHandle) -> Self::PathHandle {
         step.path_id()
     }
 
@@ -579,7 +576,7 @@ impl PathHandleGraph for HashGraph {
     }
 
     fn path_back(&self, path: &Self::PathHandle) -> Self::StepHandle {
-        PathStep::Step(*path, self.get_step_count(path) - 1)
+        PathStep::Step(*path, self.step_count(path) - 1)
     }
 
     fn path_front_end(&self, path: &Self::PathHandle) -> Self::StepHandle {
@@ -599,7 +596,7 @@ impl PathHandleGraph for HashGraph {
             PathStep::Front(pid) => self.path_begin(pid),
             PathStep::End(pid) => self.path_end(pid),
             PathStep::Step(pid, ix) => {
-                if *ix < self.get_step_count(pid) - 1 {
+                if *ix < self.step_count(pid) - 1 {
                     PathStep::Step(*pid, ix + 1)
                 } else {
                     self.path_end(pid)

@@ -4,24 +4,21 @@ pub trait PathHandleGraph {
     type PathHandle;
     type StepHandle;
 
-    fn get_path_count(&self) -> usize;
+    fn path_count(&self) -> usize;
 
     fn has_path(&self, name: &str) -> bool;
 
-    fn get_path_handle(&self, name: &str) -> Option<Self::PathHandle>;
+    fn name_to_path_handle(&self, name: &str) -> Option<Self::PathHandle>;
 
-    fn get_path_name(&self, handle: &Self::PathHandle) -> &str;
+    fn path_handle_to_name(&self, handle: &Self::PathHandle) -> &str;
 
-    fn get_is_circular(&self, handle: &Self::PathHandle) -> bool;
+    fn is_circular(&self, handle: &Self::PathHandle) -> bool;
 
-    fn get_step_count(&self, handle: &Self::PathHandle) -> usize;
+    fn step_count(&self, handle: &Self::PathHandle) -> usize;
 
-    fn get_handle_of_step(
-        &self,
-        step_handle: &Self::StepHandle,
-    ) -> Option<Handle>;
+    fn handle_of_step(&self, step_handle: &Self::StepHandle) -> Option<Handle>;
 
-    fn get_path_handle_of_step(
+    fn path_handle_of_step(
         &self,
         step_handle: &Self::StepHandle,
     ) -> Self::PathHandle;

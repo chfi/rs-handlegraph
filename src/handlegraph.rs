@@ -3,28 +3,23 @@ use crate::handle::{Direction, Edge, Handle, NodeId};
 pub trait HandleGraph {
     fn has_node(&self, node_id: NodeId) -> bool;
 
-    fn get_length(&self, handle: Handle) -> usize;
+    fn length(&self, handle: Handle) -> usize;
 
-    fn get_sequence(&self, handle: Handle) -> &str;
+    fn sequence(&self, handle: Handle) -> &str;
 
-    fn get_subsequence(
-        &self,
-        handle: Handle,
-        index: usize,
-        size: usize,
-    ) -> &str {
-        &self.get_sequence(handle)[index..index + size]
+    fn subsequence(&self, handle: Handle, index: usize, size: usize) -> &str {
+        &self.sequence(handle)[index..index + size]
     }
 
-    fn get_base(&self, handle: Handle, index: usize) -> char {
-        char::from(self.get_sequence(handle).as_bytes()[index])
+    fn base(&self, handle: Handle, index: usize) -> char {
+        char::from(self.sequence(handle).as_bytes()[index])
     }
 
-    fn get_node_count(&self) -> usize;
+    fn node_count(&self) -> usize;
     fn min_node_id(&self) -> NodeId;
     fn max_node_id(&self) -> NodeId;
 
-    fn get_degree(&self, handle: Handle, dir: Direction) -> usize {
+    fn degree(&self, handle: Handle, dir: Direction) -> usize {
         std::iter::from_fn(self.handle_edges_iter_impl(handle, dir))
             .fold(0, |a, _| a + 1)
     }
@@ -34,11 +29,11 @@ pub trait HandleGraph {
             .any(|h| h == right)
     }
 
-    fn get_edge_count(&self) -> usize;
+    fn edge_count(&self) -> usize;
 
-    fn get_total_length(&self) -> usize {
+    fn total_length(&self) -> usize {
         std::iter::from_fn(self.handle_iter_impl())
-            .fold(0, |a, v| a + self.get_sequence(v).len())
+            .fold(0, |a, v| a + self.sequence(v).len())
     }
 
     fn traverse_edge_handle(&self, edge: &Edge, left: Handle) -> Handle {

@@ -76,8 +76,8 @@ fn construct_from_gfa() {
         let graph = HashGraph::from_gfa(&gfa);
         let node_ids: Vec<_> = graph.graph.keys().collect();
 
-        assert_eq!(15, graph.get_node_count());
-        assert_eq!(40, graph.get_edge_count());
+        assert_eq!(15, graph.node_count());
+        assert_eq!(40, graph.edge_count());
         println!("Node IDs:");
         for id in node_ids.iter() {
             println!("{:?}", id);
@@ -110,8 +110,8 @@ fn fill_from_gfa_stream() {
 
     graph.fill_from_gfa_lines(&mut lines);
 
-    assert_eq!(15, graph.get_node_count());
-    assert_eq!(40, graph.get_edge_count());
+    assert_eq!(15, graph.node_count());
+    assert_eq!(40, graph.edge_count());
 }
 
 #[test]
@@ -121,10 +121,10 @@ fn degree_is_correct() {
     let h1 = Handle::pack(NodeId::from(9), false);
     let h2 = Handle::pack(NodeId::from(3), false);
 
-    assert_eq!(graph.get_degree(h1, Direction::Right), 2);
-    assert_eq!(graph.get_degree(h1, Direction::Left), 2);
-    assert_eq!(graph.get_degree(h2, Direction::Right), 2);
-    assert_eq!(graph.get_degree(h2, Direction::Left), 1);
+    assert_eq!(graph.degree(h1, Direction::Right), 2);
+    assert_eq!(graph.degree(h1, Direction::Left), 2);
+    assert_eq!(graph.degree(h2, Direction::Right), 2);
+    assert_eq!(graph.degree(h2, Direction::Left), 1);
 }
 
 fn path_graph() -> HashGraph {
@@ -381,9 +381,9 @@ fn graph_divide_handle() {
     let walk_path = |graph: &HashGraph| {
         let mut last = graph.path_front_end(&path);
         let mut handles = vec![];
-        for _ in 0..graph.get_step_count(&path) {
+        for _ in 0..graph.step_count(&path) {
             let next = graph.next_step(&last);
-            handles.push(graph.get_handle_of_step(&next));
+            handles.push(graph.handle_of_step(&next));
             last = next;
         }
         handles
@@ -393,9 +393,9 @@ fn graph_divide_handle() {
     graph.append_step(&path, H2);
     graph.append_step(&path, H3);
 
-    assert_eq!("ABCD".to_string(), graph.get_sequence(H1));
-    assert_eq!("EFGHIJKLMN".to_string(), graph.get_sequence(H2));
-    assert_eq!("OPQ".to_string(), graph.get_sequence(H3));
+    assert_eq!("ABCD".to_string(), graph.sequence(H1));
+    assert_eq!("EFGHIJKLMN".to_string(), graph.sequence(H2));
+    assert_eq!("OPQ".to_string(), graph.sequence(H3));
 
     assert!(graph.has_edge(H1, H2));
     assert!(graph.has_edge(H2, H3));
@@ -422,16 +422,16 @@ fn graph_divide_handle() {
     assert!(graph.has_edge(H6, H3));
 
     // The other handles are untouched
-    assert_eq!(graph.get_sequence(H1), "ABCD".to_string());
-    assert_eq!(graph.get_sequence(H3), "OPQ".to_string());
+    assert_eq!(graph.sequence(H1), "ABCD".to_string());
+    assert_eq!(graph.sequence(H3), "OPQ".to_string());
 
     // The split handle has a corresponding subsequence
-    assert_eq!(graph.get_sequence(H2), "EFG".to_string());
+    assert_eq!(graph.sequence(H2), "EFG".to_string());
 
     // The new handles are correctly constructed
-    assert_eq!(graph.get_sequence(H4), "HIJK".to_string());
-    assert_eq!(graph.get_sequence(H5), "LM".to_string());
-    assert_eq!(graph.get_sequence(H6), "N".to_string());
+    assert_eq!(graph.sequence(H4), "HIJK".to_string());
+    assert_eq!(graph.sequence(H5), "LM".to_string());
+    assert_eq!(graph.sequence(H6), "N".to_string());
 
     // The path is correctly updated
     let handles = walk_path(&graph);
