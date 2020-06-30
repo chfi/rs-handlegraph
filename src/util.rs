@@ -42,7 +42,7 @@ Table taken from https://github.com/vgteam/libbdsg/blob/9d8e6c06317b4eb235c8927a
 | 129 | r    |
 */
 
-pub fn complement(c: u8) -> u8 {
+pub fn reverse_complement_char(c: u8) -> u8 {
     match c {
         43 => 36,
         44 => 35,
@@ -81,5 +81,29 @@ pub fn complement(c: u8) -> u8 {
         127 => 115,
         129 => 114,
         _ => 78,
+    }
+}
+
+pub fn reverse_complement(seq: &str) -> String {
+    let mut seq_bytes = seq.as_bytes();
+
+    let mut rev_seq: Vec<_> = seq_bytes
+        .into_iter()
+        .map(|c| reverse_complement_char(*c))
+        .collect();
+
+    rev_seq.reverse();
+
+    String::from_utf8(rev_seq).unwrap_or_else(|_| {
+        panic!("Reverse complement resulted in non UTF-8 string")
+    })
+}
+
+pub fn reverse_complement_inplace(seq: &mut String) {
+    unsafe {
+        let vec = seq.as_mut_vec();
+        vec.reverse();
+        vec.iter_mut()
+            .for_each(|c| *c = reverse_complement_char(*c));
     }
 }
