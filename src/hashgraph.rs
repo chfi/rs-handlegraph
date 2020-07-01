@@ -744,12 +744,27 @@ impl PathHandleGraph for HashGraph {
 
     fn occurrences_iter_impl<'a>(
         &'a self,
-        handle: &Handle,
+        handle: Handle,
     ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a> {
         let node: &Node = self.get_node_unsafe(&handle.id());
 
         let mut iter =
             node.occurrences.iter().map(|(k, v)| PathStep::Step(*k, *v));
+
+        Box::new(move || iter.next())
+    }
+
+    fn steps_iter_impl<'a>(
+        &'a self,
+        path_handle: &'a Self::PathHandle,
+    ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a> {
+        let path = self.get_path_unsafe(path_handle);
+
+        let mut iter = path
+            .nodes
+            .iter()
+            .enumerate()
+            .map(move |(i, _)| PathStep::Step(*path_handle, i));
 
         Box::new(move || iter.next())
     }

@@ -92,7 +92,13 @@ pub trait PathHandleGraph {
     /// the graph
     fn occurrences_iter_impl<'a>(
         &'a self,
-        handle: &Handle,
+        handle: Handle,
+    ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a>;
+
+    /// Returns a closure that iterates through all the steps in a path
+    fn steps_iter_impl<'a>(
+        &'a self,
+        path: &'a Self::PathHandle,
     ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a>;
 }
 
@@ -106,7 +112,14 @@ pub fn paths_iter<'a, T: PathHandleGraph>(
 /// Constructs an iterator from paths_iter_impl
 pub fn occurrences_iter<'a, T: PathHandleGraph>(
     graph: &'a T,
-    handle: &Handle,
+    handle: Handle,
 ) -> impl Iterator<Item = <T as PathHandleGraph>::StepHandle> + 'a {
     std::iter::from_fn(graph.occurrences_iter_impl(handle))
+}
+
+pub fn steps_iter<'a, T: PathHandleGraph>(
+    graph: &'a T,
+    path: &'a <T as PathHandleGraph>::PathHandle,
+) -> impl Iterator<Item = <T as PathHandleGraph>::StepHandle> + 'a {
+    std::iter::from_fn(graph.steps_iter_impl(path))
 }

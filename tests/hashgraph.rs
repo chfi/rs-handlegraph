@@ -2,7 +2,7 @@ use handlegraph::handle::{Direction, Edge, Handle, NodeId};
 use handlegraph::handlegraph::{handle_edges_iter, handles_iter, HandleGraph};
 use handlegraph::hashgraph::{HashGraph, PathStep};
 use handlegraph::mutablehandlegraph::MutableHandleGraph;
-use handlegraph::pathgraph::PathHandleGraph;
+use handlegraph::pathgraph::{steps_iter, PathHandleGraph};
 
 static H1: Handle = Handle::from_integer(2);
 static H2: Handle = Handle::from_integer(4);
@@ -364,6 +364,27 @@ fn append_prepend_path() {
     graph.print_path(&p2);
 
     graph.print_occurrences();
+}
+
+#[test]
+fn graph_path_steps_iter() {
+    use handlegraph::hashgraph::PathStep::*;
+
+    let mut graph = path_graph();
+
+    let p1 = graph.create_path_handle("path-1", false);
+    graph.append_step(&p1, H1);
+    graph.append_step(&p1, H2);
+    graph.append_step(&p1, H5);
+    graph.append_step(&p1, H6);
+
+    let mut iter = steps_iter(&graph, &p1);
+
+    assert_eq!(Some(Step(p1, 0)), iter.next());
+    assert_eq!(Some(Step(p1, 1)), iter.next());
+    assert_eq!(Some(Step(p1, 2)), iter.next());
+    assert_eq!(Some(Step(p1, 3)), iter.next());
+    assert_eq!(None, iter.next());
 }
 
 #[test]
