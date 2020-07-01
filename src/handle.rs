@@ -1,6 +1,8 @@
 use std::cmp::Ordering;
 use std::ops::Add;
 
+/// Newtype that represents a node in the graph, no matter the
+/// graph implementation
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeId(u64);
 
@@ -30,6 +32,7 @@ impl Add<u64> for NodeId {
     }
 }
 
+/// A Handle is a node ID with an orientation, packed as a single u64
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq, Ord)]
 pub struct Handle(u64);
 
@@ -86,24 +89,26 @@ impl Handle {
 pub struct Edge(pub Handle, pub Handle);
 
 impl Edge {
-    pub fn edge_handle(left: &Handle, right: &Handle) -> Edge {
+    /// Construct an edge, taking the orientation of the handles into account
+    pub fn edge_handle(left: Handle, right: Handle) -> Edge {
         let flipped_right = right.flip();
         let flipped_left = left.flip();
 
         match left.cmp(&flipped_right) {
             Ordering::Greater => Edge(flipped_right, flipped_left),
             Ordering::Equal => {
-                if right > &flipped_left {
+                if right > flipped_left {
                     Edge(flipped_right, flipped_left)
                 } else {
-                    Edge(*left, *right)
+                    Edge(left, right)
                 }
             }
-            Ordering::Less => Edge(*left, *right),
+            Ordering::Less => Edge(left, right),
         }
     }
 }
 
+/// Enum for handle orientation
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
     Left,

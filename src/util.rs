@@ -42,6 +42,7 @@ Table taken from https://github.com/vgteam/libbdsg/blob/9d8e6c06317b4eb235c8927a
 | 129 | r    |
 */
 
+#[allow(dead_code)]
 pub fn reverse_complement_char(c: u8) -> u8 {
     match c {
         43 => 36,
@@ -84,6 +85,7 @@ pub fn reverse_complement_char(c: u8) -> u8 {
     }
 }
 
+#[allow(dead_code)]
 pub fn reverse_complement(seq: &str) -> String {
     let seq_bytes = seq.as_bytes();
 
@@ -99,6 +101,7 @@ pub fn reverse_complement(seq: &str) -> String {
     })
 }
 
+#[allow(dead_code)]
 pub fn reverse_complement_inplace(seq: &mut String) {
     unsafe {
         let vec = seq.as_mut_vec();

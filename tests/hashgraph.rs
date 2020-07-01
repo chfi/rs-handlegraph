@@ -1,5 +1,5 @@
 use handlegraph::handle::{Direction, Edge, Handle, NodeId};
-use handlegraph::handlegraph::{handle_edges_iter, handle_iter, HandleGraph};
+use handlegraph::handlegraph::{handle_edges_iter, handles_iter, HandleGraph};
 use handlegraph::hashgraph::{HashGraph, PathStep};
 use handlegraph::mutablehandlegraph::MutableHandleGraph;
 use handlegraph::pathgraph::PathHandleGraph;
@@ -182,10 +182,10 @@ fn graph_handle_edges_iter() {
 }
 
 #[test]
-fn graph_handle_iter() {
-    let mut graph = path_graph();
+fn graph_handles_iter() {
+    let graph = path_graph();
 
-    let iter = handle_iter(&graph);
+    let iter = handles_iter(&graph);
 
     let nodes: Vec<_> = vec![H1, H2, H3, H4, H5, H6]
         .into_iter()
@@ -221,17 +221,17 @@ fn graph_edges_iter() {
     edges_found.sort();
 
     let mut edges: Vec<_> = vec![
-        Edge::edge_handle(&H1, &H2),
-        Edge::edge_handle(&H1, &H3),
-        Edge::edge_handle(&H1, &H4),
-        Edge::edge_handle(&H1, &H6),
-        Edge::edge_handle(&H2, &H5),
-        Edge::edge_handle(&H4, &H2),
-        Edge::edge_handle(&H6, &H2),
-        Edge::edge_handle(&H3, &H4),
-        Edge::edge_handle(&H3, &H5),
-        Edge::edge_handle(&H4, &H6),
-        Edge::edge_handle(&H5, &H6),
+        Edge::edge_handle(H1, H2),
+        Edge::edge_handle(H1, H3),
+        Edge::edge_handle(H1, H4),
+        Edge::edge_handle(H1, H6),
+        Edge::edge_handle(H2, H5),
+        Edge::edge_handle(H4, H2),
+        Edge::edge_handle(H6, H2),
+        Edge::edge_handle(H3, H4),
+        Edge::edge_handle(H3, H5),
+        Edge::edge_handle(H4, H6),
+        Edge::edge_handle(H5, H6),
     ];
 
     edges.sort();

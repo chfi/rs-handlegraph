@@ -6,7 +6,7 @@ use std::io::prelude::*;
 use std::io::Lines;
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
-use crate::handlegraph::{handle_edges_iter, handle_iter, HandleGraph};
+use crate::handlegraph::{handle_edges_iter, handles_iter, HandleGraph};
 use crate::mutablehandlegraph::MutableHandleGraph;
 use crate::pathgraph::PathHandleGraph;
 
@@ -236,7 +236,7 @@ impl HashGraph {
     }
 
     pub fn print_occurrences(&self) {
-        handle_iter(self).for_each(|h| {
+        handles_iter(self).for_each(|h| {
             let node = self.get_node(&h.id()).unwrap();
             println!("{} - {:?}", node.sequence, node.occurrences);
         });
@@ -262,6 +262,7 @@ impl HandleGraph for HashGraph {
         self.graph.contains_key(&node_id)
     }
 
+    /// NB this should take handle orientation into account
     fn sequence(&self, handle: Handle) -> &str {
         &self.get_node_unsafe(&handle.id()).sequence
     }
@@ -320,7 +321,7 @@ impl HandleGraph for HashGraph {
         Box::new(move || iter.next())
     }
 
-    fn handle_iter_impl<'a>(
+    fn handles_iter_impl<'a>(
         &'a self,
     ) -> Box<dyn FnMut() -> Option<Handle> + 'a> {
         let mut iter = self.graph.keys().map(|i| Handle::pack(*i, false));
@@ -328,7 +329,7 @@ impl HandleGraph for HashGraph {
     }
 
     fn edges_iter_impl<'a>(&'a self) -> Box<dyn FnMut() -> Option<Edge> + 'a> {
-        let handles = std::iter::from_fn(self.handle_iter_impl());
+        let handles = std::iter::from_fn(self.handles_iter_impl());
 
         let neighbors = move |handle: Handle| {
             let right_neighbors = std::iter::from_fn(
@@ -336,7 +337,7 @@ impl HandleGraph for HashGraph {
             )
             .filter_map(move |next| {
                 if handle.id() <= next.id() {
-                    Some(Edge::edge_handle(&handle, &next))
+                    Some(Edge::edge_handle(handle, next))
                 } else {
                     None
                 }
@@ -349,7 +350,7 @@ impl HandleGraph for HashGraph {
                 if (handle.id() < prev.id())
                     || (handle.id() == prev.id() && prev.is_reverse())
                 {
-                    Some(Edge::edge_handle(&prev, &handle))
+                    Some(Edge::edge_handle(prev, handle))
                 } else {
                     None
                 }
@@ -741,7 +742,7 @@ impl PathHandleGraph for HashGraph {
         Box::new(move || iter.next())
     }
 
-    fn handle_occurrences_iter<'a>(
+    fn occurrences_iter_impl<'a>(
         &'a self,
         handle: &Handle,
     ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a> {
