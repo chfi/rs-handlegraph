@@ -6,7 +6,7 @@ use std::io::prelude::*;
 use std::io::Lines;
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
-use crate::handlegraph::{handle_edges_iter, handles_iter, HandleGraph};
+use crate::handlegraph::HandleGraph;
 use crate::mutablehandlegraph::MutableHandleGraph;
 use crate::pathgraph::PathHandleGraph;
 
@@ -236,7 +236,7 @@ impl HashGraph {
     }
 
     pub fn print_occurrences(&self) {
-        handles_iter(self).for_each(|h| {
+        self.handles_iter().for_each(|h| {
             let node = self.get_node(&h.id()).unwrap();
             println!("{} - {:?}", node.sequence, node.occurrences);
         });
@@ -297,11 +297,11 @@ impl HandleGraph for HashGraph {
             .fold(0, |a, (_, v)| a + v.left_edges.len() + v.right_edges.len())
     }
 
-    fn handle_edges_iter_impl<'a>(
+    fn handle_edges_iter<'a>(
         &'a self,
         handle: Handle,
         dir: Direction,
-    ) -> Box<dyn FnMut() -> Option<Handle> + 'a> {
+    ) -> Box<dyn Iterator<Item = Handle> + 'a> {
         let node = self.get_node_unsafe(&handle.id());
 
         let handles = match (dir, handle.is_reverse()) {
@@ -311,57 +311,51 @@ impl HandleGraph for HashGraph {
             (Direction::Right, false) => &node.right_edges,
         };
 
-        let mut iter = handles.iter().map(move |h| {
+        Box::new(handles.iter().map(move |h| {
             if dir == Direction::Left {
                 h.flip()
             } else {
                 *h
             }
-        });
-        Box::new(move || iter.next())
+        }))
     }
 
-    fn handles_iter_impl<'a>(
-        &'a self,
-    ) -> Box<dyn FnMut() -> Option<Handle> + 'a> {
-        let mut iter = self.graph.keys().map(|i| Handle::pack(*i, false));
-        Box::new(move || iter.next())
+    fn handles_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Handle> + 'a> {
+        Box::new(self.graph.keys().map(|i| Handle::pack(*i, false)))
     }
 
-    fn edges_iter_impl<'a>(&'a self) -> Box<dyn FnMut() -> Option<Edge> + 'a> {
-        let handles = std::iter::from_fn(self.handles_iter_impl());
+    fn edges_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Edge> + 'a> {
+        use Direction::*;
+
+        let handles = self.handles_iter();
 
         let neighbors = move |handle: Handle| {
-            let right_neighbors = std::iter::from_fn(
-                self.handle_edges_iter_impl(handle, Direction::Right),
-            )
-            .filter_map(move |next| {
-                if handle.id() <= next.id() {
-                    Some(Edge::edge_handle(handle, next))
-                } else {
-                    None
-                }
-            });
+            let right_neighbors = self
+                .handle_edges_iter(handle, Right)
+                .filter_map(move |next| {
+                    if handle.id() <= next.id() {
+                        Some(Edge::edge_handle(handle, next))
+                    } else {
+                        None
+                    }
+                });
 
-            let left_neighbors = std::iter::from_fn(
-                self.handle_edges_iter_impl(handle, Direction::Left),
-            )
-            .filter_map(move |prev| {
-                if (handle.id() < prev.id())
-                    || (handle.id() == prev.id() && prev.is_reverse())
-                {
-                    Some(Edge::edge_handle(prev, handle))
-                } else {
-                    None
-                }
-            });
+            let left_neighbors = self
+                .handle_edges_iter(handle, Left)
+                .filter_map(move |prev| {
+                    if (handle.id() < prev.id())
+                        || (handle.id() == prev.id() && prev.is_reverse())
+                    {
+                        Some(Edge::edge_handle(prev, handle))
+                    } else {
+                        None
+                    }
+                });
 
             right_neighbors.chain(left_neighbors)
         };
 
-        let mut edges = handles.map(neighbors).flatten();
-
-        Box::new(move || edges.next())
+        Box::new(handles.map(neighbors).flatten())
     }
 }
 
@@ -474,9 +468,9 @@ impl MutableHandleGraph for HashGraph {
 
         // update backwards references
         // first collect all the handles whose nodes we need to update
-        let last_neighbors: Vec<_> =
-            handle_edges_iter(self, *result.last().unwrap(), Direction::Right)
-                .collect();
+        let last_neighbors: Vec<_> = self
+            .handle_edges_iter(*result.last().unwrap(), Direction::Right)
+            .collect();
 
         // And perform the update
         for h in last_neighbors {
@@ -734,38 +728,30 @@ impl PathHandleGraph for HashGraph {
         (PathStep::Step(path_id, l), PathStep::Step(path_id, r))
     }
 
-    fn paths_iter_impl<'a>(
+    fn paths_iter<'a>(
         &'a self,
-    ) -> Box<dyn FnMut() -> Option<&'a Self::PathHandle> + 'a> {
-        let mut iter = self.paths.keys();
-
-        Box::new(move || iter.next())
+    ) -> Box<dyn Iterator<Item = &'a Self::PathHandle> + 'a> {
+        Box::new(self.paths.keys())
     }
 
-    fn occurrences_iter_impl<'a>(
+    fn occurrences_iter<'a>(
         &'a self,
         handle: Handle,
-    ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a> {
+    ) -> Box<dyn Iterator<Item = Self::StepHandle> + 'a> {
         let node: &Node = self.get_node_unsafe(&handle.id());
-
-        let mut iter =
-            node.occurrences.iter().map(|(k, v)| PathStep::Step(*k, *v));
-
-        Box::new(move || iter.next())
+        Box::new(node.occurrences.iter().map(|(k, v)| PathStep::Step(*k, *v)))
     }
 
-    fn steps_iter_impl<'a>(
+    fn steps_iter<'a>(
         &'a self,
         path_handle: &'a Self::PathHandle,
-    ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a> {
+    ) -> Box<dyn Iterator<Item = Self::StepHandle> + 'a> {
         let path = self.get_path_unsafe(path_handle);
-
-        let mut iter = path
-            .nodes
-            .iter()
-            .enumerate()
-            .map(move |(i, _)| PathStep::Step(*path_handle, i));
-
-        Box::new(move || iter.next())
+        Box::new(
+            path.nodes
+                .iter()
+                .enumerate()
+                .map(move |(i, _)| PathStep::Step(*path_handle, i)),
+        )
     }
 }

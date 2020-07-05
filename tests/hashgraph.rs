@@ -1,8 +1,8 @@
 use handlegraph::handle::{Direction, Edge, Handle, NodeId};
-use handlegraph::handlegraph::{handle_edges_iter, handles_iter, HandleGraph};
+use handlegraph::handlegraph::HandleGraph;
 use handlegraph::hashgraph::{HashGraph, PathStep};
 use handlegraph::mutablehandlegraph::MutableHandleGraph;
-use handlegraph::pathgraph::{steps_iter, PathHandleGraph};
+use handlegraph::pathgraph::PathHandleGraph;
 
 static H1: Handle = Handle::from_integer(2);
 static H2: Handle = Handle::from_integer(4);
@@ -172,7 +172,7 @@ fn graph_handle_edges_iter() {
     graph.create_edge(&Edge(H1, H4));
     graph.create_edge(&Edge(H1, H6));
 
-    let mut iter = handle_edges_iter(&graph, H1, Direction::Right);
+    let mut iter = graph.handle_edges_iter(H1, Direction::Right);
 
     assert_eq!(Some(H2), iter.next());
     assert_eq!(Some(H3), iter.next());
@@ -185,7 +185,7 @@ fn graph_handle_edges_iter() {
 fn graph_handles_iter() {
     let graph = path_graph();
 
-    let iter = handles_iter(&graph);
+    let iter = graph.handles_iter();
 
     let nodes: Vec<_> = vec![H1, H2, H3, H4, H5, H6]
         .into_iter()
@@ -214,9 +214,7 @@ fn graph_edges_iter() {
 
     graph.create_edge(&Edge(H3, H5));
 
-    let edges_next = graph.edges_iter_impl();
-
-    let mut edges_found: Vec<_> = std::iter::from_fn(edges_next).collect();
+    let mut edges_found: Vec<_> = graph.edges_iter().collect();
 
     edges_found.sort();
 
@@ -378,7 +376,7 @@ fn graph_path_steps_iter() {
     graph.append_step(&p1, H5);
     graph.append_step(&p1, H6);
 
-    let mut iter = steps_iter(&graph, &p1);
+    let mut iter = graph.steps_iter(&p1);
 
     assert_eq!(Some(Step(p1, 0)), iter.next());
     assert_eq!(Some(Step(p1, 1)), iter.next());

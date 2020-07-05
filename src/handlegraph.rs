@@ -27,18 +27,17 @@ pub trait HandleGraph {
     fn edge_count(&self) -> usize;
 
     fn degree(&self, handle: Handle, dir: Direction) -> usize {
-        std::iter::from_fn(self.handle_edges_iter_impl(handle, dir))
-            .fold(0, |a, _| a + 1)
+        self.handle_edges_iter(handle, dir).fold(0, |a, _| a + 1)
     }
 
     fn has_edge(&self, left: Handle, right: Handle) -> bool {
-        std::iter::from_fn(self.handle_edges_iter_impl(left, Direction::Right))
+        self.handle_edges_iter(left, Direction::Right)
             .any(|h| h == right)
     }
 
     /// Sum up all the sequences in the graph
     fn total_length(&self) -> usize {
-        std::iter::from_fn(self.handles_iter_impl())
+        self.handles_iter()
             .fold(0, |a, v| a + self.sequence(v).len())
     }
 
@@ -55,42 +54,17 @@ pub trait HandleGraph {
         }
     }
 
-    /// Returns a closure that iterates through the neighbors of a
-    /// handle in a given direction
-    fn handle_edges_iter_impl<'a>(
+    /// Returns an iterator over the neighbors of a handle in a
+    /// given direction
+    fn handle_edges_iter<'a>(
         &'a self,
         handle: Handle,
         dir: Direction,
-    ) -> Box<dyn FnMut() -> Option<Handle> + 'a>;
+    ) -> Box<dyn Iterator<Item = Handle> + 'a>;
 
-    /// Returns a closure that iterates through all the handles in the graph
-    fn handles_iter_impl<'a>(
-        &'a self,
-    ) -> Box<dyn FnMut() -> Option<Handle> + 'a>;
+    /// Returns an iterator over all the handles in the graph
+    fn handles_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Handle> + 'a>;
 
-    /// Returns a closure that iterates through all the edges in the graph
-    fn edges_iter_impl<'a>(&'a self) -> Box<dyn FnMut() -> Option<Edge> + 'a>;
-}
-
-/// Constructs an iterator from handle_edges_iter_impl
-pub fn handle_edges_iter<'a, T: HandleGraph>(
-    graph: &'a T,
-    handle: Handle,
-    dir: Direction,
-) -> impl Iterator<Item = Handle> + 'a {
-    std::iter::from_fn(graph.handle_edges_iter_impl(handle, dir))
-}
-
-/// Constructs an iterator from handle_iter_impl
-pub fn handles_iter<'a, T: HandleGraph>(
-    graph: &'a T,
-) -> impl Iterator<Item = Handle> + 'a {
-    std::iter::from_fn(graph.handles_iter_impl())
-}
-
-/// Constructs an iterator from edges_iter_impl
-pub fn edges_iter<'a, T: HandleGraph>(
-    graph: &'a T,
-) -> impl Iterator<Item = Edge> + 'a {
-    std::iter::from_fn(graph.edges_iter_impl())
+    /// Returns an iterator over all the edges in the graph
+    fn edges_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Edge> + 'a>;
 }

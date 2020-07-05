@@ -82,44 +82,22 @@ pub trait PathHandleGraph {
         new_segment: Vec<Handle>,
     ) -> (Self::StepHandle, Self::StepHandle);
 
-    /// Returns a closure that iterates through all path identifiers in the graph
-    fn paths_iter_impl<'a>(
+    /// Returns an iterator over all path identifiers in the graph
+    fn paths_iter<'a>(
         &'a self,
-    ) -> Box<dyn FnMut() -> Option<&'a Self::PathHandle> + 'a>;
+    ) -> Box<dyn Iterator<Item = &'a Self::PathHandle> + 'a>;
 
-    /// Returns a closure that iterates through all the steps that
+    /// Returns an iterator over all the steps that
     /// cross through the given node handle, across all the paths in
     /// the graph
-    fn occurrences_iter_impl<'a>(
+    fn occurrences_iter<'a>(
         &'a self,
         handle: Handle,
-    ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a>;
+    ) -> Box<dyn Iterator<Item = Self::StepHandle> + 'a>;
 
-    /// Returns a closure that iterates through all the steps in a path
-    fn steps_iter_impl<'a>(
+    /// Returns an iterator over all the steps in a path
+    fn steps_iter<'a>(
         &'a self,
         path: &'a Self::PathHandle,
-    ) -> Box<dyn FnMut() -> Option<Self::StepHandle> + 'a>;
-}
-
-/// Constructs an iterator from paths_iter_impl
-pub fn paths_iter<'a, T: PathHandleGraph>(
-    graph: &'a T,
-) -> impl Iterator<Item = &'a <T as PathHandleGraph>::PathHandle> + 'a {
-    std::iter::from_fn(graph.paths_iter_impl())
-}
-
-/// Constructs an iterator from paths_iter_impl
-pub fn occurrences_iter<'a, T: PathHandleGraph>(
-    graph: &'a T,
-    handle: Handle,
-) -> impl Iterator<Item = <T as PathHandleGraph>::StepHandle> + 'a {
-    std::iter::from_fn(graph.occurrences_iter_impl(handle))
-}
-
-pub fn steps_iter<'a, T: PathHandleGraph>(
-    graph: &'a T,
-    path: &'a <T as PathHandleGraph>::PathHandle,
-) -> impl Iterator<Item = <T as PathHandleGraph>::StepHandle> + 'a {
-    std::iter::from_fn(graph.steps_iter_impl(path))
+    ) -> Box<dyn Iterator<Item = Self::StepHandle> + 'a>;
 }
