@@ -1,3 +1,4 @@
+use gfa::gfa::Orientation;
 use std::cmp::Ordering;
 use std::ops::Add;
 
@@ -51,6 +52,22 @@ impl Handle {
 
     pub fn unpack_bit(self) -> bool {
         self.as_integer() & 1 != 0
+    }
+
+    pub fn new<T: Into<u64>>(id: T, orient: Orientation) -> Handle {
+        let id: u64 = id.into();
+        let is_reverse = if orient == Orientation::Forward {
+            false
+        } else {
+            true
+        };
+        if id < (0x1 << 63) {
+            Handle::from_integer((id << 1) | is_reverse as u64)
+        } else {
+            panic!(
+                "Tried to create a handle with a node ID that filled 64 bits"
+            )
+        }
     }
 
     pub fn pack<T: Into<u64>>(id: T, is_reverse: bool) -> Handle {
@@ -141,6 +158,11 @@ mod tests {
         let u: u64 = 597283742;
         let h1 = Handle::pack(NodeId(u), true);
         let h2 = h1.flip();
+
+        let h3 = Handle::pack(NodeId(u), false);
+        println!("{:?}, {}, {}", h1, h1.unpack_bit(), h1.is_reverse());
+        println!("{:?}, {}, {}", h2, h2.unpack_bit(), h2.is_reverse());
+        println!("{:?}, {}, {}", h3, h3.unpack_bit(), h3.is_reverse());
 
         assert_eq!(h1.unpack_number(), h2.unpack_number());
         assert_eq!(h1.unpack_bit(), true);

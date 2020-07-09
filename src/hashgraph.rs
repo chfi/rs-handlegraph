@@ -126,8 +126,8 @@ impl HashGraph {
         let left_id = get_id(&link.from_segment);
         let right_id = get_id(&link.to_segment);
 
-        let left = Handle::pack(left_id, !link.from_orient.as_bool());
-        let right = Handle::pack(right_id, !link.to_orient.as_bool());
+        let left = Handle::new(left_id, link.from_orient);
+        let right = Handle::new(right_id, link.to_orient);
 
         self.create_edge(&Edge(left, right));
     }
@@ -145,7 +145,7 @@ impl HashGraph {
         let path_id = self.create_path_handle(&path.path_name, false);
         for (name, orient) in path.segment_names.iter() {
             let id = get_id(name);
-            self.append_step(&path_id, Handle::pack(id, orient.as_bool()));
+            self.append_step(&path_id, Handle::new(id, *orient));
         }
     }
 
@@ -198,10 +198,8 @@ impl HashGraph {
                             panic!("Expected integer name in GFA link")
                         });
 
-                    let left =
-                        Handle::pack(left_id, !link.from_orient.as_bool());
-                    let right =
-                        Handle::pack(right_id, !link.to_orient.as_bool());
+                    let left = Handle::new(left_id, link.from_orient);
+                    let right = Handle::new(right_id, link.to_orient);
 
                     self.create_edge(&Edge(left, right));
                 }
@@ -210,10 +208,7 @@ impl HashGraph {
                         self.create_path_handle(&path.path_name, false);
                     for (name, orient) in path.segment_names.iter() {
                         let id = name.parse::<u64>().unwrap();
-                        self.append_step(
-                            &path_id,
-                            Handle::pack(id, orient.as_bool()),
-                        );
+                        self.append_step(&path_id, Handle::new(id, *orient));
                     }
                 }
                 _ => (),
