@@ -1,9 +1,8 @@
+use bstr::{BStr, BString};
 use std::collections::HashMap;
 
-use gfa::gfa::{Line, Link, Segment, GFA};
-use gfa::parser::parse_gfa_stream;
-use std::io::prelude::*;
-use std::io::Lines;
+use gfa::gfa::{Link, Segment, GFA};
+use gfa::optfields::OptFields;
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
 use crate::handlegraph::HandleGraph;
@@ -39,16 +38,16 @@ impl PathStep {
 
 #[derive(Debug, Clone)]
 pub struct Node {
-    pub sequence: String,
+    pub sequence: BString,
     pub left_edges: Vec<Handle>,
     pub right_edges: Vec<Handle>,
     pub occurrences: HashMap<PathId, usize>,
 }
 
 impl Node {
-    pub fn new(sequence: &str) -> Node {
+    pub fn new(sequence: &[u8]) -> Node {
         Node {
-            sequence: sequence.to_string(),
+            sequence: sequence.into(),
             left_edges: vec![],
             right_edges: vec![],
             occurrences: HashMap::new(),
@@ -59,15 +58,19 @@ impl Node {
 #[derive(Debug)]
 pub struct Path {
     pub path_id: PathId,
-    pub name: String,
+    pub name: BString,
     pub is_circular: bool,
     pub nodes: Vec<Handle>,
 }
 
 impl Path {
-    fn new(name: &str, path_id: PathId, is_circular: bool) -> Self {
+    fn new<T: Into<BString>>(
+        name: T,
+        path_id: PathId,
+        is_circular: bool,
+    ) -> Self {
         Path {
-            name: name.to_string(),
+            name: name.into(),
             path_id,
             is_circular,
             nodes: vec![],
@@ -88,7 +91,7 @@ pub struct HashGraph {
     pub max_id: NodeId,
     pub min_id: NodeId,
     pub graph: HashMap<NodeId, Node>,
-    pub path_id: HashMap<String, i64>,
+    pub path_id: HashMap<BString, i64>,
     pub paths: HashMap<i64, Path>,
 }
 
@@ -101,12 +104,13 @@ impl HashGraph {
         }
     }
 
-    fn add_gfa_segment<'a, 'b>(
+    fn add_gfa_segment<'a, 'b, T: OptFields>(
         &'a mut self,
-        name_map: &'a mut HashMap<&'b str, NodeId>,
-        seg: &'b Segment,
+        name_map: &'a mut HashMap<&'b [u8], NodeId>,
+        seg: &'b Segment<BString, T>,
     ) {
-        match seg.name.parse::<u64>() {
+        let name = std::str::from_utf8(&seg.name).unwrap();
+        match name.parse::<u64>() {
             Ok(id) => {
                 self.create_handle(&seg.sequence, NodeId::from(id));
             }
@@ -117,10 +121,17 @@ impl HashGraph {
         };
     }
 
-    fn add_gfa_link(&mut self, name_map: &HashMap<&str, NodeId>, link: &Link) {
-        let get_id = |name: &str| match name.parse::<u64>() {
-            Ok(id) => NodeId::from(id),
-            Err(_) => *name_map.get(name).unwrap(),
+    fn add_gfa_link<T: OptFields>(
+        &mut self,
+        name_map: &HashMap<&[u8], NodeId>,
+        link: &Link<BString, T>,
+    ) {
+        let get_id = |name: &[u8]| {
+            let str_name = std::str::from_utf8(name).unwrap();
+            match str_name.parse::<u64>() {
+                Ok(id) => NodeId::from(id),
+                Err(_) => *name_map.get(name).unwrap(),
+            }
         };
 
         let left_id = get_id(&link.from_segment);
@@ -132,27 +143,30 @@ impl HashGraph {
         self.create_edge(&Edge(left, right));
     }
 
-    fn add_gfa_path(
+    fn add_gfa_path<T: OptFields>(
         &mut self,
-        name_map: &HashMap<&str, NodeId>,
-        path: &gfa::gfa::Path,
+        name_map: &HashMap<&[u8], NodeId>,
+        path: &gfa::gfa::Path<T>,
     ) {
-        let get_id = |name: &str| match name.parse::<u64>() {
-            Ok(id) => NodeId::from(id),
-            Err(_) => *name_map.get(name).unwrap(),
+        let get_id = |name: &[u8]| {
+            let str_name = std::str::from_utf8(name).unwrap();
+            match str_name.parse::<u64>() {
+                Ok(id) => NodeId::from(id),
+                Err(_) => *name_map.get(name).unwrap(),
+            }
         };
 
         let path_id = self.create_path_handle(&path.path_name, false);
-        for (name, orient) in path.segment_names.iter() {
+        for (name, orient) in path.iter() {
             let id = get_id(name);
-            self.append_step(&path_id, Handle::new(id, *orient));
+            self.append_step(&path_id, Handle::new(id, orient));
         }
     }
 
-    pub fn from_gfa(gfa: &GFA) -> HashGraph {
+    pub fn from_gfa<T: OptFields>(gfa: &GFA<BString, T>) -> HashGraph {
         let mut graph = Self::new();
 
-        let mut name_map: HashMap<&str, NodeId> = HashMap::new();
+        let mut name_map: HashMap<&[u8], NodeId> = HashMap::new();
 
         // add segments
         gfa.segments
@@ -170,50 +184,6 @@ impl HashGraph {
             .for_each(|path| graph.add_gfa_path(&name_map, path));
 
         graph
-    }
-
-    // NB/TODO: this one doesn't work with string segment names, yet
-    pub fn fill_from_gfa_lines<B: BufRead>(&mut self, lines: &mut Lines<B>) {
-        let gfa_lines = parse_gfa_stream(lines);
-
-        for line in gfa_lines {
-            match line {
-                Line::Segment(seg) => {
-                    let id: u64 = seg.name.parse().unwrap_or_else(|_| {
-                        panic!(
-                            "Expected integer name in GFA, was {}\n",
-                            seg.name
-                        )
-                    });
-                    self.create_handle(&seg.sequence, NodeId::from(id));
-                }
-                Line::Link(link) => {
-                    let left_id =
-                        link.from_segment.parse::<u64>().unwrap_or_else(|_| {
-                            panic!("Expected integer name in GFA link")
-                        });
-
-                    let right_id =
-                        link.to_segment.parse::<u64>().unwrap_or_else(|_| {
-                            panic!("Expected integer name in GFA link")
-                        });
-
-                    let left = Handle::new(left_id, link.from_orient);
-                    let right = Handle::new(right_id, link.to_orient);
-
-                    self.create_edge(&Edge(left, right));
-                }
-                Line::Path(path) => {
-                    let path_id =
-                        self.create_path_handle(&path.path_name, false);
-                    for (name, orient) in path.segment_names.iter() {
-                        let id = name.parse::<u64>().unwrap();
-                        self.append_step(&path_id, Handle::new(id, *orient));
-                    }
-                }
-                _ => (),
-            }
-        }
     }
 
     pub fn print_path(&self, path_id: &PathId) {
@@ -258,7 +228,7 @@ impl HandleGraph for HashGraph {
     }
 
     /// NB this should take handle orientation into account
-    fn sequence(&self, handle: Handle) -> &str {
+    fn sequence(&self, handle: Handle) -> &[u8] {
         &self.get_node_unsafe(&handle.id()).sequence
     }
 
@@ -355,11 +325,11 @@ impl HandleGraph for HashGraph {
 }
 
 impl MutableHandleGraph for HashGraph {
-    fn append_handle(&mut self, sequence: &str) -> Handle {
-        self.create_handle(sequence, self.max_id + 1)
+    fn append_handle(&mut self, sequence: &[u8]) -> Handle {
+        self.create_handle(sequence.into(), self.max_id + 1)
     }
 
-    fn create_handle(&mut self, seq: &str, node_id: NodeId) -> Handle {
+    fn create_handle(&mut self, seq: &[u8], node_id: NodeId) -> Handle {
         if seq.is_empty() {
             panic!("Tried to add empty handle");
         }
@@ -434,10 +404,8 @@ impl MutableHandleGraph for HashGraph {
         // TODO it should be possible to do this without creating new
         // strings and collecting into a vec
 
-        let subseqs: Vec<String> = ranges
-            .into_iter()
-            .map(|r| sequence[r].to_string())
-            .collect();
+        let subseqs: Vec<BString> =
+            ranges.into_iter().map(|r| sequence[r].into()).collect();
 
         for seq in subseqs {
             let h = self.append_handle(&seq);
@@ -459,7 +427,7 @@ impl MutableHandleGraph for HashGraph {
 
         // shrink the sequence of the starting handle
         let orig_node = &mut self.get_node_mut(&handle.id()).unwrap();
-        orig_node.sequence = orig_node.sequence[0..fwd_offsets[0]].to_string();
+        orig_node.sequence = orig_node.sequence[0..fwd_offsets[0]].into();
 
         // update backwards references
         // first collect all the handles whose nodes we need to update
@@ -528,16 +496,17 @@ impl PathHandleGraph for HashGraph {
         self.path_id.len()
     }
 
-    fn has_path(&self, name: &str) -> bool {
+    fn has_path(&self, name: &BStr) -> bool {
         self.path_id.contains_key(name)
     }
 
-    fn name_to_path_handle(&self, name: &str) -> Option<Self::PathHandle> {
+    fn name_to_path_handle(&self, name: &BStr) -> Option<Self::PathHandle> {
         self.path_id.get(name).copied()
     }
 
-    fn path_handle_to_name(&self, path_id: &Self::PathHandle) -> &str {
-        &self.get_path_unsafe(path_id).name
+    fn path_handle_to_name(&self, path_id: &Self::PathHandle) -> &BStr {
+        use std::borrow::Borrow;
+        self.get_path_unsafe(path_id).name.borrow()
     }
 
     fn is_circular(&self, path_id: &Self::PathHandle) -> bool {
@@ -621,12 +590,12 @@ impl PathHandleGraph for HashGraph {
 
     fn create_path_handle(
         &mut self,
-        name: &str,
+        name: &[u8],
         is_circular: bool,
     ) -> Self::PathHandle {
         let path_id = self.paths.len() as i64;
         let path = Path::new(name, path_id, is_circular);
-        self.path_id.insert(name.to_string(), path_id);
+        self.path_id.insert(name.into(), path_id);
         self.paths.insert(path_id, path);
         path_id
     }

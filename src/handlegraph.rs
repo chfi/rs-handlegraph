@@ -7,14 +7,14 @@ pub trait HandleGraph {
     /// The length of the sequence of a given node
     fn length(&self, handle: Handle) -> usize;
 
-    fn sequence(&self, handle: Handle) -> &str;
+    fn sequence(&self, handle: Handle) -> &[u8];
 
-    fn subsequence(&self, handle: Handle, index: usize, size: usize) -> &str {
+    fn subsequence(&self, handle: Handle, index: usize, size: usize) -> &[u8] {
         &self.sequence(handle)[index..index + size]
     }
 
-    fn base(&self, handle: Handle, index: usize) -> char {
-        char::from(self.sequence(handle).as_bytes()[index])
+    fn base(&self, handle: Handle, index: usize) -> u8 {
+        self.sequence(handle)[index]
     }
 
     fn min_node_id(&self) -> NodeId;

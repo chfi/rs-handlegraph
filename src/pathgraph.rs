@@ -1,3 +1,5 @@
+use bstr::BStr;
+
 use crate::handle::Handle;
 
 /// Trait encapsulating the immutable path-related aspects of a handlegraph
@@ -12,12 +14,12 @@ pub trait PathHandleGraph {
 
     fn path_count(&self) -> usize;
 
-    fn has_path(&self, name: &str) -> bool;
+    fn has_path(&self, name: &BStr) -> bool;
 
     /// Paths have string names as well as handles
-    fn name_to_path_handle(&self, name: &str) -> Option<Self::PathHandle>;
+    fn name_to_path_handle(&self, name: &BStr) -> Option<Self::PathHandle>;
 
-    fn path_handle_to_name(&self, handle: &Self::PathHandle) -> &str;
+    fn path_handle_to_name(&self, handle: &Self::PathHandle) -> &BStr;
 
     fn is_circular(&self, handle: &Self::PathHandle) -> bool;
 
@@ -59,7 +61,7 @@ pub trait PathHandleGraph {
 
     fn create_path_handle(
         &mut self,
-        name: &str,
+        name: &[u8],
         is_circular: bool,
     ) -> Self::PathHandle;
 

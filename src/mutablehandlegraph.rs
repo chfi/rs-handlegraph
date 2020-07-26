@@ -4,9 +4,9 @@ use crate::handlegraph::HandleGraph;
 /// Trait encapsulating the mutable aspects of a handlegraph
 /// WIP
 pub trait MutableHandleGraph: HandleGraph {
-    fn append_handle(&mut self, seq: &str) -> Handle;
+    fn append_handle(&mut self, seq: &[u8]) -> Handle;
 
-    fn create_handle(&mut self, seq: &str, node_id: NodeId) -> Handle;
+    fn create_handle(&mut self, seq: &[u8], node_id: NodeId) -> Handle;
 
     fn create_edge(&mut self, edge: &Edge);
 
