@@ -5,6 +5,7 @@ use std::ops::Add;
 /// Newtype that represents a node in the graph, no matter the
 /// graph implementation
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
 pub struct NodeId(u64);
 
 impl std::fmt::Display for NodeId {
@@ -35,6 +36,7 @@ impl Add<u64> for NodeId {
 
 /// A Handle is a node ID with an orientation, packed as a single u64
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq, Ord)]
+#[repr(transparent)]
 pub struct Handle(u64);
 
 impl Handle {

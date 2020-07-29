@@ -1,4 +1,4 @@
-use bstr::{BStr, BString};
+use bstr::BString;
 use std::collections::HashMap;
 
 use gfa::gfa::{Link, Segment, GFA};
@@ -91,7 +91,7 @@ pub struct HashGraph {
     pub max_id: NodeId,
     pub min_id: NodeId,
     pub graph: HashMap<NodeId, Node>,
-    pub path_id: HashMap<BString, i64>,
+    pub path_id: HashMap<Vec<u8>, i64>,
     pub paths: HashMap<i64, Path>,
 }
 
@@ -496,17 +496,16 @@ impl PathHandleGraph for HashGraph {
         self.path_id.len()
     }
 
-    fn has_path(&self, name: &BStr) -> bool {
+    fn has_path(&self, name: &[u8]) -> bool {
         self.path_id.contains_key(name)
     }
 
-    fn name_to_path_handle(&self, name: &BStr) -> Option<Self::PathHandle> {
+    fn name_to_path_handle(&self, name: &[u8]) -> Option<Self::PathHandle> {
         self.path_id.get(name).copied()
     }
 
-    fn path_handle_to_name(&self, path_id: &Self::PathHandle) -> &BStr {
-        use std::borrow::Borrow;
-        self.get_path_unsafe(path_id).name.borrow()
+    fn path_handle_to_name(&self, path_id: &Self::PathHandle) -> &[u8] {
+        self.get_path_unsafe(path_id).name.as_slice()
     }
 
     fn is_circular(&self, path_id: &Self::PathHandle) -> bool {
