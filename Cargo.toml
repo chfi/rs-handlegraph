@@ -13,5 +13,5 @@ categories = ["science"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gfa = "0.5"
+gfa = "0.6"
 bstr = "0.2"
