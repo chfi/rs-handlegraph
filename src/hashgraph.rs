@@ -98,7 +98,7 @@ pub struct HashGraph {
 impl HashGraph {
     pub fn new() -> HashGraph {
         HashGraph {
-            max_id: NodeId::from(0 as u64),
+            max_id: NodeId::from(0),
             min_id: NodeId::from(std::u64::MAX),
             ..Default::default()
         }

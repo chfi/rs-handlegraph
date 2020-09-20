@@ -106,8 +106,8 @@ fn construct_from_gfa() {
 fn degree_is_correct() {
     let graph = read_test_gfa();
 
-    let h1 = Handle::pack(NodeId::from(9 as u64), false);
-    let h2 = Handle::pack(NodeId::from(3 as u64), false);
+    let h1 = Handle::pack(9, false);
+    let h2 = Handle::pack(3, false);
 
     assert_eq!(graph.degree(h1, Direction::Right), 2);
     assert_eq!(graph.degree(h1, Direction::Left), 2);
@@ -117,12 +117,12 @@ fn degree_is_correct() {
 
 fn path_graph() -> HashGraph {
     let mut graph = HashGraph::new();
-    let h1 = graph.create_handle(b"1", NodeId::from(1 as u64));
-    let h2 = graph.create_handle(b"2", NodeId::from(2 as u64));
-    let h3 = graph.create_handle(b"3", NodeId::from(3 as u64));
-    let h4 = graph.create_handle(b"4", NodeId::from(4 as u64));
-    let h5 = graph.create_handle(b"5", NodeId::from(5 as u64));
-    let h6 = graph.create_handle(b"6", NodeId::from(6 as u64));
+    let h1 = graph.create_handle(b"1", 1);
+    let h2 = graph.create_handle(b"2", 2);
+    let h3 = graph.create_handle(b"3", 3);
+    let h4 = graph.create_handle(b"4", 4);
+    let h5 = graph.create_handle(b"5", 5);
+    let h6 = graph.create_handle(b"6", 6);
 
     /*
     edges

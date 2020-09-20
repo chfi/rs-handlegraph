@@ -32,6 +32,12 @@ impl From<NodeId> for u64 {
     }
 }
 
+impl From<i32> for NodeId {
+    fn from(num: i32) -> Self {
+        NodeId(num as u64)
+    }
+}
+
 impl Add<u64> for NodeId {
     type Output = Self;
 
@@ -48,6 +54,18 @@ pub struct Handle(pub u64);
 impl From<Handle> for u64 {
     fn from(h: Handle) -> Self {
         h.0 >> 1
+    }
+}
+
+impl From<u32> for Handle {
+    fn from(i: u32) -> Self {
+        Handle::from_integer((i << 1) as u64)
+    }
+}
+
+impl From<i32> for Handle {
+    fn from(i: i32) -> Self {
+        Handle::from_integer((i << 1) as u64)
     }
 }
 
@@ -68,11 +86,12 @@ impl Handle {
         self.as_integer() & 1 != 0
     }
 
-    pub fn new<T: Into<u64>>(id: T, orient: Orientation) -> Handle {
-        let id: u64 = id.into();
+    pub fn new<T: Into<NodeId>>(id: T, orient: Orientation) -> Handle {
+        let id: NodeId = id.into();
+        let uint: u64 = id.into();
         let is_reverse = orient != Orientation::Forward;
-        if id < (0x1 << 63) {
-            Handle::from_integer((id << 1) | is_reverse as u64)
+        if uint < (0x1 << 63) {
+            Handle::from_integer((uint << 1) | is_reverse as u64)
         } else {
             panic!(
                 "Tried to create a handle with a node ID that filled 64 bits"
@@ -80,10 +99,11 @@ impl Handle {
         }
     }
 
-    pub fn pack<T: Into<u64>>(id: T, is_reverse: bool) -> Handle {
-        let id: u64 = id.into();
-        if id < (0x1 << 63) {
-            Handle::from_integer((id << 1) | is_reverse as u64)
+    pub fn pack<T: Into<NodeId>>(id: T, is_reverse: bool) -> Handle {
+        let id: NodeId = id.into();
+        let uint: u64 = id.into();
+        if uint < (0x1 << 63) {
+            Handle::from_integer((uint << 1) | is_reverse as u64)
         } else {
             panic!(
                 "Tried to create a handle with a node ID that filled 64 bits"
