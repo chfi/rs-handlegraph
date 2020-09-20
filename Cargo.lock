@@ -34,6 +34,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bytemuck"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db7a1029718df60331e557c9e83a55523c955e5dd2a7bfeffad6bbd50b538ae9"
+
+[[package]]
 name = "byteorder"
 version = "1.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -47,24 +53,32 @@ checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
 name = "gfa"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41a90716d27a711e74780a0b5c7c8ecc55770182cacc70604601af60eac7e0b5"
+checksum = "5ebe1a0181c8a304aa81b812ad04d1a586bb64abbfaea2914e895ecc230c9ce9"
 dependencies = [
  "bstr",
+ "bytemuck",
  "lazy_static",
  "nom",
  "regex",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
 name = "handlegraph"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "bstr",
  "gfa",
 ]
+
+[[package]]
+name = "itoa"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dc6f3ad7b9d11a0c00842ff8de1b60ee58661048eb8049ed33c73594f359d7e6"
 
 [[package]]
 name = "lazy_static"
@@ -171,6 +185,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "serde_json"
+version = "1.0.57"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "164eacbdb13512ec2745fb09d51fd5b22b0d65ed294a1dcf7285a360c80a675c"
+dependencies = [
+ "itoa",
+ "ryu",
+ "serde",
 ]
 
 [[package]]

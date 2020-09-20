@@ -98,7 +98,7 @@ pub struct HashGraph {
 impl HashGraph {
     pub fn new() -> HashGraph {
         HashGraph {
-            max_id: NodeId::from(0),
+            max_id: NodeId::from(0 as u64),
             min_id: NodeId::from(std::u64::MAX),
             ..Default::default()
         }
@@ -106,83 +106,30 @@ impl HashGraph {
 
     fn add_gfa_segment<'a, 'b, T: OptFields>(
         &'a mut self,
-        name_map: &'a mut HashMap<&'b [u8], NodeId>,
-        seg: &'b Segment<BString, T>,
+        seg: &'b Segment<usize, T>,
     ) {
-        let name = std::str::from_utf8(&seg.name).unwrap();
-        match name.parse::<u64>() {
-            Ok(id) => {
-                self.create_handle(&seg.sequence, NodeId::from(id));
-            }
-            Err(_) => {
-                let h = self.append_handle(&seg.sequence);
-                name_map.insert(&seg.name, h.id());
-            }
-        };
+        self.create_handle(&seg.sequence, seg.name as u64);
     }
 
-    fn add_gfa_link<T: OptFields>(
-        &mut self,
-        name_map: &HashMap<&[u8], NodeId>,
-        link: &Link<BString, T>,
-    ) {
-        let get_id = |name: &[u8]| {
-            let str_name = std::str::from_utf8(name).unwrap();
-            match str_name.parse::<u64>() {
-                Ok(id) => NodeId::from(id),
-                Err(_) => *name_map.get(name).unwrap(),
-            }
-        };
-
-        let left_id = get_id(&link.from_segment);
-        let right_id = get_id(&link.to_segment);
-
-        let left = Handle::new(left_id, link.from_orient);
-        let right = Handle::new(right_id, link.to_orient);
+    fn add_gfa_link<T: OptFields>(&mut self, link: &Link<usize, T>) {
+        let left = Handle::new(link.from_segment as u64, link.from_orient);
+        let right = Handle::new(link.to_segment as u64, link.to_orient);
 
         self.create_edge(&Edge(left, right));
     }
 
-    fn add_gfa_path<T: OptFields>(
-        &mut self,
-        name_map: &HashMap<&[u8], NodeId>,
-        path: &gfa::gfa::Path<T>,
-    ) {
-        let get_id = |name: &[u8]| {
-            let str_name = std::str::from_utf8(name).unwrap();
-            match str_name.parse::<u64>() {
-                Ok(id) => NodeId::from(id),
-                Err(_) => *name_map.get(name).unwrap(),
-            }
-        };
-
+    fn add_gfa_path<T: OptFields>(&mut self, path: &gfa::gfa::Path<usize, T>) {
         let path_id = self.create_path_handle(&path.path_name, false);
         for (name, orient) in path.iter() {
-            let id = get_id(name);
-            self.append_step(&path_id, Handle::new(id, orient));
+            self.append_step(&path_id, Handle::new(name as u64, orient));
         }
     }
 
-    pub fn from_gfa<T: OptFields>(gfa: &GFA<BString, T>) -> HashGraph {
+    pub fn from_gfa<T: OptFields>(gfa: &GFA<usize, T>) -> HashGraph {
         let mut graph = Self::new();
-
-        let mut name_map: HashMap<&[u8], NodeId> = HashMap::new();
-
-        // add segments
-        gfa.segments
-            .iter()
-            .for_each(|seg| graph.add_gfa_segment(&mut name_map, seg));
-
-        // add links
-        gfa.links
-            .iter()
-            .for_each(|link| graph.add_gfa_link(&name_map, link));
-
-        // add paths
-        gfa.paths
-            .iter()
-            .for_each(|path| graph.add_gfa_path(&name_map, path));
-
+        gfa.segments.iter().for_each(|s| graph.add_gfa_segment(s));
+        gfa.links.iter().for_each(|l| graph.add_gfa_link(l));
+        gfa.paths.iter().for_each(|p| graph.add_gfa_path(p));
         graph
     }
 
@@ -326,17 +273,23 @@ impl HandleGraph for HashGraph {
 
 impl MutableHandleGraph for HashGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {
-        self.create_handle(sequence.into(), self.max_id + 1)
+        self.create_handle(sequence, self.max_id + 1)
     }
 
-    fn create_handle(&mut self, seq: &[u8], node_id: NodeId) -> Handle {
+    fn create_handle<T: Into<NodeId>>(
+        &mut self,
+        seq: &[u8],
+        node_id: T,
+    ) -> Handle {
+        let id: NodeId = node_id.into();
+
         if seq.is_empty() {
             panic!("Tried to add empty handle");
         }
-        self.graph.insert(node_id, Node::new(seq));
-        self.max_id = std::cmp::max(self.max_id, node_id);
-        self.min_id = std::cmp::min(self.min_id, node_id);
-        Handle::pack(node_id, false)
+        self.graph.insert(id, Node::new(seq));
+        self.max_id = std::cmp::max(self.max_id, id);
+        self.min_id = std::cmp::min(self.min_id, id);
+        Handle::pack(id, false)
     }
 
     fn create_edge(&mut self, Edge(left, right): &Edge) {

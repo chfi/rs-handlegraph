@@ -6,7 +6,11 @@ use crate::handlegraph::HandleGraph;
 pub trait MutableHandleGraph: HandleGraph {
     fn append_handle(&mut self, seq: &[u8]) -> Handle;
 
-    fn create_handle(&mut self, seq: &[u8], node_id: NodeId) -> Handle;
+    fn create_handle<T: Into<NodeId>>(
+        &mut self,
+        seq: &[u8],
+        node_id: T,
+    ) -> Handle;
 
     fn create_edge(&mut self, edge: &Edge);
 

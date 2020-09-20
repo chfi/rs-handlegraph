@@ -1,9 +1,10 @@
-use bstr::BString;
-use handlegraph::handle::{Direction, Edge, Handle, NodeId};
-use handlegraph::handlegraph::HandleGraph;
-use handlegraph::hashgraph::{HashGraph, PathStep};
-use handlegraph::mutablehandlegraph::MutableHandleGraph;
-use handlegraph::pathgraph::PathHandleGraph;
+use handlegraph::{
+    handle::{Direction, Edge, Handle, NodeId},
+    handlegraph::HandleGraph,
+    hashgraph::{HashGraph, PathStep},
+    mutablehandlegraph::MutableHandleGraph,
+    pathgraph::PathHandleGraph,
+};
 
 static H1: Handle = Handle::from_integer(2);
 static H2: Handle = Handle::from_integer(4);
@@ -23,8 +24,8 @@ fn can_create_handles() {
     let n2 = graph.get_node_unsafe(&h2.id());
     let n3 = graph.get_node_unsafe(&h3.id());
 
-    assert_eq!(h1.id(), NodeId::from(1));
-    assert_eq!(h3.id(), NodeId::from(3));
+    assert_eq!(u64::from(h1), 1);
+    assert_eq!(u64::from(h3), 3);
 
     assert_eq!(n1.sequence.as_slice(), b"CAAATAAG");
     assert_eq!(n2.sequence.as_slice(), b"A");
@@ -66,7 +67,7 @@ fn read_test_gfa() -> HashGraph {
     use gfa::parser::GFAParser;
 
     let parser = GFAParser::new();
-    let gfa: GFA<BString, ()> = parser.parse_file("./lil.gfa").unwrap();
+    let gfa: GFA<usize, ()> = parser.parse_file("./lil.gfa").unwrap();
 
     HashGraph::from_gfa(&gfa)
 }
@@ -77,7 +78,7 @@ fn construct_from_gfa() {
     use gfa::parser::GFAParser;
 
     let parser = GFAParser::new();
-    let gfa: Option<GFA<BString, ()>> = parser.parse_file("./lil.gfa").ok();
+    let gfa: Option<GFA<usize, ()>> = parser.parse_file("./lil.gfa").ok();
 
     if let Some(gfa) = gfa {
         let graph = HashGraph::from_gfa(&gfa);
@@ -101,34 +102,12 @@ fn construct_from_gfa() {
     }
 }
 
-/*
-#[test]
-fn fill_from_gfa_stream() {
-    use std::fs::File;
-    use std::io::prelude::*;
-    use std::io::BufReader;
-    use std::path::PathBuf;
-
-    let mut graph = HashGraph::new();
-
-    let file = File::open(&PathBuf::from("./lil.gfa")).unwrap();
-
-    let reader = BufReader::new(file);
-    let mut lines = reader.lines();
-
-    graph.fill_from_gfa_lines(&mut lines);
-
-    assert_eq!(15, graph.node_count());
-    assert_eq!(40, graph.edge_count());
-}
-*/
-
 #[test]
 fn degree_is_correct() {
     let graph = read_test_gfa();
 
-    let h1 = Handle::pack(NodeId::from(9), false);
-    let h2 = Handle::pack(NodeId::from(3), false);
+    let h1 = Handle::pack(NodeId::from(9 as u64), false);
+    let h2 = Handle::pack(NodeId::from(3 as u64), false);
 
     assert_eq!(graph.degree(h1, Direction::Right), 2);
     assert_eq!(graph.degree(h1, Direction::Left), 2);
@@ -138,12 +117,12 @@ fn degree_is_correct() {
 
 fn path_graph() -> HashGraph {
     let mut graph = HashGraph::new();
-    let h1 = graph.create_handle(b"1", NodeId::from(1));
-    let h2 = graph.create_handle(b"2", NodeId::from(2));
-    let h3 = graph.create_handle(b"3", NodeId::from(3));
-    let h4 = graph.create_handle(b"4", NodeId::from(4));
-    let h5 = graph.create_handle(b"5", NodeId::from(5));
-    let h6 = graph.create_handle(b"6", NodeId::from(6));
+    let h1 = graph.create_handle(b"1", NodeId::from(1 as u64));
+    let h2 = graph.create_handle(b"2", NodeId::from(2 as u64));
+    let h3 = graph.create_handle(b"3", NodeId::from(3 as u64));
+    let h4 = graph.create_handle(b"4", NodeId::from(4 as u64));
+    let h5 = graph.create_handle(b"5", NodeId::from(5 as u64));
+    let h6 = graph.create_handle(b"6", NodeId::from(6 as u64));
 
     /*
     edges

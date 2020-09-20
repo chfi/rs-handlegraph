@@ -20,6 +20,12 @@ impl From<u64> for NodeId {
     }
 }
 
+impl From<usize> for NodeId {
+    fn from(num: usize) -> Self {
+        NodeId(num as u64)
+    }
+}
+
 impl From<NodeId> for u64 {
     fn from(id: NodeId) -> Self {
         id.0
@@ -37,7 +43,13 @@ impl Add<u64> for NodeId {
 /// A Handle is a node ID with an orientation, packed as a single u64
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq, Ord)]
 #[repr(transparent)]
-pub struct Handle(u64);
+pub struct Handle(pub u64);
+
+impl From<Handle> for u64 {
+    fn from(h: Handle) -> Self {
+        h.0 >> 1
+    }
+}
 
 impl Handle {
     pub fn as_integer(self) -> u64 {
@@ -58,11 +70,7 @@ impl Handle {
 
     pub fn new<T: Into<u64>>(id: T, orient: Orientation) -> Handle {
         let id: u64 = id.into();
-        let is_reverse = if orient == Orientation::Forward {
-            false
-        } else {
-            true
-        };
+        let is_reverse = orient != Orientation::Forward;
         if id < (0x1 << 63) {
             Handle::from_integer((id << 1) | is_reverse as u64)
         } else {
