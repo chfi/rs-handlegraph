@@ -7,10 +7,23 @@ pub trait HandleGraph {
     /// The length of the sequence of a given node
     fn length(&self, handle: Handle) -> usize;
 
-    fn sequence(&self, handle: Handle) -> &[u8];
+    /// Returns the sequence of a node in the handle's local forward
+    /// orientation. Copies the sequence, as the sequence in the graph
+    /// may be reversed depending on orientation.
+    fn sequence(&self, handle: Handle) -> Vec<u8>;
 
-    fn subsequence(&self, handle: Handle, index: usize, size: usize) -> &[u8] {
-        &self.sequence(handle)[index..index + size]
+    /// Returns a slice with sequence for a node's handle. Avoids
+    /// copying but doesn't have to take the handle orientation into
+    /// account!
+    fn sequence_slice(&self, handle: Handle) -> &[u8];
+
+    fn subsequence(
+        &self,
+        handle: Handle,
+        index: usize,
+        size: usize,
+    ) -> Vec<u8> {
+        self.sequence(handle)[index..index + size].into()
     }
 
     fn base(&self, handle: Handle, index: usize) -> u8 {

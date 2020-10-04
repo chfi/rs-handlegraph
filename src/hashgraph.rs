@@ -1,13 +1,19 @@
 use bstr::BString;
 use std::collections::HashMap;
 
-use gfa::gfa::{Link, Segment, GFA};
-use gfa::optfields::OptFields;
+use gfa::{
+    gfa::{Link, Segment, GFA},
+    optfields::OptFields,
+};
 
-use crate::handle::{Direction, Edge, Handle, NodeId};
-use crate::handlegraph::HandleGraph;
-use crate::mutablehandlegraph::MutableHandleGraph;
-use crate::pathgraph::PathHandleGraph;
+use crate::{
+    handle::{Direction, Edge, Handle, NodeId},
+    handlegraph::HandleGraph,
+    mutablehandlegraph::MutableHandleGraph,
+    pathgraph::PathHandleGraph,
+};
+
+use bio::alphabets::dna;
 
 pub type PathId = i64;
 
@@ -174,9 +180,17 @@ impl HandleGraph for HashGraph {
         self.graph.contains_key(&node_id)
     }
 
-    /// NB this should take handle orientation into account
-    fn sequence(&self, handle: Handle) -> &[u8] {
-        &self.get_node_unsafe(&handle.id()).sequence
+    fn sequence(&self, handle: Handle) -> Vec<u8> {
+        let seq: &[u8] = &self.get_node_unsafe(&handle.id()).sequence.as_ref();
+        if handle.is_reverse() {
+            dna::revcomp(seq)
+        } else {
+            seq.into()
+        }
+    }
+
+    fn sequence_slice(&self, handle: Handle) -> &[u8] {
+        &self.get_node_unsafe(&handle.id()).sequence.as_ref()
     }
 
     fn length(&self, handle: Handle) -> usize {

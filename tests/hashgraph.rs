@@ -400,9 +400,9 @@ fn graph_divide_handle() {
     graph.append_step(&path, H2);
     graph.append_step(&path, H3);
 
-    assert_eq!(b"ABCD", graph.sequence(H1));
-    assert_eq!(b"EFGHIJKLMN", graph.sequence(H2));
-    assert_eq!(b"OPQ", graph.sequence(H3));
+    assert_eq!(b"ABCD", graph.sequence(H1).as_slice());
+    assert_eq!(b"EFGHIJKLMN", graph.sequence(H2).as_slice());
+    assert_eq!(b"OPQ", graph.sequence(H3).as_slice());
 
     assert!(graph.has_edge(H1, H2));
     assert!(graph.has_edge(H2, H3));
