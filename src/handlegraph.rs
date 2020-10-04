@@ -17,6 +17,11 @@ pub trait HandleGraph {
     /// account!
     fn sequence_slice(&self, handle: Handle) -> &[u8];
 
+    fn sequence_iter(&self, handle: Handle) -> SeqIter<'_> {
+        let seq = self.sequence_slice(handle);
+        SeqIter::new(seq, handle.is_reverse())
+    }
+
     fn subsequence(
         &self,
         handle: Handle,
@@ -80,4 +85,62 @@ pub trait HandleGraph {
 
     /// Returns an iterator over all the edges in the graph
     fn edges_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Edge> + 'a>;
+}
+
+/// An iterator over a sequence that takes orientation into account.
+pub struct SeqIter<'a> {
+    slice: &'a [u8],
+    reversing: bool,
+    index: usize,
+}
+
+impl<'a> SeqIter<'a> {
+    fn new(sequence: &'a [u8], reversing: bool) -> SeqIter<'a> {
+        let index = if reversing { sequence.len() - 1 } else { 0 };
+        SeqIter {
+            slice: sequence,
+            reversing,
+            index,
+        }
+    }
+}
+
+impl<'a> Iterator for SeqIter<'a> {
+    type Item = u8;
+
+    #[inline]
+    fn next(&mut self) -> Option<u8> {
+        if self.reversing && self.index > 0 {
+            let out = bio::alphabets::dna::complement(self.slice[self.index]);
+            self.index -= 1;
+            Some(out)
+        } else if !self.reversing && self.index < self.slice.len() {
+            let out = self.slice[self.index];
+            self.index += 1;
+            Some(out)
+        } else {
+            None
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn seq_iter_forward() {
+        let seq = b"AGCTYRWSKMDVHBN";
+        let seq_iter = SeqIter::new(seq, false);
+        let iter_out = seq_iter.collect::<Vec<u8>>();
+        assert_eq!(iter_out, Vec::from(&seq[..]));
+    }
+
+    #[test]
+    fn seq_iter_reverse() {
+        let seq = b"AGCTYRWSKMDVHBN";
+        let seq_iter = SeqIter::new(seq, true);
+        let iter_out = seq_iter.collect::<Vec<u8>>();
+        assert_eq!(&iter_out, b"NVDBHKMSWYRAGC");
+    }
 }
