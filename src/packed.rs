@@ -1,15 +1,14 @@
 use succinct::{IntVec, IntVecMut, IntVector};
 
+#[derive(Debug, Clone)]
 pub struct PackedIntVec {
     vector: IntVector<u64>,
     filled_elements: usize,
     width: usize,
 }
 
-impl PackedIntVec {
-    const FACTOR: f64 = 1.25;
-
-    pub fn new() -> Self {
+impl Default for PackedIntVec {
+    fn default() -> PackedIntVec {
         let width = 1;
         let vector = IntVector::new(width);
         let filled_elements = 0;
@@ -18,6 +17,18 @@ impl PackedIntVec {
             filled_elements,
             width,
         }
+    }
+}
+
+impl PackedIntVec {
+    const FACTOR: f64 = 1.25;
+
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
     }
 
     pub fn len(&self) -> usize {
@@ -65,14 +76,7 @@ impl PackedIntVec {
     pub fn set(&mut self, index: usize, value: u64) {
         assert!(index < self.filled_elements);
 
-        let mut new_width = self.width;
-        let max = std::u64::MAX;
-        let mut mask = max << new_width;
-
-        while (mask & value) != 0 {
-            new_width += 1;
-            mask = max << new_width;
-        }
+        let new_width = 64 - value.leading_zeros() as usize;
 
         if new_width > self.width {
             self.width = new_width;
@@ -81,7 +85,7 @@ impl PackedIntVec {
                 IntVector::with_capacity(new_width, self.vector.len());
 
             for ix in 0..(self.filled_elements as u64) {
-                new_vec.set(ix, self.vector.get(ix));
+                new_vec.push(self.vector.get(ix));
             }
             std::mem::swap(&mut self.vector, &mut new_vec);
         }
@@ -95,7 +99,7 @@ impl PackedIntVec {
     }
 
     pub fn append(&mut self, value: u64) {
-        self.resize(self.filled_elements);
+        self.resize(self.filled_elements + 1);
         self.set(self.filled_elements - 1, value);
     }
 
@@ -107,5 +111,109 @@ impl PackedIntVec {
 impl PartialEq for PackedIntVec {
     fn eq(&self, other: &PackedIntVec) -> bool {
         self.vector == other.vector
+    }
+}
+
+use quickcheck::{Arbitrary, Gen};
+
+impl Arbitrary for PackedIntVec {
+    fn arbitrary<G: Gen>(g: &mut G) -> PackedIntVec {
+        let mut intvec = PackedIntVec::new();
+        let u64_vec: Vec<u64> = Vec::arbitrary(g);
+
+        for v in u64_vec {
+            intvec.append(v);
+        }
+        intvec
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use quickcheck::quickcheck;
+
+    use super::*;
+
+    #[test]
+    fn test_append() {
+        let mut intvec = PackedIntVec::new();
+        assert_eq!(intvec.len(), 0);
+        assert_eq!(intvec.width(), 1);
+
+        intvec.append(1);
+        assert_eq!(intvec.len(), 1);
+        assert_eq!(intvec.width(), 1);
+
+        intvec.append(2);
+        assert_eq!(intvec.len(), 2);
+        assert_eq!(intvec.width(), 2);
+
+        intvec.append(10);
+        assert_eq!(intvec.len(), 3);
+        assert_eq!(intvec.width(), 4);
+
+        intvec.append(120);
+        assert_eq!(intvec.len(), 4);
+        assert_eq!(intvec.width(), 7);
+
+        intvec.append(3);
+        assert_eq!(intvec.len(), 5);
+        assert_eq!(intvec.width(), 7);
+    }
+
+    quickcheck! {
+        fn prop_append(intvec: PackedIntVec, value: u64) -> bool {
+            let mut intvec = intvec;
+
+            let filled_before = intvec.len();
+            let width_before = intvec.width();
+
+            intvec.append(value);
+
+            let filled_correct = intvec.len() == filled_before + 1;
+
+            let last_val = intvec.get(intvec.len() - 1);
+
+            let width_after = intvec.width();
+
+            filled_correct && last_val == value && width_after >= width_before
+        }
+    }
+
+    quickcheck! {
+        fn prop_pop(intvec: PackedIntVec) -> bool {
+            let mut intvec = intvec;
+
+            let filled_before = intvec.len();
+            let width_before = intvec.width();
+
+            intvec.pop();
+
+            let filled_after = intvec.len();
+            let width_after = intvec.width();
+
+            filled_after == filled_before - 1 &&
+                width_before == width_after
+        }
+    }
+
+    quickcheck! {
+        fn prop_get(vector: Vec<u64>) -> bool {
+            let mut intvec = PackedIntVec::new();
+            for &x in vector.iter() {
+                intvec.append(x);
+            }
+
+            for ix in 0..vector.len() {
+                let a = vector[ix];
+                let b = intvec.get(ix);
+                if a != b {
+                    return false;
+                }
+            }
+
+            true
+        }
     }
 }
