@@ -1,0 +1,108 @@
+use std::collections::HashMap;
+
+use gfa::{
+    gfa::{Link, Segment, GFA},
+    optfields::OptFields,
+};
+
+use crate::{
+    handle::{Edge, Handle, NodeId},
+    handlegraph::HandleGraph,
+    mutablehandlegraph::MutableHandleGraph,
+    pathgraph::PathHandleGraph,
+};
+
+use super::{Node, Path, PathId};
+
+#[derive(Default, Debug)]
+pub struct HashGraph {
+    pub max_id: NodeId,
+    pub min_id: NodeId,
+    pub graph: HashMap<NodeId, Node>,
+    pub path_id: HashMap<Vec<u8>, i64>,
+    pub paths: HashMap<i64, Path>,
+}
+
+impl HashGraph {
+    pub fn new() -> HashGraph {
+        HashGraph {
+            max_id: NodeId::from(0),
+            min_id: NodeId::from(std::u64::MAX),
+            ..Default::default()
+        }
+    }
+
+    fn add_gfa_segment<'a, 'b, T: OptFields>(
+        &'a mut self,
+        seg: &'b Segment<usize, T>,
+    ) {
+        self.create_handle(&seg.sequence, seg.name as u64);
+    }
+
+    fn add_gfa_link<T: OptFields>(&mut self, link: &Link<usize, T>) {
+        let left = Handle::new(link.from_segment as u64, link.from_orient);
+        let right = Handle::new(link.to_segment as u64, link.to_orient);
+
+        self.create_edge(&Edge(left, right));
+    }
+
+    fn add_gfa_path<T: OptFields>(&mut self, path: &gfa::gfa::Path<usize, T>) {
+        let path_id = self.create_path_handle(&path.path_name, false);
+        for (name, orient) in path.iter() {
+            self.append_step(&path_id, Handle::new(name as u64, orient));
+        }
+    }
+
+    pub fn from_gfa<T: OptFields>(gfa: &GFA<usize, T>) -> HashGraph {
+        let mut graph = Self::new();
+        gfa.segments.iter().for_each(|s| graph.add_gfa_segment(s));
+        gfa.links.iter().for_each(|l| graph.add_gfa_link(l));
+        gfa.paths.iter().for_each(|p| graph.add_gfa_path(p));
+        graph
+    }
+
+    pub fn print_path(&self, path_id: &PathId) {
+        let path = self.paths.get(&path_id).unwrap();
+        println!("Path\t{}", path_id);
+        for (ix, handle) in path.nodes.iter().enumerate() {
+            let node = self.get_node(&handle.id()).unwrap();
+            if ix != 0 {
+                print!(" -> ");
+            }
+            print!("{}", node.sequence);
+        }
+
+        println!();
+    }
+
+    pub fn print_occurrences(&self) {
+        self.handles_iter().for_each(|h| {
+            let node = self.get_node(&h.id()).unwrap();
+            println!("{} - {:?}", node.sequence, node.occurrences);
+        });
+    }
+
+    pub fn get_node(&self, node_id: &NodeId) -> Option<&Node> {
+        self.graph.get(node_id)
+    }
+
+    pub fn get_node_unchecked(&self, node_id: &NodeId) -> &Node {
+        self.graph.get(node_id).unwrap_or_else(|| {
+            panic!("Tried getting a node that doesn't exist, ID: {:?}", node_id)
+        })
+    }
+
+    pub fn get_node_mut(&mut self, node_id: &NodeId) -> Option<&mut Node> {
+        self.graph.get_mut(node_id)
+    }
+
+    pub fn get_path(&self, path_id: &PathId) -> Option<&Path> {
+        self.paths.get(path_id)
+    }
+
+    pub fn get_path_unchecked(&self, path_id: &PathId) -> &Path {
+        self.paths
+            .get(path_id)
+            .unwrap_or_else(|| panic!("Tried to look up nonexistent path:"))
+    }
+}

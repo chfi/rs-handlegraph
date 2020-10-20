@@ -20,9 +20,9 @@ fn can_create_handles() {
     let h2 = graph.append_handle(b"A");
     let h3 = graph.append_handle(b"G");
 
-    let n1 = graph.get_node_unsafe(&h1.id());
-    let n2 = graph.get_node_unsafe(&h2.id());
-    let n3 = graph.get_node_unsafe(&h3.id());
+    let n1 = graph.get_node_unchecked(&h1.id());
+    let n2 = graph.get_node_unchecked(&h2.id());
+    let n3 = graph.get_node_unchecked(&h3.id());
 
     assert_eq!(u64::from(h1), 1);
     assert_eq!(u64::from(h3), 3);
@@ -45,10 +45,10 @@ fn can_create_edges() {
     graph.create_edge(&Edge(h2, h4));
     graph.create_edge(&Edge(h3, h4));
 
-    let n1 = graph.get_node_unsafe(&h1.id());
-    let n2 = graph.get_node_unsafe(&h2.id());
-    let n3 = graph.get_node_unsafe(&h3.id());
-    let n4 = graph.get_node_unsafe(&h4.id());
+    let n1 = graph.get_node_unchecked(&h1.id());
+    let n2 = graph.get_node_unchecked(&h2.id());
+    let n3 = graph.get_node_unchecked(&h3.id());
+    let n4 = graph.get_node_unchecked(&h4.id());
 
     assert_eq!(true, n1.right_edges.contains(&h2));
     assert_eq!(true, n1.right_edges.contains(&h3));
