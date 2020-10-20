@@ -394,6 +394,25 @@ impl PathHandleGraph for HashGraph {
         matches!(step, PathStep::Front(_))
     }
 
+    fn path_bases_len(&self, path_handle: &Self::PathHandle) -> Option<usize> {
+        let path = self.paths.get(path_handle)?;
+        Some(path.bases_len(&self.graph))
+    }
+
+    fn position_of_step(&self, step: &Self::StepHandle) -> Option<usize> {
+        let path = self.paths.get(&step.path_id())?;
+        path.position_of_step(&self.graph, step)
+    }
+
+    fn step_at_position(
+        &self,
+        path_handle: &Self::PathHandle,
+        pos: usize,
+    ) -> Option<Self::StepHandle> {
+        let path = self.paths.get(path_handle)?;
+        Some(path.step_at_position(&self.graph, pos))
+    }
+
     fn next_step(&self, step: &Self::StepHandle) -> Self::StepHandle {
         match step {
             PathStep::Front(pid) => self.path_begin(pid),

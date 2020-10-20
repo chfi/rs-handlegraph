@@ -50,6 +50,17 @@ pub trait PathHandleGraph {
 
     fn has_previous_step(&self, step_handle: &Self::StepHandle) -> bool;
 
+    fn path_bases_len(&self, path_handle: &Self::PathHandle) -> Option<usize>;
+
+    fn position_of_step(&self, step_handle: &Self::StepHandle)
+        -> Option<usize>;
+
+    fn step_at_position(
+        &self,
+        path_handle: &Self::PathHandle,
+        pos: usize,
+    ) -> Option<Self::StepHandle>;
+
     fn destroy_path(&mut self, path: &Self::PathHandle);
 
     fn next_step(&self, step_handle: &Self::StepHandle) -> Self::StepHandle;

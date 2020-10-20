@@ -98,9 +98,13 @@ impl Path {
         }
     }
 
-    pub fn step_at_position(&self, pos: usize) -> PathStep {
+    pub fn step_at_position(
+        &self,
+        graph: &HashMap<NodeId, Node>,
+        pos: usize,
+    ) -> PathStep {
         if pos == 0 {
-            return PathStep::Front(*self.path_id);
+            return PathStep::Front(self.path_id);
         }
 
         let mut bases = 0;
@@ -108,10 +112,10 @@ impl Path {
             let node = graph.get(&handle.id()).unwrap();
             bases += node.sequence.len();
             if pos < bases {
-                return PathStep::Step(*self.path_id, ix);
+                return PathStep::Step(self.path_id, ix);
             }
         }
 
-        return PathStep::End(*self.path_id);
+        return PathStep::End(self.path_id);
     }
 }
