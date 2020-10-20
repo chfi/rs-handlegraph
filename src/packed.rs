@@ -3,7 +3,7 @@ use succinct::{IntVec, IntVecMut, IntVector};
 #[derive(Debug, Clone)]
 pub struct PackedIntVec {
     vector: IntVector<u64>,
-    filled_elements: usize,
+    num_entries: usize,
     width: usize,
 }
 
@@ -11,10 +11,10 @@ impl Default for PackedIntVec {
     fn default() -> PackedIntVec {
         let width = 1;
         let vector = IntVector::new(width);
-        let filled_elements = 0;
+        let num_entries = 0;
         PackedIntVec {
             vector,
-            filled_elements,
+            num_entries,
             width,
         }
     }
@@ -27,32 +27,37 @@ impl PackedIntVec {
         Default::default()
     }
 
+    #[inline]
     pub fn width(&self) -> usize {
         self.width
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
-        self.filled_elements
+        self.num_entries
     }
 
+    #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
+    #[inline]
     pub fn clear(&mut self) {
         self.width = 1;
         self.vector = IntVector::new(self.width);
-        self.filled_elements = 0;
+        self.num_entries = 0;
     }
 
+    #[inline]
     pub fn resize(&mut self, size: usize) {
-        if size < self.filled_elements {
+        if size < self.num_entries {
             let capacity = self.vector.len() as f64 / (Self::FACTOR.powi(2));
             let capacity = capacity as usize;
             if size < capacity {
                 let mut new_vec: IntVector<u64> =
                     IntVector::with_capacity(self.width, self.vector.len());
-                for ix in 0..(self.filled_elements as u64) {
+                for ix in 0..(self.num_entries as u64) {
                     new_vec.set(ix, self.vector.get(ix));
                 }
                 std::mem::swap(&mut self.vector, &mut new_vec);
@@ -64,17 +69,19 @@ impl PackedIntVec {
             self.reserve(new_cap);
         }
 
-        self.filled_elements = size;
+        self.num_entries = size;
     }
 
+    #[inline]
     pub fn reserve(&mut self, size: usize) {
         if size > self.vector.len() as usize {
             self.vector.resize(size as u64, 0);
         }
     }
 
+    #[inline]
     pub fn set(&mut self, index: usize, value: u64) {
-        assert!(index < self.filled_elements);
+        assert!(index < self.num_entries);
 
         let new_width = 64 - value.leading_zeros() as usize;
 
@@ -84,7 +91,7 @@ impl PackedIntVec {
             let mut new_vec: IntVector<u64> =
                 IntVector::with_capacity(new_width, self.vector.len());
 
-            for ix in 0..(self.filled_elements as u64) {
+            for ix in 0..(self.num_entries as u64) {
                 new_vec.push(self.vector.get(ix));
             }
             std::mem::swap(&mut self.vector, &mut new_vec);
@@ -93,22 +100,26 @@ impl PackedIntVec {
         self.vector.set(index as u64, value);
     }
 
+    #[inline]
     pub fn get(&self, index: usize) -> u64 {
-        assert!(index < self.filled_elements);
+        assert!(index < self.num_entries);
         self.vector.get(index as u64)
     }
 
+    #[inline]
     pub fn append(&mut self, value: u64) {
-        self.resize(self.filled_elements + 1);
-        self.set(self.filled_elements - 1, value);
+        self.resize(self.num_entries + 1);
+        self.set(self.num_entries - 1, value);
     }
 
+    #[inline]
     pub fn pop(&mut self) {
-        self.resize(self.filled_elements - 1);
+        self.resize(self.num_entries - 1);
     }
 }
 
 impl PartialEq for PackedIntVec {
+    #[inline]
     fn eq(&self, other: &PackedIntVec) -> bool {
         self.vector == other.vector
     }
