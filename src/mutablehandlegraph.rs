@@ -29,10 +29,5 @@ pub trait MutableHandleGraph: HandleGraph {
         (handles[0], handles[1])
     }
 
-    /*
-
-    // this needs some additional functions first, such as reverse complement
-    fn apply_orientation(&mut self, handle: &Handle) -> Handle;
-
-    */
+    fn apply_orientation(&mut self, handle: Handle) -> Handle;
 }

@@ -442,6 +442,54 @@ impl MutableHandleGraph for HashGraph {
 
         result
     }
+
+    fn apply_orientation(&mut self, handle: Handle) -> Handle {
+        if !handle.is_reverse() {
+            return handle;
+        }
+
+        let node = self.get_node_mut(&handle.id()).unwrap();
+        node.sequence = dna::revcomp(node.sequence.as_slice()).into();
+
+        let edges = {
+            let node = self.get_node(&handle.id()).unwrap();
+            node.left_edges
+                .iter()
+                .chain(node.right_edges.iter())
+                .copied()
+                .collect::<Vec<_>>()
+        };
+
+        for target in edges {
+            let other = self.get_node_mut(&target.id()).unwrap();
+            let backward_edges = if target.is_reverse() {
+                other.right_edges.iter_mut()
+            } else {
+                other.left_edges.iter_mut()
+            };
+
+            for backward_handle in backward_edges {
+                if backward_handle.id() == handle.id() {
+                    *backward_handle = backward_handle.flip();
+                    break;
+                }
+            }
+        }
+
+        let node = self.get_node_mut(&handle.id()).unwrap();
+        std::mem::swap(&mut node.left_edges, &mut node.right_edges);
+
+        let occurrences = &self.graph.get(&handle.id()).unwrap().occurrences;
+        let paths = &mut self.paths;
+
+        for (path_id, index) in occurrences.iter() {
+            let path = paths.get_mut(&path_id).unwrap();
+            let step = path.nodes.get_mut(*index).unwrap();
+            *step = step.flip();
+        }
+
+        handle.flip()
+    }
 }
 
 impl HashGraph {
