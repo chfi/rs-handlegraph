@@ -1,5 +1,5 @@
 use bstr::BString;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 use crate::handle::{Handle, NodeId};
 
@@ -58,7 +58,7 @@ impl Path {
         self.nodes.len()
     }
 
-    pub fn bases_len(&self, graph: &HashMap<NodeId, Node>) -> usize {
+    pub fn bases_len(&self, graph: &FnvHashMap<NodeId, Node>) -> usize {
         self.nodes
             .iter()
             .filter_map(|handle| {
@@ -77,7 +77,7 @@ impl Path {
 
     pub fn position_of_step(
         &self,
-        graph: &HashMap<NodeId, Node>,
+        graph: &FnvHashMap<NodeId, Node>,
         step: &PathStep,
     ) -> Option<usize> {
         if step.path_id() != self.path_id {
@@ -100,7 +100,7 @@ impl Path {
 
     pub fn step_at_position(
         &self,
-        graph: &HashMap<NodeId, Node>,
+        graph: &FnvHashMap<NodeId, Node>,
         pos: usize,
     ) -> PathStep {
         if pos == 0 {

@@ -1,5 +1,5 @@
 use bstr::BString;
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 use crate::handle::Handle;
 
@@ -10,7 +10,7 @@ pub struct Node {
     pub sequence: BString,
     pub left_edges: Vec<Handle>,
     pub right_edges: Vec<Handle>,
-    pub occurrences: HashMap<PathId, usize>,
+    pub occurrences: FnvHashMap<PathId, usize>,
 }
 
 impl Node {
@@ -19,7 +19,7 @@ impl Node {
             sequence: sequence.into(),
             left_edges: vec![],
             right_edges: vec![],
-            occurrences: HashMap::new(),
+            occurrences: FnvHashMap::default(),
         }
     }
 }

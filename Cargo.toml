@@ -16,3 +16,4 @@ categories = ["science"]
 gfa = "0.8"
 bstr = "0.2"
 bio = "0.32"
+fnv = "1.0"

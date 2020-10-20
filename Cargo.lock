@@ -313,6 +313,7 @@ version = "0.5.0"
 dependencies = [
  "bio",
  "bstr",
+ "fnv",
  "gfa",
 ]
 

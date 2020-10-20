@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use fnv::FnvHashMap;
 
 use gfa::{
     gfa::{Link, Segment, GFA},
@@ -18,9 +18,9 @@ use super::{Node, Path, PathId};
 pub struct HashGraph {
     pub max_id: NodeId,
     pub min_id: NodeId,
-    pub graph: HashMap<NodeId, Node>,
-    pub path_id: HashMap<Vec<u8>, i64>,
-    pub paths: HashMap<i64, Path>,
+    pub graph: FnvHashMap<NodeId, Node>,
+    pub path_id: FnvHashMap<Vec<u8>, i64>,
+    pub paths: FnvHashMap<i64, Path>,
 }
 
 impl HashGraph {
