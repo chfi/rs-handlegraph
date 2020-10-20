@@ -7,6 +7,70 @@ pub struct PackedIntVec {
     width: usize,
 }
 
+pub struct PackedIntVecIter<'a> {
+    iter: succinct::int_vec::Iter<'a, u64>,
+    num_entries: usize,
+    index: usize,
+}
+
+impl<'a> PackedIntVecIter<'a> {
+    fn new(iter: succinct::int_vec::Iter<'a, u64>, num_entries: usize) -> Self {
+        Self {
+            iter,
+            num_entries,
+            index: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for PackedIntVecIter<'a> {
+    type Item = u64;
+
+    fn next(&mut self) -> Option<u64> {
+        if self.index < self.num_entries {
+            let item = self.iter.next();
+            self.index += 1;
+            item
+        } else {
+            None
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let lower = if self.index < self.num_entries {
+            self.num_entries - self.index
+        } else {
+            0
+        };
+        let upper = Some(lower);
+        (lower, upper)
+    }
+
+    fn count(self) -> usize {
+        if self.index < self.num_entries {
+            self.num_entries - self.index
+        } else {
+            0
+        }
+    }
+
+    fn last(mut self) -> Option<u64> {
+        if self.index < self.num_entries {
+            self.iter.nth(self.num_entries - self.index)
+        } else {
+            None
+        }
+    }
+
+    fn nth(&mut self, n: usize) -> Option<u64> {
+        if self.index + n < self.num_entries {
+            self.iter.nth(n)
+        } else {
+            None
+        }
+    }
+}
+
 impl Default for PackedIntVec {
     fn default() -> PackedIntVec {
         let width = 1;
@@ -114,7 +178,14 @@ impl PackedIntVec {
 
     #[inline]
     pub fn pop(&mut self) {
-        self.resize(self.num_entries - 1);
+        if self.num_entries > 0 {
+            self.resize(self.num_entries - 1);
+        }
+    }
+
+    pub fn iter(&self) -> PackedIntVecIter<'_> {
+        let iter = self.vector.iter();
+        PackedIntVecIter::new(iter, self.num_entries)
     }
 }
 
@@ -244,14 +315,16 @@ impl PagedIntVec {
 
     #[inline]
     pub fn pop(&mut self) {
-        self.num_entries -= 1;
+        if self.num_entries > 0 {
+            self.num_entries -= 1;
 
-        while self.num_entries + self.page_size
-            <= self.pages.len() * self.page_size
-        {
-            self.pages.pop();
-            self.pages.shrink_to_fit();
-            self.anchors.pop();
+            while self.num_entries + self.page_size
+                <= self.pages.len() * self.page_size
+            {
+                self.pages.pop();
+                self.pages.shrink_to_fit();
+                self.anchors.pop();
+            }
         }
     }
 
@@ -303,6 +376,7 @@ mod tests {
     #[test]
     fn test_append() {
         let mut intvec = PackedIntVec::new();
+
         assert_eq!(intvec.len(), 0);
         assert_eq!(intvec.width(), 1);
 
@@ -325,6 +399,9 @@ mod tests {
         intvec.append(3);
         assert_eq!(intvec.len(), 5);
         assert_eq!(intvec.width(), 7);
+
+        let vector = vec![1, 2, 10, 120, 3];
+        assert!(intvec.iter().eq(vector.into_iter()));
     }
 
     quickcheck! {
@@ -358,7 +435,13 @@ mod tests {
             let filled_after = intvec.len();
             let width_after = intvec.width();
 
-            filled_after == filled_before - 1 &&
+            let filled_correct = if filled_before > 0 {
+                filled_after == filled_before - 1
+            } else {
+                filled_after == filled_before
+            };
+
+            filled_correct &&
                 width_before == width_after
         }
     }
@@ -379,6 +462,17 @@ mod tests {
             }
 
             true
+        }
+    }
+
+    quickcheck! {
+        fn prop_iter(vector: Vec<u64>) -> bool {
+            let mut intvec = PackedIntVec::new();
+            for &x in vector.iter() {
+                intvec.append(x);
+            }
+
+            vector.into_iter().eq(intvec.iter())
         }
     }
 }
