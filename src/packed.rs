@@ -20,6 +20,20 @@ impl PackedIntVec {
         }
     }
 
+    pub fn len(&self) -> usize {
+        self.filled_elements
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    pub fn clear(&mut self) {
+        self.width = 1;
+        self.vector = IntVector::new(self.width);
+        self.filled_elements = 0;
+    }
+
     pub fn resize(&mut self, size: usize) {
         if size < self.filled_elements {
             let capacity = self.vector.len() as f64 / (Self::FACTOR.powi(2));
@@ -51,18 +65,20 @@ impl PackedIntVec {
     pub fn set(&mut self, index: usize, value: u64) {
         assert!(index < self.filled_elements);
 
-        let mut width = self.width;
+        let mut new_width = self.width;
         let max = std::u64::MAX;
-        let mut mask = max << width;
+        let mut mask = max << new_width;
 
         while (mask & value) != 0 {
-            width += 1;
-            mask = max << width;
+            new_width += 1;
+            mask = max << new_width;
         }
 
-        if width > self.width {
+        if new_width > self.width {
+            self.width = new_width;
+
             let mut new_vec: IntVector<u64> =
-                IntVector::with_capacity(width, self.vector.len());
+                IntVector::with_capacity(new_width, self.vector.len());
 
             for ix in 0..(self.filled_elements as u64) {
                 new_vec.set(ix, self.vector.get(ix));
@@ -78,6 +94,18 @@ impl PackedIntVec {
         self.vector.get(index as u64)
     }
 
-    // pub fn append(&mut self, value: u64) {
-    // }
+    pub fn append(&mut self, value: u64) {
+        self.resize(self.filled_elements);
+        self.set(self.filled_elements - 1, value);
+    }
+
+    pub fn pop(&mut self) {
+        self.resize(self.filled_elements - 1);
+    }
+}
+
+impl PartialEq for PackedIntVec {
+    fn eq(&self, other: &PackedIntVec) -> bool {
+        self.vector == other.vector
+    }
 }
