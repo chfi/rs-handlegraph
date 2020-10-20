@@ -164,7 +164,7 @@ impl HashGraph {
         self.graph.get(node_id)
     }
 
-    pub fn get_node_unsafe(&self, node_id: &NodeId) -> &Node {
+    pub fn get_node_unchecked(&self, node_id: &NodeId) -> &Node {
         self.graph.get(node_id).unwrap_or_else(|| {
             panic!("Tried getting a node that doesn't exist, ID: {:?}", node_id)
         })
@@ -181,7 +181,8 @@ impl HandleGraph for HashGraph {
     }
 
     fn sequence(&self, handle: Handle) -> Vec<u8> {
-        let seq: &[u8] = &self.get_node_unsafe(&handle.id()).sequence.as_ref();
+        let seq: &[u8] =
+            &self.get_node_unchecked(&handle.id()).sequence.as_ref();
         if handle.is_reverse() {
             dna::revcomp(seq)
         } else {
@@ -190,7 +191,7 @@ impl HandleGraph for HashGraph {
     }
 
     fn sequence_slice(&self, handle: Handle) -> &[u8] {
-        &self.get_node_unsafe(&handle.id()).sequence.as_ref()
+        &self.get_node_unchecked(&handle.id()).sequence.as_ref()
     }
 
     fn length(&self, handle: Handle) -> usize {
@@ -198,7 +199,7 @@ impl HandleGraph for HashGraph {
     }
 
     fn degree(&self, handle: Handle, dir: Direction) -> usize {
-        let n = self.get_node_unsafe(&handle.id());
+        let n = self.get_node_unchecked(&handle.id());
         match dir {
             Direction::Right => n.right_edges.len(),
             Direction::Left => n.left_edges.len(),
@@ -228,7 +229,7 @@ impl HandleGraph for HashGraph {
         handle: Handle,
         dir: Direction,
     ) -> Box<dyn Iterator<Item = Handle> + 'a> {
-        let node = self.get_node_unsafe(&handle.id());
+        let node = self.get_node_unchecked(&handle.id());
 
         let handles = match (dir, handle.is_reverse()) {
             (Direction::Left, true) => &node.right_edges,
@@ -428,7 +429,7 @@ impl MutableHandleGraph for HashGraph {
         // TODO this is probably not
         // correct, and it's silly to clone the results all the time
         let affected_paths: Vec<(i64, usize)> = self
-            .get_node_unsafe(&handle.id())
+            .get_node_unchecked(&handle.id())
             .occurrences
             .iter()
             .map(|(k, v)| (*k, *v))
@@ -448,7 +449,7 @@ impl HashGraph {
         self.paths.get(path_id)
     }
 
-    pub fn get_path_unsafe(&self, path_id: &PathId) -> &Path {
+    pub fn get_path_unchecked(&self, path_id: &PathId) -> &Path {
         self.paths
             .get(path_id)
             .unwrap_or_else(|| panic!("Tried to look up nonexistent path:"))
@@ -472,19 +473,19 @@ impl PathHandleGraph for HashGraph {
     }
 
     fn path_handle_to_name(&self, path_id: &Self::PathHandle) -> &[u8] {
-        self.get_path_unsafe(path_id).name.as_slice()
+        self.get_path_unchecked(path_id).name.as_slice()
     }
 
     fn is_circular(&self, path_id: &Self::PathHandle) -> bool {
-        self.get_path_unsafe(path_id).is_circular
+        self.get_path_unchecked(path_id).is_circular
     }
 
     fn step_count(&self, path_id: &Self::PathHandle) -> usize {
-        self.get_path_unsafe(path_id).nodes.len()
+        self.get_path_unchecked(path_id).nodes.len()
     }
 
     fn handle_of_step(&self, step: &Self::StepHandle) -> Option<Handle> {
-        self.get_path_unsafe(&step.path_id())
+        self.get_path_unchecked(&step.path_id())
             .lookup_step_handle(step)
     }
 
@@ -668,7 +669,7 @@ impl PathHandleGraph for HashGraph {
         &'a self,
         handle: Handle,
     ) -> Box<dyn Iterator<Item = Self::StepHandle> + 'a> {
-        let node: &Node = self.get_node_unsafe(&handle.id());
+        let node: &Node = self.get_node_unchecked(&handle.id());
         Box::new(node.occurrences.iter().map(|(k, v)| PathStep::Step(*k, *v)))
     }
 
@@ -676,7 +677,7 @@ impl PathHandleGraph for HashGraph {
         &'a self,
         path_handle: &'a Self::PathHandle,
     ) -> Box<dyn Iterator<Item = Self::StepHandle> + 'a> {
-        let path = self.get_path_unsafe(path_handle);
+        let path = self.get_path_unchecked(path_handle);
         Box::new(
             path.nodes
                 .iter()

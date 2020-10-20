@@ -132,7 +132,7 @@ impl Handle {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd, Hash, Eq, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Hash, Eq, Ord)]
 pub struct Edge(pub Handle, pub Handle);
 
 impl Edge {
