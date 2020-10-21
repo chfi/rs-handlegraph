@@ -872,7 +872,62 @@ mod tests {
         }
     }
 
-            len_correct
+    quickcheck! {
+        fn prop_deque_push_front(deque: PackedDeque, val: u64) -> bool {
+            let mut deque = deque;
+            let len = deque.len();
+
+            deque.push_front(val);
+
+            deque.len() == len + 1 &&
+            deque.get(0) == val
+        }
+    }
+
+    quickcheck! {
+        fn prop_deque_push_back(deque: PackedDeque, val: u64) -> bool {
+            let mut deque = deque;
+            let len = deque.len();
+
+            deque.push_back(val);
+
+            deque.len() == len + 1 &&
+                deque.get(deque.len() - 1) == val
+        }
+    }
+
+    quickcheck! {
+        fn prop_deque_pop_back(deque: PackedDeque) -> bool {
+            let mut deque = deque;
+            let len = deque.len();
+
+            if len <= 1 {
+                deque.pop_back();
+                deque.len() == 0
+            } else {
+                let second_last = deque.get(deque.len() - 2);
+                deque.pop_back();
+                deque.len() == len - 1 &&
+                    deque.get(deque.len() - 1) == second_last
+            }
+        }
+    }
+
+    quickcheck! {
+        fn prop_deque_pop_front(deque: PackedDeque) -> bool {
+            let mut deque = deque;
+            let len = deque.len();
+
+            if len <= 1 {
+                deque.pop_front();
+                deque.len() == 0
+            } else {
+                let second = deque.get(1);
+                deque.pop_front();
+
+                deque.len() == len - 1 &&
+                    deque.get(0) == second
+            }
         }
     }
 }
