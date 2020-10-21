@@ -1,5 +1,14 @@
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
+pub mod iter;
+
+pub use self::iter::*;
+
+pub trait Sequences {
+    type Sequence: Iterator<Item = u8> + DoubleEndedIterator;
+    fn sequence_iter(self, handle: Handle) -> Self::Sequence;
+}
+
 /// Trait encapsulating the immutable aspects of a handlegraph
 pub trait HandleGraph {
     fn has_node(&self, node_id: NodeId) -> bool;
@@ -12,15 +21,10 @@ pub trait HandleGraph {
     /// may be reversed depending on orientation.
     fn sequence(&self, handle: Handle) -> Vec<u8>;
 
-    /// Returns a slice with sequence for a node's handle. Avoids
-    /// copying but doesn't have to take the handle orientation into
-    /// account!
-    fn sequence_slice(&self, handle: Handle) -> &[u8];
-
-    fn sequence_iter(&self, handle: Handle) -> SeqIter<'_> {
-        let seq = self.sequence_slice(handle);
-        SeqIter::new(seq, handle.is_reverse())
-    }
+    // /// Returns a slice with sequence for a node's handle. Avoids
+    // /// copying but doesn't have to take the handle orientation into
+    // /// account!
+    // fn sequence_slice(&self, handle: Handle) -> &[u8];
 
     fn subsequence(
         &self,

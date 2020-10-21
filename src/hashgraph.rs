@@ -31,9 +31,9 @@ impl HandleGraph for HashGraph {
         }
     }
 
-    fn sequence_slice(&self, handle: Handle) -> &[u8] {
-        &self.get_node_unchecked(&handle.id()).sequence.as_ref()
-    }
+    // fn sequence_slice(&self, handle: Handle) -> &[u8] {
+    //     &self.get_node_unchecked(&handle.id()).sequence.as_ref()
+    // }
 
     fn length(&self, handle: Handle) -> usize {
         self.sequence(handle).len()
