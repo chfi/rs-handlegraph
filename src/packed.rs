@@ -453,6 +453,142 @@ impl RobustPagedIntVec {
     }
 }
 
+#[derive(Debug, Default, Clone)]
+pub struct PackedDeque {
+    vector: PackedIntVec,
+    start_ix: usize,
+    num_entries: usize,
+}
+
+impl PackedDeque {
+    const FACTOR: f64 = 1.25;
+
+    pub fn new() -> Self {
+        Default::default()
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.num_entries
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
+    pub fn clear(&mut self) {
+        self.vector.clear();
+        self.num_entries = 0;
+        self.start_ix = 0;
+    }
+
+    #[inline]
+    pub fn reserve(&mut self, capacity: usize) {
+        if capacity > self.vector.len() {
+            let mut vector = PackedIntVec::new();
+            vector.resize(capacity);
+            for i in 0..self.num_entries {
+                vector.set(i, self.get(i));
+            }
+
+            std::mem::swap(&mut vector, &mut self.vector);
+            self.start_ix = 0;
+        }
+    }
+
+    #[inline]
+    pub fn set(&mut self, ix: usize, value: u64) {
+        self.vector.set(self.internal_index(ix), value);
+    }
+
+    #[inline]
+    pub fn get(&self, ix: usize) -> u64 {
+        self.vector.get(self.internal_index(ix))
+    }
+
+    #[inline]
+    pub fn push_front(&mut self, value: u64) {
+        if self.num_entries == self.vector.len() {
+            let capacity = Self::FACTOR * self.vector.len() as f64;
+            let capacity = 1 + capacity as usize;
+            self.reserve(capacity);
+        }
+
+        if self.start_ix == 0 {
+            self.start_ix = self.vector.len() - 1;
+        } else {
+            self.start_ix -= 1;
+        }
+
+        self.num_entries += 1;
+
+        self.set(0, value);
+    }
+
+    #[inline]
+    pub fn push_back(&mut self, value: u64) {
+        if self.num_entries == self.vector.len() {
+            let capacity = Self::FACTOR * self.vector.len() as f64;
+            let capacity = 1 + capacity as usize;
+            self.reserve(capacity);
+        }
+
+        self.num_entries += 1;
+
+        self.set(self.num_entries - 1, value);
+    }
+
+    #[inline]
+    pub fn pop_front(&mut self) {
+        if self.num_entries > 0 {
+            self.start_ix += 1;
+
+            if self.start_ix == self.vector.len() {
+                self.start_ix = 0;
+            }
+
+            self.num_entries -= 1;
+            self.contract();
+        }
+    }
+
+    #[inline]
+    pub fn pop_back(&mut self) {
+        if self.num_entries > 0 {
+            self.num_entries -= 1;
+            self.contract();
+        }
+    }
+
+    #[inline]
+    fn contract(&mut self) {
+        let capacity = self.vector.len() as f64 / Self::FACTOR.powi(2);
+        let capacity = capacity as usize;
+        if self.num_entries <= capacity {
+            let mut vector = PackedIntVec::new();
+            vector.resize(self.num_entries);
+            for i in 0..self.num_entries {
+                vector.set(i, self.get(i));
+            }
+
+            std::mem::swap(&mut vector, &mut self.vector);
+            self.start_ix = 0;
+        }
+    }
+
+    #[inline]
+    fn internal_index(&self, ix: usize) -> usize {
+        assert!(ix < self.num_entries);
+        if ix < self.vector.len() - self.start_ix {
+            self.start_ix + ix
+        } else {
+            ix - (self.vector.len() - self.start_ix)
+        }
+    }
+}
+
 use quickcheck::{Arbitrary, Gen};
 
 impl Arbitrary for PackedIntVec {
