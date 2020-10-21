@@ -3,7 +3,9 @@ use bstr::BString;
 
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::{AllEdges, AllHandles, HandleGraph, HandleNeighbors},
+    handlegraph::{
+        AllEdges, AllHandles, HandleGraph, HandleNeighbors, HandleSequences,
+    },
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,
 };
@@ -579,7 +581,9 @@ impl PathHandleGraph for HashGraph {
     }
 }
 
-use crate::handlegraph::iter::{EdgesIter, NeighborIter, NodeIdRefHandles};
+use crate::handlegraph::iter::{
+    EdgesIter, NeighborIter, NodeIdRefHandles, SequenceIter,
+};
 
 impl<'a> HandleNeighbors for &'a HashGraph {
     type Neighbors = NeighborIter<'a, std::slice::Iter<'a, Handle>>;
@@ -615,5 +619,16 @@ impl<'a> AllEdges for &'a HashGraph {
 
     fn all_edges(self) -> Self::Edges {
         EdgesIter::new(self)
+    }
+}
+
+impl<'a> HandleSequences for &'a HashGraph {
+    type Sequence = SequenceIter<std::iter::Copied<std::slice::Iter<'a, u8>>>;
+
+    fn sequence_iter(self, handle: Handle) -> Self::Sequence {
+        let seq: &[u8] =
+            &self.get_node_unchecked(&handle.id()).sequence.as_ref();
+        let iter = seq.iter();
+        SequenceIter::new(seq.iter().copied(), handle.is_reverse())
     }
 }

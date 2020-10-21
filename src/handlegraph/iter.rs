@@ -6,20 +6,6 @@ pub trait AllHandles {
     fn all_handles(self) -> Self::Handles;
 }
 
-/// Iterator over all edges in a graph
-pub trait AllEdges {
-    type Edges: Iterator<Item = Edge>;
-    fn all_edges(self) -> Self::Edges;
-}
-
-/// Iterator over the neighbors of a handle in a given direction
-///
-/// Implementors should make sure that handles are flipped correctly depending on direction, e.g. using NeighborIter
-pub trait HandleNeighbors {
-    type Neighbors: Iterator<Item = Handle>;
-    fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors;
-}
-
 /// Iterator adapter to create an Iterator over `Handle`s from an
 /// iterator over &NodeId, in a way that can be used as the `Handles`
 /// type in an `AllHandles` implementation.
@@ -52,6 +38,14 @@ where
     }
 }
 
+/// Iterator over all edges in a graph
+pub trait AllEdges {
+    type Edges: Iterator<Item = Edge>;
+    fn all_edges(self) -> Self::Edges;
+}
+
+/// Utility struct for iterating through the edges of a single handle,
+/// for use with EdgesIter
 struct HandleEdgesIter<I>
 where
     I: Iterator<Item = Handle>,
@@ -206,6 +200,14 @@ impl<G> std::iter::FusedIterator for EdgesIter<G> where
 {
 }
 
+/// Iterator over the neighbors of a handle in a given direction
+///
+/// Implementors should make sure that handles are flipped correctly depending on direction, e.g. using NeighborIter
+pub trait HandleNeighbors {
+    type Neighbors: Iterator<Item = Handle>;
+    fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors;
+}
+
 /// Wrapper struct for ensuring handles are flipped correctly when
 /// iterating over the neighbors of a handle
 pub struct NeighborIter<'a, I>
@@ -238,6 +240,55 @@ where
             next.map(Handle::flip)
         } else {
             next
+        }
+    }
+}
+
+/// Iterator over the sequence of a node. Implementors should only
+/// define `sequence_iter_impl` that returns a DoubleEndedIterator
+/// over the sequence bases in their forward orientation, and users
+/// should only use `sequence_iter`, which automatically wraps the
+/// iterator so that it steps through the reverse complement when the
+/// handle is reversed.
+pub trait HandleSequences: Sized {
+    type Sequence: Iterator<Item = u8>;
+    fn sequence_iter(self, handle: Handle) -> Self::Sequence;
+}
+
+/// Iterator adapter that transforms an iterator over ASCII-encoded
+/// bases into an iterator over the sequence or its reverse
+/// complement.
+pub struct SequenceIter<I>
+where
+    I: Iterator<Item = u8>,
+    I: DoubleEndedIterator,
+{
+    iter: I,
+    reversing: bool,
+}
+
+impl<I> SequenceIter<I>
+where
+    I: Iterator<Item = u8>,
+    I: DoubleEndedIterator,
+{
+    pub fn new(iter: I, reversing: bool) -> Self {
+        Self { iter, reversing }
+    }
+}
+
+impl<I> Iterator for SequenceIter<I>
+where
+    I: Iterator<Item = u8>,
+    I: DoubleEndedIterator,
+{
+    type Item = u8;
+
+    fn next(&mut self) -> Option<u8> {
+        if self.reversing {
+            self.iter.next_back().map(bio::alphabets::dna::complement)
+        } else {
+            self.iter.next()
         }
     }
 }
