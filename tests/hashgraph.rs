@@ -1,6 +1,6 @@
 use handlegraph::{
     handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::{HandleGraph, HandleNeighbors},
+    handlegraph::{AllEdges, AllHandles, HandleGraph, HandleNeighbors},
     hashgraph::{HashGraph, PathStep},
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,
@@ -208,6 +208,27 @@ fn graph_handles_iter() {
 }
 
 #[test]
+fn graph_all_handles_iter() {
+    let graph = path_graph();
+
+    let iter = graph.all_handles();
+
+    let nodes: Vec<_> = vec![H1, H2, H3, H4, H5, H6]
+        .into_iter()
+        .map(|x| x.id())
+        .collect();
+
+    let mut iter_nodes: Vec<NodeId> = vec![];
+
+    for h in iter {
+        iter_nodes.push(h.id())
+    }
+
+    assert!(iter_nodes.iter().all(|n| graph.get_node(n).is_some()));
+    assert!(nodes.iter().all(|n| iter_nodes.contains(n)));
+}
+
+#[test]
 fn graph_edges_iter() {
     let mut graph = path_graph();
 
@@ -220,6 +241,42 @@ fn graph_edges_iter() {
     graph.create_edge(&Edge(H3, H5));
 
     let mut edges_found: Vec<_> = graph.edges_iter().collect();
+
+    edges_found.sort();
+
+    let mut edges: Vec<_> = vec![
+        Edge::edge_handle(H1, H2),
+        Edge::edge_handle(H1, H3),
+        Edge::edge_handle(H1, H4),
+        Edge::edge_handle(H1, H6),
+        Edge::edge_handle(H2, H5),
+        Edge::edge_handle(H4, H2),
+        Edge::edge_handle(H6, H2),
+        Edge::edge_handle(H3, H4),
+        Edge::edge_handle(H3, H5),
+        Edge::edge_handle(H4, H6),
+        Edge::edge_handle(H5, H6),
+    ];
+
+    edges.sort();
+
+    assert_eq!(edges, edges_found);
+}
+
+#[test]
+fn graph_all_edges_iter() {
+    let mut graph = path_graph();
+
+    graph.create_edge(&Edge(H1, H4));
+    graph.create_edge(&Edge(H1, H6));
+
+    graph.create_edge(&Edge(H4, H2));
+    graph.create_edge(&Edge(H6, H2));
+
+    graph.create_edge(&Edge(H3, H5));
+
+    let mut edges_found: Vec<_> = graph.all_edges().collect();
+    // let mut edges_found: Vec<_> = graph.edges_iter().collect();
 
     edges_found.sort();
 

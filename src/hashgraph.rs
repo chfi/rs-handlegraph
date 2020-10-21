@@ -579,11 +579,10 @@ impl PathHandleGraph for HashGraph {
     }
 }
 
+use crate::handlegraph::iter::{EdgesIter, NeighborIter, NodeIdRefHandles};
+
 impl<'a> HandleNeighbors for &'a HashGraph {
-    type Neighbors = crate::handlegraph::iter::NeighborIter<
-        'a,
-        std::slice::Iter<'a, Handle>,
-    >;
+    type Neighbors = NeighborIter<'a, std::slice::Iter<'a, Handle>>;
 
     fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors {
         let node = self.get_node_unchecked(&handle.id());
@@ -595,9 +594,26 @@ impl<'a> HandleNeighbors for &'a HashGraph {
             (Direction::Right, false) => &node.right_edges,
         };
 
-        crate::handlegraph::iter::NeighborIter::new(
-            handles.iter(),
-            dir == Direction::Left,
-        )
+        NeighborIter::new(handles.iter(), dir == Direction::Left)
+    }
+}
+
+impl<'a> AllHandles for &'a HashGraph {
+    type Handles = NodeIdRefHandles<
+        'a,
+        std::collections::hash_map::Keys<'a, NodeId, Node>,
+    >;
+
+    fn all_handles(self) -> Self::Handles {
+        let keys = self.graph.keys();
+        NodeIdRefHandles::new(keys)
+    }
+}
+
+impl<'a> AllEdges for &'a HashGraph {
+    type Edges = EdgesIter<&'a HashGraph>;
+
+    fn all_edges(self) -> Self::Edges {
+        EdgesIter::new(self)
     }
 }
