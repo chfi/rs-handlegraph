@@ -25,8 +25,44 @@ pub struct Sequences {
     indices: PagedIntVec,
 }
 
+const fn encode_dna_base(base: u8) -> u64 {
+    match base {
+        b'a' | b'A' => 0,
+        b'c' | b'C' => 1,
+        b'g' | b'G' => 2,
+        b't' | b'T' => 3,
+        _ => 4,
+    }
+}
+
+const fn encoded_complement(val: u64) -> u64 {
+    if val == 4 {
+        4
+    } else {
+        3 - val
+    }
+}
+
+const fn decode_dna_base(byte: u64) -> u8 {
+    match byte {
+        0 => b'A',
+        1 => b'C',
+        2 => b'G',
+        3 => b'T',
+        _ => b'N',
+    }
+}
+
 impl Sequences {
     const SIZE: usize = 1;
+
+    fn add_record(&mut self, ix: usize, seq: &[u8]) {
+        let seq_ix = self.sequences.len();
+        self.indices.set(ix, seq_ix as u64);
+        self.lengths.set(ix, seq.len() as u64);
+        seq.iter()
+            .for_each(|&b| self.sequences.append(encode_dna_base(b)));
+    }
 }
 
 impl Default for Sequences {
@@ -141,6 +177,11 @@ impl Graph {
         }
     }
 
+    fn graph_seq_record_ix(&self, graph_ix: GraphIx) -> usize {
+        let ix = graph_ix.0;
+        (ix * Sequences::SIZE) / GraphRecord::SIZE
+    }
+
     fn push_node_record(&mut self, id: NodeId) -> GraphIx {
         let next_ix = self.new_record_ix();
 
@@ -174,5 +215,23 @@ impl Graph {
         self.id_graph_map.set(index as usize, value as u64);
 
         next_ix
+    }
+
+    pub fn create_handle(&mut self, sequence: &[u8], id: NodeId) -> Handle {
+        assert!(!sequence.is_empty() && id != NodeId::from(0));
+
+        // todo make sure the node doesn't already exist
+
+        let graph_ix = self.push_node_record(id);
+        let seq_ix = self.graph_seq_record_ix(graph_ix);
+
+        self.sequences.add_record(seq_ix, sequence);
+
+        Handle::pack(id, false)
+    }
+
+    pub fn append_handle(&mut self, sequence: &[u8]) -> Handle {
+        let id = NodeId::from(self.max_id + 1);
+        self.create_handle(sequence, id)
     }
 }
