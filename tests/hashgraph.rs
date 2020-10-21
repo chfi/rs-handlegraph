@@ -1,6 +1,6 @@
 use handlegraph::{
     handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::HandleGraph,
+    handlegraph::{HandleGraph, HandleNeighbors},
     hashgraph::{HashGraph, PathStep},
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,
@@ -161,6 +161,23 @@ fn graph_handle_edges_iter() {
     graph.create_edge(&Edge(H1, H6));
 
     let mut iter = graph.handle_edges_iter(H1, Direction::Right);
+
+    assert_eq!(Some(H2), iter.next());
+    assert_eq!(Some(H3), iter.next());
+    assert_eq!(Some(H4), iter.next());
+    assert_eq!(Some(H6), iter.next());
+    assert_eq!(None, iter.next());
+}
+
+#[test]
+fn graph_neighbors_iter() {
+    let mut graph = path_graph();
+
+    graph.create_edge(&Edge(H1, H4));
+    graph.create_edge(&Edge(H1, H6));
+
+    // let mut iter = graph.handle_edges_iter(H1, Direction::Right);
+    let mut iter = graph.neighbors(H1, Direction::Right);
 
     assert_eq!(Some(H2), iter.next());
     assert_eq!(Some(H3), iter.next());

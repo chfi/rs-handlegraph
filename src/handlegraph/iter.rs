@@ -55,7 +55,8 @@ where
     }
 }
 
-/// Wrapper struct for ensuring handles are flipped correctly when iterating over the neighbors of a handle
+/// Wrapper struct for ensuring handles are flipped correctly when
+/// iterating over the neighbors of a handle
 pub struct NeighborIter<'a, I>
 where
     I: Iterator<Item = &'a Handle>,

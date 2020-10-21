@@ -3,7 +3,7 @@ use bstr::BString;
 
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::HandleGraph,
+    handlegraph::{AllEdges, AllHandles, HandleGraph, HandleNeighbors},
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,
 };
@@ -30,10 +30,6 @@ impl HandleGraph for HashGraph {
             seq.into()
         }
     }
-
-    // fn sequence_slice(&self, handle: Handle) -> &[u8] {
-    //     &self.get_node_unchecked(&handle.id()).sequence.as_ref()
-    // }
 
     fn length(&self, handle: Handle) -> usize {
         self.sequence(handle).len()
@@ -579,6 +575,29 @@ impl PathHandleGraph for HashGraph {
                 .iter()
                 .enumerate()
                 .map(move |(i, _)| PathStep::Step(*path_handle, i)),
+        )
+    }
+}
+
+impl<'a> HandleNeighbors for &'a HashGraph {
+    type Neighbors = crate::handlegraph::iter::NeighborIter<
+        'a,
+        std::slice::Iter<'a, Handle>,
+    >;
+
+    fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors {
+        let node = self.get_node_unchecked(&handle.id());
+
+        let handles = match (dir, handle.is_reverse()) {
+            (Direction::Left, true) => &node.right_edges,
+            (Direction::Left, false) => &node.left_edges,
+            (Direction::Right, true) => &node.left_edges,
+            (Direction::Right, false) => &node.right_edges,
+        };
+
+        crate::handlegraph::iter::NeighborIter::new(
+            handles.iter(),
+            dir == Direction::Left,
         )
     }
 }
