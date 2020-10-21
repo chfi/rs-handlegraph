@@ -15,24 +15,35 @@ impl std::fmt::Display for NodeId {
 }
 
 impl From<u64> for NodeId {
+    #[inline]
     fn from(num: u64) -> Self {
         NodeId(num)
     }
 }
 
 impl From<usize> for NodeId {
+    #[inline]
     fn from(num: usize) -> Self {
         NodeId(num as u64)
     }
 }
 
 impl From<NodeId> for u64 {
+    #[inline]
     fn from(id: NodeId) -> Self {
         id.0
     }
 }
 
+impl From<NodeId> for usize {
+    #[inline]
+    fn from(id: NodeId) -> Self {
+        id.0 as usize
+    }
+}
+
 impl From<i32> for NodeId {
+    #[inline]
     fn from(num: i32) -> Self {
         NodeId(num as u64)
     }
@@ -41,6 +52,7 @@ impl From<i32> for NodeId {
 impl Add<u64> for NodeId {
     type Output = Self;
 
+    #[inline]
     fn add(self, other: u64) -> Self {
         NodeId(self.0 + other)
     }
@@ -52,40 +64,48 @@ impl Add<u64> for NodeId {
 pub struct Handle(pub u64);
 
 impl From<Handle> for u64 {
+    #[inline]
     fn from(h: Handle) -> Self {
         h.0 >> 1
     }
 }
 
 impl From<u32> for Handle {
+    #[inline]
     fn from(i: u32) -> Self {
         Handle::from_integer((i << 1) as u64)
     }
 }
 
 impl From<i32> for Handle {
+    #[inline]
     fn from(i: i32) -> Self {
         Handle::from_integer((i << 1) as u64)
     }
 }
 
 impl Handle {
+    #[inline]
     pub fn as_integer(self) -> u64 {
         self.0
     }
 
+    #[inline]
     pub const fn from_integer(i: u64) -> Self {
         Handle(i)
     }
 
+    #[inline]
     pub fn unpack_number(self) -> u64 {
         self.as_integer() >> 1
     }
 
+    #[inline]
     pub fn unpack_bit(self) -> bool {
         self.as_integer() & 1 != 0
     }
 
+    #[inline]
     pub fn new<T: Into<NodeId>>(id: T, orient: Orientation) -> Handle {
         let id: NodeId = id.into();
         let uint: u64 = id.into();
@@ -99,6 +119,7 @@ impl Handle {
         }
     }
 
+    #[inline]
     pub fn pack<T: Into<NodeId>>(id: T, is_reverse: bool) -> Handle {
         let id: NodeId = id.into();
         let uint: u64 = id.into();
@@ -111,18 +132,22 @@ impl Handle {
         }
     }
 
+    #[inline]
     pub fn id(self) -> NodeId {
         NodeId(self.unpack_number())
     }
 
+    #[inline]
     pub fn is_reverse(&self) -> bool {
         self.unpack_bit()
     }
 
+    #[inline]
     pub fn flip(self) -> Self {
         Handle(self.as_integer() ^ 1)
     }
 
+    #[inline]
     pub fn forward(self) -> Self {
         if self.is_reverse() {
             self.flip()

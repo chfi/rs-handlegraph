@@ -96,6 +96,10 @@ pub struct EdgeRecord {
     next: EdgeIx,
 }
 
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[repr(transparent)]
+pub struct EdgeIx(pub usize);
+
 #[derive(Debug, Clone)]
 pub struct EdgeLists {
     edge_lists: PagedIntVec,
@@ -105,6 +109,31 @@ impl Default for EdgeLists {
     fn default() -> Self {
         EdgeLists {
             edge_lists: PagedIntVec::new(WIDE_PAGE_WIDTH),
+        }
+    }
+}
+
+impl EdgeLists {
+    const RECORD_SIZE: usize = 2;
+    fn append_record(&mut self, handle: Handle, next: usize) -> EdgeIx {
+        self.edge_lists.append(handle.as_integer());
+        self.edge_lists.append(next as u64);
+        let ix = self.edge_lists.len() / Self::RECORD_SIZE;
+        EdgeIx(ix)
+    }
+
+    fn get_record(&self, ix: EdgeIx) -> EdgeRecord {
+        let ix = (ix.0 - 1) * Self::RECORD_SIZE;
+        let handle = Handle::from_integer(self.edge_lists.get(ix));
+        let next = EdgeIx(self.edge_lists.get(ix + 1) as usize);
+        EdgeRecord { handle, next }
+    }
+
+    fn next(&self, rec: EdgeRecord) -> Option<EdgeRecord> {
+        if rec.next.0 != 0 {
+            Some(self.get_record(rec.next))
+        } else {
+            None
         }
     }
 }
@@ -238,6 +267,10 @@ impl Graph {
         next_ix
     }
 
+    pub fn has_node(&self, id: NodeId) -> bool {
+        self.get_node_index(id).is_some()
+    }
+
     pub fn create_handle(&mut self, sequence: &[u8], id: NodeId) -> Handle {
         assert!(!sequence.is_empty() && id != NodeId::from(0));
 
@@ -254,6 +287,40 @@ impl Graph {
     pub fn append_handle(&mut self, sequence: &[u8]) -> Handle {
         let id = NodeId::from(self.max_id + 1);
         self.create_handle(sequence, id)
+    }
+
+    pub fn create_edge(&mut self, left: Handle, right: Handle) -> Option<()> {
+        let left_g_ix = self.handle_graph_ix(left)?;
+        let right_g_ix = self.handle_graph_ix(right)?;
+
+        let left_edge_g_ix = if left.is_reverse() {
+            GraphRecord::start_edges_ix(left_g_ix)
+        } else {
+            GraphRecord::end_edges_ix(left_g_ix)
+        };
+
+        let right_edge_g_ix = if right.is_reverse() {
+            GraphRecord::end_edges_ix(right_g_ix)
+        } else {
+            GraphRecord::start_edges_ix(right_g_ix)
+        };
+
+        let right_next = self.node_records.get(left_edge_g_ix);
+        let edge_ix = self.edges.append_record(right, right_next as usize);
+
+        self.node_records.set(left_edge_g_ix, edge_ix.0 as u64);
+
+        if left_edge_g_ix == right_edge_g_ix {
+            // todo reversing self edge records?
+            return Some(());
+        }
+
+        let left_next = self.node_records.get(right_edge_g_ix);
+        let edge_ix = self.edges.append_record(left.flip(), left_next as usize);
+
+        self.node_records.set(right_edge_g_ix, edge_ix.0 as u64);
+
+        Some(())
     }
 
     pub fn sequence(&self, handle: Handle) -> Vec<u8> {
