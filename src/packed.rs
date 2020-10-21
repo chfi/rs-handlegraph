@@ -178,8 +178,8 @@ impl PackedIntVec {
 
     #[inline]
     pub fn pop(&mut self) {
-        if self.num_entries > 0 {
-            self.resize(self.num_entries - 1);
+        if let Some(new_size) = self.num_entries.checked_sub(1) {
+            self.resize(new_size);
         }
     }
 
@@ -508,18 +508,22 @@ impl PackedDeque {
         self.vector.get(self.internal_index(ix))
     }
 
-    #[inline]
-    pub fn push_front(&mut self, value: u64) {
+    fn grow_as_needed(&mut self) {
         if self.num_entries == self.vector.len() {
             let capacity = Self::FACTOR * self.vector.len() as f64;
             let capacity = 1 + capacity as usize;
             self.reserve(capacity);
         }
+    }
 
-        if self.start_ix == 0 {
-            self.start_ix = self.vector.len() - 1;
+    #[inline]
+    pub fn push_front(&mut self, value: u64) {
+        self.grow_as_needed();
+
+        if let Some(dec_start) = self.start_ix.checked_sub(1) {
+            self.start_ix = dec_start;
         } else {
-            self.start_ix -= 1;
+            self.start_ix = self.vector.len() - 1;
         }
 
         self.num_entries += 1;
@@ -529,11 +533,7 @@ impl PackedDeque {
 
     #[inline]
     pub fn push_back(&mut self, value: u64) {
-        if self.num_entries == self.vector.len() {
-            let capacity = Self::FACTOR * self.vector.len() as f64;
-            let capacity = 1 + capacity as usize;
-            self.reserve(capacity);
-        }
+        self.grow_as_needed();
 
         self.num_entries += 1;
 
@@ -603,6 +603,48 @@ impl Arbitrary for PackedIntVec {
     }
 }
 
+impl Arbitrary for PagedIntVec {
+    fn arbitrary<G: Gen>(g: &mut G) -> PagedIntVec {
+        let mut paged = PagedIntVec::new(64);
+        let u64_vec: Vec<u64> = Vec::arbitrary(g);
+
+        for v in u64_vec {
+            paged.append(v);
+        }
+        paged
+    }
+}
+
+impl Arbitrary for RobustPagedIntVec {
+    fn arbitrary<G: Gen>(g: &mut G) -> RobustPagedIntVec {
+        let first_page = PackedIntVec::arbitrary(g);
+        let other_pages = PagedIntVec::arbitrary(g);
+        Self {
+            first_page,
+            other_pages,
+        }
+    }
+}
+
+impl Arbitrary for PackedDeque {
+    fn arbitrary<G: Gen>(g: &mut G) -> PackedDeque {
+        let front: Vec<u64> = Vec::arbitrary(g);
+        let back: Vec<u64> = Vec::arbitrary(g);
+        let front_first = bool::arbitrary(g);
+
+        let mut deque = PackedDeque::new();
+
+        if front_first {
+            front.into_iter().for_each(|v| deque.push_front(v));
+            back.into_iter().for_each(|v| deque.push_back(v));
+        } else {
+            back.into_iter().for_each(|v| deque.push_back(v));
+            front.into_iter().for_each(|v| deque.push_front(v));
+        }
+        deque
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -611,7 +653,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_append() {
+    fn test_intvec_append() {
         let mut intvec = PackedIntVec::new();
 
         assert_eq!(intvec.len(), 0);
@@ -642,7 +684,7 @@ mod tests {
     }
 
     quickcheck! {
-        fn prop_append(intvec: PackedIntVec, value: u64) -> bool {
+        fn prop_intvec_append(intvec: PackedIntVec, value: u64) -> bool {
             let mut intvec = intvec;
 
             let filled_before = intvec.len();
@@ -661,7 +703,7 @@ mod tests {
     }
 
     quickcheck! {
-        fn prop_pop(intvec: PackedIntVec) -> bool {
+        fn prop_intvec_pop(intvec: PackedIntVec) -> bool {
             let mut intvec = intvec;
 
             let filled_before = intvec.len();
@@ -684,7 +726,7 @@ mod tests {
     }
 
     quickcheck! {
-        fn prop_get(vector: Vec<u64>) -> bool {
+        fn prop_intvec_get(vector: Vec<u64>) -> bool {
             let mut intvec = PackedIntVec::new();
             for &x in vector.iter() {
                 intvec.append(x);
@@ -703,7 +745,7 @@ mod tests {
     }
 
     quickcheck! {
-        fn prop_iter(vector: Vec<u64>) -> bool {
+        fn prop_intvec_iter(vector: Vec<u64>) -> bool {
             let mut intvec = PackedIntVec::new();
             for &x in vector.iter() {
                 intvec.append(x);
