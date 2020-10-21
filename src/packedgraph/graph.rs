@@ -63,6 +63,21 @@ impl Sequences {
         seq.iter()
             .for_each(|&b| self.sequences.append(encode_dna_base(b)));
     }
+
+    fn get_sequence(&self, ix: usize) -> Vec<u8> {
+        let start = self.indices.get(ix) as usize;
+        let len = self.lengths.get(ix) as usize;
+        let mut seq = Vec::with_capacity(len);
+        for i in 0..len {
+            let base = self.sequences.get(start + i);
+            seq.push(decode_dna_base(base));
+        }
+        seq
+    }
+
+    fn length(&self, ix: usize) -> usize {
+        self.lengths.get(ix) as usize
+    }
 }
 
 impl Default for Sequences {
@@ -177,6 +192,12 @@ impl Graph {
         }
     }
 
+    fn handle_graph_ix(&self, handle: Handle) -> Option<GraphIx> {
+        let id = handle.id();
+        let GraphIx(index) = self.get_node_index(id)?;
+        Some(GraphIx((index - 1) * GraphRecord::SIZE))
+    }
+
     fn graph_seq_record_ix(&self, graph_ix: GraphIx) -> usize {
         let ix = graph_ix.0;
         (ix * Sequences::SIZE) / GraphRecord::SIZE
@@ -233,5 +254,23 @@ impl Graph {
     pub fn append_handle(&mut self, sequence: &[u8]) -> Handle {
         let id = NodeId::from(self.max_id + 1);
         self.create_handle(sequence, id)
+    }
+
+    pub fn sequence(&self, handle: Handle) -> Vec<u8> {
+        let graph_ix = self.handle_graph_ix(handle).unwrap();
+        let seq_ix = self.graph_seq_record_ix(graph_ix);
+        let seq = self.sequences.get_sequence(seq_ix);
+
+        if handle.is_reverse() {
+            dna::revcomp(seq)
+        } else {
+            seq
+        }
+    }
+
+    pub fn length(&self, handle: Handle) -> usize {
+        let graph_ix = self.handle_graph_ix(handle).unwrap();
+        let seq_ix = self.graph_seq_record_ix(graph_ix);
+        self.sequences.length(seq_ix)
     }
 }
