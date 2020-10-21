@@ -196,6 +196,25 @@ impl PartialEq for PackedIntVec {
     }
 }
 
+impl std::iter::FromIterator<u64> for PackedIntVec {
+    fn from_iter<I: IntoIterator<Item = u64>>(iter: I) -> Self {
+        let mut intvec = PackedIntVec::new();
+        iter.into_iter().for_each(|v| intvec.append(v));
+        intvec
+    }
+}
+
+impl From<Vec<u64>> for PackedIntVec {
+    fn from(vector: Vec<u64>) -> Self {
+        let mut intvec = PackedIntVec::new();
+        intvec.resize(vector.len());
+        for (ix, v) in vector.into_iter().enumerate() {
+            intvec.set(ix, v);
+        }
+        intvec
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct PagedIntVec {
     page_size: usize,
@@ -586,6 +605,14 @@ impl PackedDeque {
         } else {
             ix - (self.vector.len() - self.start_ix)
         }
+    }
+}
+
+impl std::iter::FromIterator<u64> for PackedDeque {
+    fn from_iter<I: IntoIterator<Item = u64>>(iter: I) -> Self {
+        let mut deque = PackedDeque::new();
+        iter.into_iter().for_each(|v| deque.push_back(v));
+        deque
     }
 }
 
