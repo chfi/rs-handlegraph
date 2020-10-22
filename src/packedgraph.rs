@@ -21,7 +21,7 @@ impl HandleGraph for PackedGraph {
     /// The length of the sequence of a given node
     fn length(&self, handle: Handle) -> usize {
         let graph_ix = self.handle_graph_ix(handle).unwrap();
-        let seq_ix = self.graph_seq_record_ix(graph_ix);
+        let seq_ix = graph_ix.to_seq_record_ix();
         self.sequences.length(seq_ix)
     }
 
@@ -30,7 +30,7 @@ impl HandleGraph for PackedGraph {
     /// may be reversed depending on orientation.
     fn sequence(&self, handle: Handle) -> Vec<u8> {
         let graph_ix = self.handle_graph_ix(handle).unwrap();
-        let seq_ix = self.graph_seq_record_ix(graph_ix);
+        let seq_ix = graph_ix.to_seq_record_ix();
         let seq = self.sequences.get_sequence(seq_ix);
 
         if handle.is_reverse() {

@@ -1,7 +1,3 @@
-use bio::alphabets::dna;
-use bstr::BString;
-use fnv::FnvHashMap;
-
 use gfa::{
     gfa::{Link, Orientation, Segment, GFA},
     optfields::OptFields,
@@ -9,10 +5,7 @@ use gfa::{
 
 use crate::{
     handle::{Edge, Handle, NodeId},
-    handlegraph::HandleGraph,
-    mutablehandlegraph::MutableHandleGraph,
     packed::*,
-    pathgraph::PathHandleGraph,
 };
 
 static NARROW_PAGE_WIDTH: usize = 256;
@@ -98,7 +91,19 @@ pub struct EdgeRecord {
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct EdgeIx(pub usize);
+pub struct EdgeIx(usize);
+
+impl EdgeIx {
+    #[inline]
+    pub(super) fn from_edge_list_ix(ix: usize) -> Self {
+        EdgeIx(ix / EdgeLists::RECORD_SIZE)
+    }
+
+    #[inline]
+    pub(super) fn to_edge_list_ix(&self) -> usize {
+        (self.0 - 1) * EdgeLists::RECORD_SIZE
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct EdgeLists {
@@ -118,16 +123,17 @@ impl EdgeLists {
     pub(super) fn append_record(
         &mut self,
         handle: Handle,
-        next: usize,
+        next: EdgeIx,
     ) -> EdgeIx {
+        let ix = EdgeIx::from_edge_list_ix(self.edge_lists.len());
         self.edge_lists.append(handle.as_integer());
+        let next = next.to_edge_list_ix();
         self.edge_lists.append(next as u64);
-        let ix = self.edge_lists.len() / Self::RECORD_SIZE;
-        EdgeIx(ix)
+        ix
     }
 
     pub(super) fn get_record(&self, ix: EdgeIx) -> EdgeRecord {
-        let ix = (ix.0 - 1) * Self::RECORD_SIZE;
+        let ix = ix.to_edge_list_ix();
         let handle = Handle::from_integer(self.edge_lists.get(ix));
         let next = EdgeIx(self.edge_lists.get(ix + 1) as usize);
         EdgeRecord { handle, next }
@@ -152,21 +158,11 @@ impl GraphRecord {
     pub(super) const SIZE: usize = 2;
     pub(super) const START_OFFSET: usize = 0;
     pub(super) const END_OFFSET: usize = 1;
-
-    pub(super) fn start_edges_ix(g_ix: GraphIx) -> usize {
-        let ix = g_ix.0;
-        g_ix.0 + Self::START_OFFSET
-    }
-
-    pub(super) fn end_edges_ix(g_ix: GraphIx) -> usize {
-        let ix = g_ix.0;
-        g_ix.0 + Self::END_OFFSET
-    }
 }
 
 #[derive(Debug, Clone)]
 pub struct PackedGraph {
-    pub(super) node_records: PagedIntVec,
+    pub(super) graph_records: PagedIntVec,
     pub(super) sequences: Sequences,
     pub(super) edges: EdgeLists,
     pub(super) id_graph_map: PackedDeque,
@@ -179,13 +175,13 @@ impl Default for PackedGraph {
         let sequences = Default::default();
         let edges = Default::default();
         let id_graph_map = Default::default();
-        let node_records = PagedIntVec::new(NARROW_PAGE_WIDTH);
+        let graph_records = PagedIntVec::new(NARROW_PAGE_WIDTH);
         let max_id = 0;
         let min_id = std::u64::MAX;
         PackedGraph {
             sequences,
             edges,
-            node_records,
+            graph_records,
             id_graph_map,
             max_id,
             min_id,
@@ -195,7 +191,41 @@ impl Default for PackedGraph {
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct GraphIx(pub usize);
+pub struct GraphIx(usize);
+
+impl GraphIx {
+    pub(super) fn to_id_map_entry(&self) -> u64 {
+        let ix = self.0 as u64;
+        ix + 1
+    }
+
+    pub(super) fn from_id_map_entry(ix: u64) -> Option<Self> {
+        if ix == 0 {
+            None
+        } else {
+            Some(GraphIx((ix - 1) as usize))
+        }
+    }
+
+    pub(super) fn from_graph_records_ix(ix: usize) -> Self {
+        GraphIx(ix / GraphRecord::SIZE)
+    }
+
+    pub(super) fn to_seq_record_ix(&self) -> usize {
+        let ix = self.0;
+        (ix * Sequences::SIZE) / GraphRecord::SIZE
+    }
+
+    pub(super) fn start_edges_ix(&self) -> usize {
+        let ix = self.0;
+        (ix * GraphRecord::SIZE) + GraphRecord::START_OFFSET
+    }
+
+    pub(super) fn end_edges_ix(&self) -> usize {
+        let ix = self.0;
+        (ix * GraphRecord::SIZE) + GraphRecord::END_OFFSET
+    }
+}
 
 impl PackedGraph {
     pub fn new() -> Self {
@@ -203,12 +233,21 @@ impl PackedGraph {
     }
 
     pub(super) fn new_record_ix(&mut self) -> GraphIx {
-        let new_ix = self.node_records.len();
-        self.node_records.append(0);
-        self.node_records.append(0);
+        let new_ix = self.graph_records.len();
+        self.graph_records.append(0);
+        self.graph_records.append(0);
         self.sequences.lengths.append(0);
         self.sequences.indices.append(0);
-        GraphIx(new_ix)
+        GraphIx::from_graph_records_ix(new_ix)
+    }
+
+    pub(super) fn get_graph_record(&self, ix: GraphIx) -> GraphRecord {
+        let edges_start = self.graph_records.get(ix.start_edges_ix()) as usize;
+        let edges_end = self.graph_records.get(ix.end_edges_ix()) as usize;
+        GraphRecord {
+            edges_start,
+            edges_end,
+        }
     }
 
     pub(super) fn get_node_index(&self, id: NodeId) -> Option<GraphIx> {
@@ -218,22 +257,11 @@ impl PackedGraph {
         }
         let map_ix = id - self.min_id;
         let ix = self.id_graph_map.get(map_ix as usize);
-        if ix == 0 {
-            None
-        } else {
-            Some(GraphIx((ix - 1) as usize))
-        }
+        GraphIx::from_id_map_entry(ix)
     }
 
     pub(super) fn handle_graph_ix(&self, handle: Handle) -> Option<GraphIx> {
-        let id = handle.id();
-        let GraphIx(index) = self.get_node_index(id)?;
-        Some(GraphIx((index - 1) * GraphRecord::SIZE))
-    }
-
-    pub(super) fn graph_seq_record_ix(&self, graph_ix: GraphIx) -> usize {
-        let ix = graph_ix.0;
-        (ix * Sequences::SIZE) / GraphRecord::SIZE
+        self.get_node_index(handle.id())
     }
 
     pub(super) fn push_node_record(&mut self, id: NodeId) -> GraphIx {
@@ -264,9 +292,9 @@ impl PackedGraph {
         self.max_id = self.max_id.max(id);
 
         let index = id - self.min_id;
-        let value = self.node_records.len();
+        let value = next_ix.to_id_map_entry();
 
-        self.id_graph_map.set(index as usize, value as u64);
+        self.id_graph_map.set(index as usize, value);
 
         next_ix
     }
@@ -277,7 +305,7 @@ impl PackedGraph {
         // todo make sure the node doesn't already exist
 
         let graph_ix = self.push_node_record(id);
-        let seq_ix = self.graph_seq_record_ix(graph_ix);
+        let seq_ix = graph_ix.to_seq_record_ix();
 
         self.sequences.add_record(seq_ix, sequence);
 
@@ -289,36 +317,46 @@ impl PackedGraph {
         self.create_handle(sequence, id)
     }
 
+    #[inline]
+    fn get_edge_list_entry(&self, ix: usize) -> EdgeIx {
+        let entry = self.graph_records.get(ix);
+        EdgeIx::from_edge_list_ix(entry as usize)
+    }
+
     pub fn create_edge(&mut self, left: Handle, right: Handle) -> Option<()> {
         let left_g_ix = self.handle_graph_ix(left)?;
         let right_g_ix = self.handle_graph_ix(right)?;
 
         let left_edge_g_ix = if left.is_reverse() {
-            GraphRecord::start_edges_ix(left_g_ix)
+            left_g_ix.start_edges_ix()
         } else {
-            GraphRecord::end_edges_ix(left_g_ix)
+            left_g_ix.end_edges_ix()
         };
 
         let right_edge_g_ix = if right.is_reverse() {
-            GraphRecord::end_edges_ix(right_g_ix)
+            right_g_ix.end_edges_ix()
         } else {
-            GraphRecord::start_edges_ix(right_g_ix)
+            right_g_ix.start_edges_ix()
         };
 
-        let right_next = self.node_records.get(left_edge_g_ix);
-        let edge_ix = self.edges.append_record(right, right_next as usize);
+        let right_next = self.get_edge_list_entry(left_edge_g_ix);
+        let edge_ix = self.edges.append_record(right, right_next);
 
-        self.node_records.set(left_edge_g_ix, edge_ix.0 as u64);
+        // self.graph_records.set(left_edge_g_ix, edge_ix.0 as u64);
+        self.graph_records
+            .set(left_edge_g_ix, edge_ix.to_edge_list_ix() as u64);
 
         if left_edge_g_ix == right_edge_g_ix {
             // todo reversing self edge records?
             return Some(());
         }
 
-        let left_next = self.node_records.get(right_edge_g_ix);
-        let edge_ix = self.edges.append_record(left.flip(), left_next as usize);
+        let left_next = self.get_edge_list_entry(right_edge_g_ix);
+        let edge_ix = self.edges.append_record(left.flip(), left_next);
 
-        self.node_records.set(right_edge_g_ix, edge_ix.0 as u64);
+        // self.graph_records.set(right_edge_g_ix, edge_ix.0 as u64);
+        self.graph_records
+            .set(right_edge_g_ix, edge_ix.to_edge_list_ix() as u64);
 
         Some(())
     }
