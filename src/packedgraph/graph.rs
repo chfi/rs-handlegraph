@@ -85,7 +85,7 @@ impl Default for Sequences {
 
 #[derive(Debug, Clone, Copy)]
 pub struct EdgeRecord {
-    handle: Handle,
+    pub handle: Handle,
     next: EdgeIx,
 }
 
@@ -96,7 +96,7 @@ pub struct EdgeIx(usize);
 impl EdgeIx {
     #[inline]
     pub(super) fn from_edge_list_ix(ix: usize) -> Self {
-        EdgeIx(ix / EdgeLists::RECORD_SIZE)
+        EdgeIx((ix + 1) / EdgeLists::RECORD_SIZE)
     }
 
     #[inline]
@@ -132,6 +132,7 @@ impl EdgeLists {
         ix
     }
 
+    #[inline]
     pub(super) fn get_record(&self, ix: EdgeIx) -> EdgeRecord {
         let ix = ix.to_edge_list_ix();
         let handle = Handle::from_integer(self.edge_lists.get(ix));
@@ -139,6 +140,7 @@ impl EdgeLists {
         EdgeRecord { handle, next }
     }
 
+    #[inline]
     pub(super) fn next(&self, rec: EdgeRecord) -> Option<EdgeRecord> {
         if rec.next.0 != 0 {
             Some(self.get_record(rec.next))
@@ -213,7 +215,7 @@ impl GraphIx {
 
     pub(super) fn to_seq_record_ix(&self) -> usize {
         let ix = self.0;
-        (ix * Sequences::SIZE) / GraphRecord::SIZE
+        ix * Sequences::SIZE
     }
 
     pub(super) fn start_edges_ix(&self) -> usize {
@@ -278,10 +280,12 @@ impl PackedGraph {
                 }
             }
             if id > self.max_id {
-                let to_append =
-                    self.id_graph_map.len() - (id - self.min_id) as usize;
-                for _ in 0..to_append {
-                    self.id_graph_map.push_back(0);
+                let ix = (id - self.min_id) as usize;
+                if let Some(to_append) = ix.checked_sub(self.id_graph_map.len())
+                {
+                    for _ in 0..=to_append {
+                        self.id_graph_map.push_back(0);
+                    }
                 }
             }
         }
@@ -300,7 +304,7 @@ impl PackedGraph {
     }
 
     pub fn create_handle(&mut self, sequence: &[u8], id: NodeId) -> Handle {
-        assert!(!sequence.is_empty() && id != NodeId::from(0));
+        assert!(!sequence.is_empty());
 
         // todo make sure the node doesn't already exist
 
@@ -359,5 +363,78 @@ impl PackedGraph {
             .set(right_edge_g_ix, edge_ix.to_edge_list_ix() as u64);
 
         Some(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packedgraph_node_record_indices() {
+        let mut graph = PackedGraph::new();
+        let id_0 = NodeId::from(5);
+        let id_1 = NodeId::from(7);
+        let id_2 = NodeId::from(3);
+        let id_3 = NodeId::from(10);
+
+        let _g_0 = graph.push_node_record(id_0);
+        let _g_1 = graph.push_node_record(id_1);
+        let _g_2 = graph.push_node_record(id_2);
+        let _g_3 = graph.push_node_record(id_3);
+
+        assert_eq!(graph.min_id, 3);
+        assert_eq!(graph.max_id, 10);
+
+        assert_eq!(graph.id_graph_map.get(2), 1);
+        assert_eq!(graph.id_graph_map.get(4), 2);
+        assert_eq!(graph.id_graph_map.get(0), 3);
+        assert_eq!(graph.id_graph_map.get(7), 4);
+    }
+
+    #[test]
+    fn packedgraph_create_handle() {
+        let mut graph = PackedGraph::new();
+        let n0 = NodeId::from(0);
+        let n1 = NodeId::from(1);
+        let n2 = NodeId::from(2);
+        let h0 = graph.create_handle(b"GTCCA", n0);
+        let h1 = graph.create_handle(b"AAA", n1);
+        let h2 = graph.create_handle(b"GTGTGT", n2);
+
+        let g0 = graph.handle_graph_ix(h0);
+        assert_eq!(g0, Some(GraphIx(0)));
+
+        let g1 = graph.handle_graph_ix(h1);
+        assert_eq!(g1, Some(GraphIx(1)));
+
+        let g2 = graph.handle_graph_ix(h2);
+        assert_eq!(g2, Some(GraphIx(2)));
+
+        let handles = vec![h0, h1, h2];
+
+        use crate::handlegraph::{HandleGraph, HandleSequences};
+
+        use bstr::{BString, B};
+
+        let sequences = vec![B("GTCCA"), B("AAA"), B("GTGTGT")];
+
+        let s0: BString = graph.sequence(h0).into();
+        let s1: BString = graph.sequence(h1).into();
+        let s2: BString = graph.sequence(h2).into();
+
+        let s0_b: BString = graph.sequence_iter(h0).collect();
+        let s1_b: BString = graph.sequence_iter(h1).collect();
+        let s2_b: BString = graph.sequence_iter(h2).collect();
+
+        assert_eq!(
+            sequences,
+            vec![s0.as_slice(), s1.as_slice(), s2.as_slice()]
+        );
+
+        assert_eq!(
+            sequences,
+            vec![s0_b.as_slice(), s1_b.as_slice(), s2_b.as_slice()]
+        );
     }
 }
