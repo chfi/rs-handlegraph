@@ -29,15 +29,7 @@ impl HandleGraph for PackedGraph {
     /// orientation. Copies the sequence, as the sequence in the graph
     /// may be reversed depending on orientation.
     fn sequence(&self, handle: Handle) -> Vec<u8> {
-        let graph_ix = self.handle_graph_ix(handle).unwrap();
-        let seq_ix = graph_ix.to_seq_record_ix();
-        let seq = self.sequences.get_sequence(seq_ix);
-
-        if handle.is_reverse() {
-            dna::revcomp(seq)
-        } else {
-            seq
-        }
+        self.sequence_iter(handle).collect()
     }
 
     fn subsequence(
@@ -46,45 +38,41 @@ impl HandleGraph for PackedGraph {
         index: usize,
         size: usize,
     ) -> Vec<u8> {
-        self.sequence(handle)[index..index + size].into()
+        self.sequence_iter(handle).skip(index).take(size).collect()
     }
 
     fn base(&self, handle: Handle, index: usize) -> u8 {
-        self.sequence(handle)[index]
+        let g_ix = self.handle_graph_ix(handle).unwrap();
+        let seq_ix = g_ix.to_seq_record_ix();
+        self.sequences.base(seq_ix, index)
     }
 
+    #[inline]
     fn min_node_id(&self) -> NodeId {
         self.min_id.into()
     }
+    #[inline]
     fn max_node_id(&self) -> NodeId {
         self.max_id.into()
     }
 
     /// Return the total number of nodes in the graph
+    #[inline]
     fn node_count(&self) -> usize {
         // need to make sure this is correct, especially once I add deletion
         self.id_graph_map.len()
     }
 
     /// Return the total number of edges in the graph
+    #[inline]
     fn edge_count(&self) -> usize {
         self.edges.edge_lists.len() / EdgeLists::RECORD_SIZE
         // need to make sure this is correct!
     }
 
-    fn degree(&self, handle: Handle, dir: Direction) -> usize {
-        self.handle_edges_iter(handle, dir).fold(0, |a, _| a + 1)
-    }
-
-    fn has_edge(&self, left: Handle, right: Handle) -> bool {
-        self.handle_edges_iter(left, Direction::Right)
-            .any(|h| h == right)
-    }
-
     /// Sum up all the sequences in the graph
     fn total_length(&self) -> usize {
-        self.handles_iter()
-            .fold(0, |a, v| a + self.sequence(v).len())
+        self.sequences.total_length()
     }
 
     fn handle_edges_iter<'a>(
@@ -92,11 +80,11 @@ impl HandleGraph for PackedGraph {
         handle: Handle,
         dir: Direction,
     ) -> Box<dyn Iterator<Item = Handle> + 'a> {
-        unimplemented!();
+        Box::new(self.neighbors(handle, dir))
     }
 
     fn handles_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Handle> + 'a> {
-        unimplemented!();
+        Box::new(self.all_handles())
     }
 
     fn edges_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Edge> + 'a> {
@@ -147,6 +135,7 @@ where
 impl<'a> AllHandles for &'a PackedGraph {
     type Handles = PackedHandlesIter<crate::packed::PackedDequeIter<'a>>;
 
+    #[inline]
     fn all_handles(self) -> Self::Handles {
         let iter = self.id_graph_map.iter();
         PackedHandlesIter::new(iter, self.min_id as usize)
@@ -175,6 +164,7 @@ impl<'a> EdgeListIter<'a> {
 impl<'a> Iterator for EdgeListIter<'a> {
     type Item = Handle;
 
+    #[inline]
     fn next(&mut self) -> Option<Handle> {
         if self.finished {
             return None;
@@ -193,6 +183,7 @@ impl<'a> Iterator for EdgeListIter<'a> {
 impl<'a> HandleNeighbors for &'a PackedGraph {
     type Neighbors = EdgeListIter<'a>;
 
+    #[inline]
     fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors {
         use Direction as Dir;
         let g_ix = self.handle_graph_ix(handle).unwrap();
@@ -213,6 +204,7 @@ impl<'a> HandleNeighbors for &'a PackedGraph {
 impl<'a> HandleSequences for &'a PackedGraph {
     type Sequence = PackedSeqIter<'a>;
 
+    #[inline]
     fn sequence_iter(self, handle: Handle) -> Self::Sequence {
         let g_ix = self.handle_graph_ix(handle).unwrap();
         let seq_ix = g_ix.to_seq_record_ix();

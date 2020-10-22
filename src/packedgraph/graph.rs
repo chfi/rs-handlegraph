@@ -57,21 +57,22 @@ impl Sequences {
             .for_each(|&b| self.sequences.append(encode_dna_base(b)));
     }
 
+    #[inline]
     pub(super) fn get_sequence(&self, ix: usize) -> Vec<u8> {
-        let start = self.indices.get(ix) as usize;
-        let len = self.lengths.get(ix) as usize;
-        let mut seq = Vec::with_capacity(len);
-        for i in 0..len {
-            let base = self.sequences.get(start + i);
-            seq.push(decode_dna_base(base));
-        }
-        seq
+        self.iter(ix, false).collect()
     }
 
+    #[inline]
     pub(super) fn length(&self, ix: usize) -> usize {
         self.lengths.get(ix) as usize
     }
 
+    #[inline]
+    pub(super) fn total_length(&self) -> usize {
+        self.lengths.iter().sum::<u64>() as usize
+    }
+
+    #[inline]
     pub(super) fn base(&self, seq_ix: usize, base_ix: usize) -> u8 {
         let len = self.lengths.get(seq_ix) as usize;
         assert!(base_ix < len);
