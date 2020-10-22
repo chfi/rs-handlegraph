@@ -9,16 +9,39 @@ pub struct PackedIntVec {
 
 pub struct PackedIntVecIter<'a> {
     iter: succinct::int_vec::Iter<'a, u64>,
-    num_entries: usize,
-    index: usize,
+    left_ix: usize,
+    right_ix: usize,
 }
 
 impl<'a> PackedIntVecIter<'a> {
     fn new(iter: succinct::int_vec::Iter<'a, u64>, num_entries: usize) -> Self {
+        let left_ix = 0;
+        let right_ix = num_entries;
         Self {
             iter,
-            num_entries,
-            index: 0,
+            left_ix,
+            right_ix,
+        }
+    }
+
+    fn offset_new(
+        mut iter: succinct::int_vec::Iter<'a, u64>,
+        offset: usize,
+        length: usize,
+    ) -> Self {
+        let drop_right = iter.len() - (offset + length);
+        for _ in 0..drop_right {
+            iter.next_back();
+        }
+        let left_ix = offset;
+        let right_ix = offset + length;
+        for _ in 0..offset {
+            iter.next();
+        }
+        Self {
+            iter,
+            left_ix,
+            right_ix,
         }
     }
 }
@@ -27,9 +50,9 @@ impl<'a> Iterator for PackedIntVecIter<'a> {
     type Item = u64;
 
     fn next(&mut self) -> Option<u64> {
-        if self.index < self.num_entries {
+        if self.left_ix < self.right_ix {
             let item = self.iter.next();
-            self.index += 1;
+            self.left_ix += 1;
             item
         } else {
             None
@@ -37,8 +60,8 @@ impl<'a> Iterator for PackedIntVecIter<'a> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let lower = if self.index < self.num_entries {
-            self.num_entries - self.index
+        let lower = if self.left_ix < self.right_ix {
+            self.right_ix - self.left_ix
         } else {
             0
         };
@@ -47,24 +70,36 @@ impl<'a> Iterator for PackedIntVecIter<'a> {
     }
 
     fn count(self) -> usize {
-        if self.index < self.num_entries {
-            self.num_entries - self.index
+        if self.left_ix < self.right_ix {
+            self.right_ix - self.left_ix
         } else {
             0
         }
     }
 
     fn last(mut self) -> Option<u64> {
-        if self.index < self.num_entries {
-            self.iter.nth(self.num_entries - self.index)
+        if self.left_ix < self.right_ix {
+            self.iter.nth(self.right_ix - self.left_ix)
         } else {
             None
         }
     }
 
     fn nth(&mut self, n: usize) -> Option<u64> {
-        if self.index + n < self.num_entries {
+        if self.left_ix + n < self.right_ix {
             self.iter.nth(n)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> DoubleEndedIterator for PackedIntVecIter<'a> {
+    fn next_back(&mut self) -> Option<u64> {
+        if self.right_ix > self.left_ix {
+            let item = self.iter.next_back();
+            self.right_ix += 1;
+            item
         } else {
             None
         }
@@ -186,6 +221,15 @@ impl PackedIntVec {
     pub fn iter(&self) -> PackedIntVecIter<'_> {
         let iter = self.vector.iter();
         PackedIntVecIter::new(iter, self.num_entries)
+    }
+
+    pub fn iter_slice(
+        &self,
+        offset: usize,
+        length: usize,
+    ) -> PackedIntVecIter<'_> {
+        let iter = self.vector.iter();
+        PackedIntVecIter::offset_new(iter, offset, length)
     }
 }
 
