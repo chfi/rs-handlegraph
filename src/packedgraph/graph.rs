@@ -71,6 +71,46 @@ impl Sequences {
     pub(super) fn length(&self, ix: usize) -> usize {
         self.lengths.get(ix) as usize
     }
+
+    pub(super) fn base(&self, seq_ix: usize, base_ix: usize) -> u8 {
+        let len = self.lengths.get(seq_ix) as usize;
+        assert!(base_ix < len);
+        let offset = self.indices.get(seq_ix) as usize;
+        let base = self.sequences.get(offset + base_ix);
+        decode_dna_base(base)
+    }
+
+    pub(super) fn iter(
+        &self,
+        seq_ix: usize,
+        reverse: bool,
+    ) -> PackedSeqIter<'_> {
+        let offset = self.indices.get(seq_ix) as usize;
+        let len = self.lengths.get(seq_ix) as usize;
+
+        let iter = self.sequences.iter_slice(offset, len);
+
+        PackedSeqIter { iter, reverse }
+    }
+}
+
+pub struct PackedSeqIter<'a> {
+    iter: PackedIntVecIter<'a>,
+    reverse: bool,
+}
+
+impl<'a> Iterator for PackedSeqIter<'a> {
+    type Item = u8;
+
+    fn next(&mut self) -> Option<u8> {
+        if self.reverse {
+            let base = self.iter.next_back()?;
+            Some(decode_dna_base(encoded_complement(base)))
+        } else {
+            let base = self.iter.next()?;
+            Some(decode_dna_base(base))
+        }
+    }
 }
 
 impl Default for Sequences {
