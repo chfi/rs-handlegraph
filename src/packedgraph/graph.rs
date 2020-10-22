@@ -362,7 +362,7 @@ impl PackedGraph {
     }
 
     #[inline]
-    fn get_edge_list_entry(&self, ix: usize) -> EdgeIx {
+    pub(super) fn get_edge_list_ix(&self, ix: usize) -> EdgeIx {
         let entry = self.graph_records.get(ix);
         EdgeIx::from_edge_list_ix(entry as usize)
     }
@@ -383,7 +383,7 @@ impl PackedGraph {
             right_g_ix.start_edges_ix()
         };
 
-        let right_next = self.get_edge_list_entry(left_edge_g_ix);
+        let right_next = self.get_edge_list_ix(left_edge_g_ix);
         let edge_ix = self.edges.append_record(right, right_next);
 
         // self.graph_records.set(left_edge_g_ix, edge_ix.0 as u64);
@@ -395,7 +395,7 @@ impl PackedGraph {
             return Some(());
         }
 
-        let left_next = self.get_edge_list_entry(right_edge_g_ix);
+        let left_next = self.get_edge_list_ix(right_edge_g_ix);
         let edge_ix = self.edges.append_record(left.flip(), left_next);
 
         // self.graph_records.set(right_edge_g_ix, edge_ix.0 as u64);
