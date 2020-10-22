@@ -53,19 +53,6 @@ pub trait HandleGraph {
             .fold(0, |a, v| a + self.sequence(v).len())
     }
 
-    fn traverse_edge_handle(&self, edge: &Edge, left: Handle) -> Handle {
-        let Edge(el, er) = *edge;
-
-        if left == el {
-            er
-        } else if left == er.flip() {
-            el.flip()
-        } else {
-            // TODO this should be improved -- this whole function, really
-            panic!("traverse_edge_handle called with a handle that the edge didn't connect");
-        }
-    }
-
     /// Returns an iterator over the neighbors of a handle in a
     /// given direction
     fn handle_edges_iter<'a>(

@@ -56,7 +56,7 @@ const fn decode_dna_base(byte: u64) -> u8 {
 impl Sequences {
     const SIZE: usize = 1;
 
-    fn add_record(&mut self, ix: usize, seq: &[u8]) {
+    pub(super) fn add_record(&mut self, ix: usize, seq: &[u8]) {
         let seq_ix = self.sequences.len();
         self.indices.set(ix, seq_ix as u64);
         self.lengths.set(ix, seq.len() as u64);
@@ -64,7 +64,7 @@ impl Sequences {
             .for_each(|&b| self.sequences.append(encode_dna_base(b)));
     }
 
-    fn get_sequence(&self, ix: usize) -> Vec<u8> {
+    pub(super) fn get_sequence(&self, ix: usize) -> Vec<u8> {
         let start = self.indices.get(ix) as usize;
         let len = self.lengths.get(ix) as usize;
         let mut seq = Vec::with_capacity(len);
@@ -75,7 +75,7 @@ impl Sequences {
         seq
     }
 
-    fn length(&self, ix: usize) -> usize {
+    pub(super) fn length(&self, ix: usize) -> usize {
         self.lengths.get(ix) as usize
     }
 }
@@ -102,7 +102,7 @@ pub struct EdgeIx(pub usize);
 
 #[derive(Debug, Clone)]
 pub struct EdgeLists {
-    edge_lists: PagedIntVec,
+    pub(super) edge_lists: PagedIntVec,
 }
 
 impl Default for EdgeLists {
@@ -114,22 +114,26 @@ impl Default for EdgeLists {
 }
 
 impl EdgeLists {
-    const RECORD_SIZE: usize = 2;
-    fn append_record(&mut self, handle: Handle, next: usize) -> EdgeIx {
+    pub(super) const RECORD_SIZE: usize = 2;
+    pub(super) fn append_record(
+        &mut self,
+        handle: Handle,
+        next: usize,
+    ) -> EdgeIx {
         self.edge_lists.append(handle.as_integer());
         self.edge_lists.append(next as u64);
         let ix = self.edge_lists.len() / Self::RECORD_SIZE;
         EdgeIx(ix)
     }
 
-    fn get_record(&self, ix: EdgeIx) -> EdgeRecord {
+    pub(super) fn get_record(&self, ix: EdgeIx) -> EdgeRecord {
         let ix = (ix.0 - 1) * Self::RECORD_SIZE;
         let handle = Handle::from_integer(self.edge_lists.get(ix));
         let next = EdgeIx(self.edge_lists.get(ix + 1) as usize);
         EdgeRecord { handle, next }
     }
 
-    fn next(&self, rec: EdgeRecord) -> Option<EdgeRecord> {
+    pub(super) fn next(&self, rec: EdgeRecord) -> Option<EdgeRecord> {
         if rec.next.0 != 0 {
             Some(self.get_record(rec.next))
         } else {
@@ -145,32 +149,32 @@ pub struct GraphRecord {
 }
 
 impl GraphRecord {
-    const SIZE: usize = 2;
-    const START_OFFSET: usize = 0;
-    const END_OFFSET: usize = 1;
+    pub(super) const SIZE: usize = 2;
+    pub(super) const START_OFFSET: usize = 0;
+    pub(super) const END_OFFSET: usize = 1;
 
-    fn start_edges_ix(g_ix: GraphIx) -> usize {
+    pub(super) fn start_edges_ix(g_ix: GraphIx) -> usize {
         let ix = g_ix.0;
         g_ix.0 + Self::START_OFFSET
     }
 
-    fn end_edges_ix(g_ix: GraphIx) -> usize {
+    pub(super) fn end_edges_ix(g_ix: GraphIx) -> usize {
         let ix = g_ix.0;
         g_ix.0 + Self::END_OFFSET
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct Graph {
-    node_records: PagedIntVec,
-    sequences: Sequences,
-    edges: EdgeLists,
-    id_graph_map: PackedDeque,
-    max_id: u64,
-    min_id: u64,
+pub struct PackedGraph {
+    pub(super) node_records: PagedIntVec,
+    pub(super) sequences: Sequences,
+    pub(super) edges: EdgeLists,
+    pub(super) id_graph_map: PackedDeque,
+    pub(super) max_id: u64,
+    pub(super) min_id: u64,
 }
 
-impl Default for Graph {
+impl Default for PackedGraph {
     fn default() -> Self {
         let sequences = Default::default();
         let edges = Default::default();
@@ -178,7 +182,7 @@ impl Default for Graph {
         let node_records = PagedIntVec::new(NARROW_PAGE_WIDTH);
         let max_id = 0;
         let min_id = std::u64::MAX;
-        Graph {
+        PackedGraph {
             sequences,
             edges,
             node_records,
@@ -193,12 +197,12 @@ impl Default for Graph {
 #[repr(transparent)]
 pub struct GraphIx(pub usize);
 
-impl Graph {
+impl PackedGraph {
     pub fn new() -> Self {
         Default::default()
     }
 
-    fn new_record_ix(&mut self) -> GraphIx {
+    pub(super) fn new_record_ix(&mut self) -> GraphIx {
         let new_ix = self.node_records.len();
         self.node_records.append(0);
         self.node_records.append(0);
@@ -207,7 +211,7 @@ impl Graph {
         GraphIx(new_ix)
     }
 
-    fn get_node_index(&self, id: NodeId) -> Option<GraphIx> {
+    pub(super) fn get_node_index(&self, id: NodeId) -> Option<GraphIx> {
         let id = u64::from(id);
         if id < self.min_id || id > self.max_id {
             return None;
@@ -221,18 +225,18 @@ impl Graph {
         }
     }
 
-    fn handle_graph_ix(&self, handle: Handle) -> Option<GraphIx> {
+    pub(super) fn handle_graph_ix(&self, handle: Handle) -> Option<GraphIx> {
         let id = handle.id();
         let GraphIx(index) = self.get_node_index(id)?;
         Some(GraphIx((index - 1) * GraphRecord::SIZE))
     }
 
-    fn graph_seq_record_ix(&self, graph_ix: GraphIx) -> usize {
+    pub(super) fn graph_seq_record_ix(&self, graph_ix: GraphIx) -> usize {
         let ix = graph_ix.0;
         (ix * Sequences::SIZE) / GraphRecord::SIZE
     }
 
-    fn push_node_record(&mut self, id: NodeId) -> GraphIx {
+    pub(super) fn push_node_record(&mut self, id: NodeId) -> GraphIx {
         let next_ix = self.new_record_ix();
 
         if self.id_graph_map.is_empty() {
@@ -265,10 +269,6 @@ impl Graph {
         self.id_graph_map.set(index as usize, value as u64);
 
         next_ix
-    }
-
-    pub fn has_node(&self, id: NodeId) -> bool {
-        self.get_node_index(id).is_some()
     }
 
     pub fn create_handle(&mut self, sequence: &[u8], id: NodeId) -> Handle {
@@ -321,23 +321,5 @@ impl Graph {
         self.node_records.set(right_edge_g_ix, edge_ix.0 as u64);
 
         Some(())
-    }
-
-    pub fn sequence(&self, handle: Handle) -> Vec<u8> {
-        let graph_ix = self.handle_graph_ix(handle).unwrap();
-        let seq_ix = self.graph_seq_record_ix(graph_ix);
-        let seq = self.sequences.get_sequence(seq_ix);
-
-        if handle.is_reverse() {
-            dna::revcomp(seq)
-        } else {
-            seq
-        }
-    }
-
-    pub fn length(&self, handle: Handle) -> usize {
-        let graph_ix = self.handle_graph_ix(handle).unwrap();
-        let seq_ix = self.graph_seq_record_ix(graph_ix);
-        self.sequences.length(seq_ix)
     }
 }
