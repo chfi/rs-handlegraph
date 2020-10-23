@@ -1,5 +1,5 @@
 use crate::handle::{Edge, Handle, NodeId};
-use crate::handlegraph::HandleGraph;
+use crate::handlegraph::{HandleGraph, HandleGraphRef};
 
 /// Trait encapsulating the mutable aspects of a handlegraph
 /// WIP
@@ -30,4 +30,13 @@ pub trait MutableHandleGraph: HandleGraph {
     }
 
     fn apply_orientation(&mut self, handle: Handle) -> Handle;
+}
+
+pub trait MutHandleGraphRef: HandleGraphRef {}
+
+impl<'a, T> MutHandleGraphRef for &'a T
+where
+    T: HandleGraph,
+    &'a T: HandleGraphRef,
+{
 }

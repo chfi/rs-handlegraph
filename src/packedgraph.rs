@@ -6,6 +6,7 @@ use crate::{
     handlegraph::{
         AllEdges, AllHandles, HandleGraph, HandleNeighbors, HandleSequences,
     },
+    mutablehandlegraph::MutableHandleGraph,
 };
 
 pub mod graph;
@@ -81,6 +82,75 @@ impl HandleGraph for PackedGraph {
 
     fn has_edge(&self, left: Handle, right: Handle) -> bool {
         self.neighbors(left, Direction::Right).any(|h| h == right)
+    }
+}
+
+impl MutableHandleGraph for PackedGraph {
+    fn append_handle(&mut self, sequence: &[u8]) -> Handle {
+        let id = NodeId::from(self.max_id + 1);
+        self.create_handle(sequence, id)
+    }
+
+    fn create_handle<T: Into<NodeId>>(
+        &mut self,
+        sequence: &[u8],
+        node_id: T,
+    ) -> Handle {
+        let id = node_id.into();
+        assert!(
+            id != NodeId::from(0) && !sequence.is_empty() && !self.has_node(id)
+        );
+
+        let graph_ix = self.push_node_record(id);
+        let seq_ix = graph_ix.to_seq_record_ix();
+
+        self.sequences.add_record(seq_ix, sequence);
+
+        Handle::pack(id, false)
+    }
+
+    fn create_edge(&mut self, Edge(left, right): Edge) {
+        let left_g_ix = self.handle_graph_ix(left).unwrap();
+        let right_g_ix = self.handle_graph_ix(right).unwrap();
+
+        let left_edge_g_ix = if left.is_reverse() {
+            left_g_ix.start_edges_ix()
+        } else {
+            left_g_ix.end_edges_ix()
+        };
+
+        let right_edge_g_ix = if right.is_reverse() {
+            right_g_ix.end_edges_ix()
+        } else {
+            right_g_ix.start_edges_ix()
+        };
+
+        let right_next = self.get_edge_list_ix(left_edge_g_ix);
+        let edge_ix = self.edges.append_record(right, right_next);
+
+        self.graph_records.set(left_edge_g_ix, edge_ix.0 as u64);
+
+        if left_edge_g_ix == right_edge_g_ix {
+            // todo reversing self edge records?
+            return;
+        }
+
+        let left_next = self.get_edge_list_ix(right_edge_g_ix);
+        let edge_ix = self.edges.append_record(left.flip(), left_next);
+
+        self.graph_records.set(right_edge_g_ix, edge_ix.0 as u64);
+    }
+
+    fn divide_handle(
+        &mut self,
+        handle: Handle,
+        offsets: Vec<usize>,
+    ) -> Vec<Handle> {
+        unimplemented!();
+    }
+
+    fn apply_orientation(&mut self, handle: Handle) -> Handle {
+        unimplemented!();
     }
 }
 

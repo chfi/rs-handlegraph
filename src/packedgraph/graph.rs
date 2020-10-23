@@ -133,7 +133,7 @@ pub struct EdgeRecord {
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct EdgeIx(usize);
+pub struct EdgeIx(pub(super) usize);
 
 impl EdgeIx {
     #[inline]
@@ -349,62 +349,10 @@ impl PackedGraph {
         next_ix
     }
 
-    pub fn create_handle(&mut self, sequence: &[u8], id: NodeId) -> Handle {
-        assert!(
-            id != NodeId::from(0) && !sequence.is_empty() && !self.has_node(id)
-        );
-
-        let graph_ix = self.push_node_record(id);
-        let seq_ix = graph_ix.to_seq_record_ix();
-
-        self.sequences.add_record(seq_ix, sequence);
-
-        Handle::pack(id, false)
-    }
-
-    pub fn append_handle(&mut self, sequence: &[u8]) -> Handle {
-        let id = NodeId::from(self.max_id + 1);
-        self.create_handle(sequence, id)
-    }
-
     #[inline]
     pub(super) fn get_edge_list_ix(&self, ix: usize) -> EdgeIx {
         let entry = self.graph_records.get(ix);
         EdgeIx(entry as usize)
-    }
-
-    pub fn create_edge(&mut self, left: Handle, right: Handle) -> Option<()> {
-        let left_g_ix = self.handle_graph_ix(left)?;
-        let right_g_ix = self.handle_graph_ix(right)?;
-
-        let left_edge_g_ix = if left.is_reverse() {
-            left_g_ix.start_edges_ix()
-        } else {
-            left_g_ix.end_edges_ix()
-        };
-
-        let right_edge_g_ix = if right.is_reverse() {
-            right_g_ix.end_edges_ix()
-        } else {
-            right_g_ix.start_edges_ix()
-        };
-
-        let right_next = self.get_edge_list_ix(left_edge_g_ix);
-        let edge_ix = self.edges.append_record(right, right_next);
-
-        self.graph_records.set(left_edge_g_ix, edge_ix.0 as u64);
-
-        if left_edge_g_ix == right_edge_g_ix {
-            // todo reversing self edge records?
-            return Some(());
-        }
-
-        let left_next = self.get_edge_list_ix(right_edge_g_ix);
-        let edge_ix = self.edges.append_record(left.flip(), left_next);
-
-        self.graph_records.set(right_edge_g_ix, edge_ix.0 as u64);
-
-        Some(())
     }
 }
 
