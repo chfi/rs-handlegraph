@@ -146,14 +146,14 @@ impl MutableHandleGraph for HashGraph {
         Handle::pack(id, false)
     }
 
-    fn create_edge(&mut self, Edge(left, right): &Edge) {
+    fn create_edge(&mut self, Edge(left, right): Edge) {
         let add_edge = {
             let left_node = self
                 .graph
                 .get(&left.id())
                 .expect("Node doesn't exist for the given handle");
 
-            None == left_node.right_edges.iter().find(|h| *h == right)
+            None == left_node.right_edges.iter().find(|&&h| h == right)
         };
 
         if add_edge {
@@ -162,11 +162,11 @@ impl MutableHandleGraph for HashGraph {
                 .get_mut(&left.id())
                 .expect("Node doesn't exist for the given handle");
             if left.is_reverse() {
-                left_node.left_edges.push(*right);
+                left_node.left_edges.push(right);
             } else {
-                left_node.right_edges.push(*right);
+                left_node.right_edges.push(right);
             }
-            if left != &right.flip() {
+            if left != right.flip() {
                 let right_node = self
                     .graph
                     .get_mut(&right.id())
@@ -260,7 +260,7 @@ impl MutableHandleGraph for HashGraph {
 
         // create edges between the new segments
         for (this, next) in result.iter().zip(result.iter().skip(1)) {
-            self.create_edge(&Edge(*this, *next));
+            self.create_edge(Edge(*this, *next));
         }
 
         // update paths and path occurrences
@@ -628,7 +628,6 @@ impl<'a> HandleSequences for &'a HashGraph {
     fn sequence_iter(self, handle: Handle) -> Self::Sequence {
         let seq: &[u8] =
             &self.get_node_unchecked(&handle.id()).sequence.as_ref();
-        let iter = seq.iter();
         SequenceIter::new(seq.iter().copied(), handle.is_reverse())
     }
 }

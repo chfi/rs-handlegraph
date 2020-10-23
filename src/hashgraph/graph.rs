@@ -43,7 +43,7 @@ impl HashGraph {
         let left = Handle::new(link.from_segment as u64, link.from_orient);
         let right = Handle::new(link.to_segment as u64, link.to_orient);
 
-        self.create_edge(&Edge(left, right));
+        self.create_edge(Edge(left, right));
     }
 
     fn add_gfa_path<T: OptFields>(&mut self, path: &gfa::gfa::Path<usize, T>) {

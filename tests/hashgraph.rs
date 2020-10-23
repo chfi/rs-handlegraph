@@ -40,10 +40,10 @@ fn can_create_edges() {
     let h3 = graph.append_handle(b"G");
     let h4 = graph.append_handle(b"TTG");
 
-    graph.create_edge(&Edge(h1, h2));
-    graph.create_edge(&Edge(h1, h3));
-    graph.create_edge(&Edge(h2, h4));
-    graph.create_edge(&Edge(h3, h4));
+    graph.create_edge(Edge(h1, h2));
+    graph.create_edge(Edge(h1, h3));
+    graph.create_edge(Edge(h2, h4));
+    graph.create_edge(Edge(h3, h4));
 
     let n1 = graph.get_node_unchecked(&h1.id());
     let n2 = graph.get_node_unchecked(&h2.id());
@@ -129,13 +129,13 @@ fn path_graph() -> HashGraph {
     1  -> 2 -> 5 -> 6
       \-> 3 -> 4 /
      */
-    graph.create_edge(&Edge(h1, h2));
-    graph.create_edge(&Edge(h2, h5));
-    graph.create_edge(&Edge(h5, h6));
+    graph.create_edge(Edge(h1, h2));
+    graph.create_edge(Edge(h2, h5));
+    graph.create_edge(Edge(h5, h6));
 
-    graph.create_edge(&Edge(h1, h3));
-    graph.create_edge(&Edge(h3, h4));
-    graph.create_edge(&Edge(h4, h6));
+    graph.create_edge(Edge(h1, h3));
+    graph.create_edge(Edge(h3, h4));
+    graph.create_edge(Edge(h4, h6));
 
     graph
 }
@@ -157,8 +157,8 @@ fn graph_has_edge() {
 fn graph_handle_edges_iter() {
     let mut graph = path_graph();
 
-    graph.create_edge(&Edge(H1, H4));
-    graph.create_edge(&Edge(H1, H6));
+    graph.create_edge(Edge(H1, H4));
+    graph.create_edge(Edge(H1, H6));
 
     let mut iter = graph.handle_edges_iter(H1, Direction::Right);
 
@@ -173,8 +173,8 @@ fn graph_handle_edges_iter() {
 fn graph_neighbors_iter() {
     let mut graph = path_graph();
 
-    graph.create_edge(&Edge(H1, H4));
-    graph.create_edge(&Edge(H1, H6));
+    graph.create_edge(Edge(H1, H4));
+    graph.create_edge(Edge(H1, H6));
 
     // let mut iter = graph.handle_edges_iter(H1, Direction::Right);
     let mut iter = graph.neighbors(H1, Direction::Right);
@@ -232,13 +232,13 @@ fn graph_all_handles_iter() {
 fn graph_edges_iter() {
     let mut graph = path_graph();
 
-    graph.create_edge(&Edge(H1, H4));
-    graph.create_edge(&Edge(H1, H6));
+    graph.create_edge(Edge(H1, H4));
+    graph.create_edge(Edge(H1, H6));
 
-    graph.create_edge(&Edge(H4, H2));
-    graph.create_edge(&Edge(H6, H2));
+    graph.create_edge(Edge(H4, H2));
+    graph.create_edge(Edge(H6, H2));
 
-    graph.create_edge(&Edge(H3, H5));
+    graph.create_edge(Edge(H3, H5));
 
     let mut edges_found: Vec<_> = graph.edges_iter().collect();
 
@@ -267,13 +267,13 @@ fn graph_edges_iter() {
 fn graph_all_edges_iter() {
     let mut graph = path_graph();
 
-    graph.create_edge(&Edge(H1, H4));
-    graph.create_edge(&Edge(H1, H6));
+    graph.create_edge(Edge(H1, H4));
+    graph.create_edge(Edge(H1, H6));
 
-    graph.create_edge(&Edge(H4, H2));
-    graph.create_edge(&Edge(H6, H2));
+    graph.create_edge(Edge(H4, H2));
+    graph.create_edge(Edge(H6, H2));
 
-    graph.create_edge(&Edge(H3, H5));
+    graph.create_edge(Edge(H3, H5));
 
     let mut edges_found: Vec<_> = graph.all_edges().collect();
     // let mut edges_found: Vec<_> = graph.edges_iter().collect();
@@ -454,8 +454,8 @@ fn graph_divide_handle() {
     graph.append_handle(b"EFGHIJKLMN");
     graph.append_handle(b"OPQ");
 
-    graph.create_edge(&Edge(H1, H2));
-    graph.create_edge(&Edge(H2, H3));
+    graph.create_edge(Edge(H1, H2));
+    graph.create_edge(Edge(H2, H3));
 
     let path = graph.create_path_handle(b"path-1", false);
 

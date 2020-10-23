@@ -12,7 +12,7 @@ pub trait MutableHandleGraph: HandleGraph {
         node_id: T,
     ) -> Handle;
 
-    fn create_edge(&mut self, edge: &Edge);
+    fn create_edge(&mut self, edge: Edge);
 
     fn divide_handle(
         &mut self,
