@@ -145,7 +145,7 @@ impl<'a> AllHandles for &'a PackedGraph {
 /// Iterator for stepping through an edge list, returning Handles.
 pub struct EdgeListIter<'a> {
     edge_lists: &'a EdgeLists,
-    current: EdgeRecord,
+    current: Option<EdgeRecord>,
     finished: bool,
 }
 
@@ -169,9 +169,9 @@ impl<'a> Iterator for EdgeListIter<'a> {
         if self.finished {
             return None;
         }
-        let item = self.current.handle;
-        if let Some(next) = self.edge_lists.next(self.current) {
-            self.current = next;
+        if let Some(current) = self.current {
+            let item = current.handle;
+            self.current = self.edge_lists.next(current);
             Some(item)
         } else {
             self.finished = true;

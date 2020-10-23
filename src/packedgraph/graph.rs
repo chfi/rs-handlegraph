@@ -179,20 +179,20 @@ impl EdgeLists {
     }
 
     #[inline]
-    pub(super) fn get_record(&self, ix: EdgeIx) -> EdgeRecord {
-        let ix = ix.to_edge_list_ix();
-        let handle = Handle::from_integer(self.edge_lists.get(ix));
-        let next = EdgeIx(self.edge_lists.get(ix + 1) as usize);
-        EdgeRecord { handle, next }
+    pub(super) fn get_record(&self, ix: EdgeIx) -> Option<EdgeRecord> {
+        if ix == EdgeIx(0) {
+            None
+        } else {
+            let ix = ix.to_edge_list_ix();
+            let handle = Handle::from_integer(self.edge_lists.get(ix));
+            let next = EdgeIx(self.edge_lists.get(ix + 1) as usize);
+            Some(EdgeRecord { handle, next })
+        }
     }
 
     #[inline]
     pub(super) fn next(&self, rec: EdgeRecord) -> Option<EdgeRecord> {
-        if rec.next.0 != 0 {
-            Some(self.get_record(rec.next))
-        } else {
-            None
-        }
+        self.get_record(rec.next)
     }
 }
 
@@ -437,9 +437,9 @@ mod tests {
     #[test]
     fn packedgraph_create_handle() {
         let mut graph = PackedGraph::new();
-        let n0 = NodeId::from(0);
-        let n1 = NodeId::from(1);
-        let n2 = NodeId::from(2);
+        let n0 = NodeId::from(1);
+        let n1 = NodeId::from(2);
+        let n2 = NodeId::from(3);
         let h0 = graph.create_handle(b"GTCCA", n0);
         let h1 = graph.create_handle(b"AAA", n1);
         let h2 = graph.create_handle(b"GTGTGT", n2);
@@ -455,7 +455,7 @@ mod tests {
 
         let handles = vec![h0, h1, h2];
 
-        use crate::handlegraph::{HandleGraph, HandleSequences};
+        use crate::handlegraph::{AllHandles, HandleGraph, HandleSequences};
 
         use bstr::{BString, B};
 
@@ -478,6 +478,11 @@ mod tests {
             sequences,
             vec![s0_b.as_slice(), s1_b.as_slice(), s2_b.as_slice()]
         );
+
+        let mut handles = graph.all_handles().collect::<Vec<_>>();
+        handles.sort();
+        let hnd = |x: u64| Handle::pack(x, false);
+        assert_eq!(handles, vec![hnd(1), hnd(2), hnd(3)]);
     }
 
     #[test]
@@ -510,14 +515,43 @@ mod tests {
 
         graph.create_edge(hnd(4), hnd(5));
 
-        /*
-        println!("Node 1 neighbors:");
-        for n0 in graph.neighbors(hnd(1), Direction::Right) {
-            println!("{:?} -> {:?}", hnd(1), n0);
-        }
-        for n0 in graph.neighbors(hnd(1), Direction::Left) {
-            println!("{:?} -> {:?}", hnd(1), n0);
-        }
-        */
+        let adj = |x: u64, left: bool| {
+            let dir = if left {
+                Direction::Left
+            } else {
+                Direction::Right
+            };
+            graph
+                .neighbors(hnd(x), dir)
+                .map(|h| u64::from(h.id()))
+                .collect::<Vec<_>>()
+        };
+
+        let adj = |x: u64, left: bool| {
+            let dir = if left {
+                Direction::Left
+            } else {
+                Direction::Right
+            };
+            graph
+                .neighbors(hnd(x), dir)
+                .map(|h| u64::from(h.id()))
+                .collect::<Vec<_>>()
+        };
+
+        assert!(adj(1, true).is_empty());
+        assert_eq!(vec![3, 2], adj(1, false));
+
+        assert_eq!(vec![1], adj(2, true));
+        assert_eq!(vec![4], adj(2, false));
+
+        assert_eq!(vec![1], adj(3, true));
+        assert_eq!(vec![5, 4], adj(3, false));
+
+        assert_eq!(vec![3, 2], adj(4, true));
+        assert_eq!(vec![5], adj(4, false));
+
+        assert_eq!(vec![4, 3], adj(5, true));
+        assert!(adj(5, false).is_empty());
     }
 }
