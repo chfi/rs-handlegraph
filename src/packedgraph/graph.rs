@@ -4,7 +4,8 @@ use gfa::{
 };
 
 use crate::{
-    handle::{Edge, Handle, NodeId},
+    handle::{Direction, Edge, Handle, NodeId},
+    handlegraph::HandleGraph,
     packed::*,
 };
 
@@ -137,12 +138,16 @@ pub struct EdgeIx(usize);
 impl EdgeIx {
     #[inline]
     pub(super) fn from_edge_list_ix(ix: usize) -> Self {
-        EdgeIx((ix + 1) / EdgeLists::RECORD_SIZE)
+        EdgeIx((ix / EdgeLists::RECORD_SIZE) + 1)
     }
 
     #[inline]
     pub(super) fn to_edge_list_ix(&self) -> usize {
-        (self.0 - 1) * EdgeLists::RECORD_SIZE
+        if self.0 == 0 {
+            0
+        } else {
+            (self.0 - 1) * EdgeLists::RECORD_SIZE
+        }
     }
 }
 
@@ -168,7 +173,7 @@ impl EdgeLists {
     ) -> EdgeIx {
         let ix = EdgeIx::from_edge_list_ix(self.edge_lists.len());
         self.edge_lists.append(handle.as_integer());
-        let next = next.to_edge_list_ix();
+        let next = next.0;
         self.edge_lists.append(next as u64);
         ix
     }
@@ -345,9 +350,9 @@ impl PackedGraph {
     }
 
     pub fn create_handle(&mut self, sequence: &[u8], id: NodeId) -> Handle {
-        assert!(!sequence.is_empty());
-
-        // todo make sure the node doesn't already exist
+        assert!(
+            id != NodeId::from(0) && !sequence.is_empty() && !self.has_node(id)
+        );
 
         let graph_ix = self.push_node_record(id);
         let seq_ix = graph_ix.to_seq_record_ix();
@@ -365,7 +370,7 @@ impl PackedGraph {
     #[inline]
     pub(super) fn get_edge_list_ix(&self, ix: usize) -> EdgeIx {
         let entry = self.graph_records.get(ix);
-        EdgeIx::from_edge_list_ix(entry as usize)
+        EdgeIx(entry as usize)
     }
 
     pub fn create_edge(&mut self, left: Handle, right: Handle) -> Option<()> {
@@ -387,9 +392,7 @@ impl PackedGraph {
         let right_next = self.get_edge_list_ix(left_edge_g_ix);
         let edge_ix = self.edges.append_record(right, right_next);
 
-        // self.graph_records.set(left_edge_g_ix, edge_ix.0 as u64);
-        self.graph_records
-            .set(left_edge_g_ix, edge_ix.to_edge_list_ix() as u64);
+        self.graph_records.set(left_edge_g_ix, edge_ix.0 as u64);
 
         if left_edge_g_ix == right_edge_g_ix {
             // todo reversing self edge records?
@@ -399,9 +402,7 @@ impl PackedGraph {
         let left_next = self.get_edge_list_ix(right_edge_g_ix);
         let edge_ix = self.edges.append_record(left.flip(), left_next);
 
-        // self.graph_records.set(right_edge_g_ix, edge_ix.0 as u64);
-        self.graph_records
-            .set(right_edge_g_ix, edge_ix.to_edge_list_ix() as u64);
+        self.graph_records.set(right_edge_g_ix, edge_ix.0 as u64);
 
         Some(())
     }
@@ -477,5 +478,46 @@ mod tests {
             sequences,
             vec![s0_b.as_slice(), s1_b.as_slice(), s2_b.as_slice()]
         );
+    }
+
+    #[test]
+    fn packedgraph_create_edge() {
+        use crate::handlegraph::{HandleNeighbors, HandleSequences};
+        use bstr::{BString, B};
+
+        let mut graph = PackedGraph::new();
+
+        let seqs =
+            vec![B("GTCCA"), B("AAA"), B("GTGTGT"), B("TTCT"), B("AGTAGT")];
+        //   node     1          2           3           4          5
+
+        let mut handles: Vec<Handle> = Vec::new();
+
+        for seq in seqs.iter() {
+            let handle = graph.append_handle(seq);
+            handles.push(handle);
+        }
+
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        graph.create_edge(hnd(1), hnd(2));
+        graph.create_edge(hnd(1), hnd(3));
+
+        graph.create_edge(hnd(2), hnd(4));
+
+        graph.create_edge(hnd(3), hnd(4));
+        graph.create_edge(hnd(3), hnd(5));
+
+        graph.create_edge(hnd(4), hnd(5));
+
+        /*
+        println!("Node 1 neighbors:");
+        for n0 in graph.neighbors(hnd(1), Direction::Right) {
+            println!("{:?} -> {:?}", hnd(1), n0);
+        }
+        for n0 in graph.neighbors(hnd(1), Direction::Left) {
+            println!("{:?} -> {:?}", hnd(1), n0);
+        }
+        */
     }
 }
