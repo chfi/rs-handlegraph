@@ -1,6 +1,6 @@
 use handlegraph::{
     handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::{AllEdges, AllHandles, HandleGraph, HandleNeighbors},
+    handlegraph::*,
     hashgraph::{HashGraph, PathStep},
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,
@@ -74,6 +74,7 @@ fn read_test_gfa() -> HashGraph {
 
 #[test]
 fn construct_from_gfa() {
+    use bstr::BStr;
     use gfa::gfa::GFA;
     use gfa::parser::GFAParser;
 
@@ -82,20 +83,22 @@ fn construct_from_gfa() {
 
     if let Some(gfa) = gfa {
         let graph = HashGraph::from_gfa(&gfa);
-        let node_ids: Vec<_> = graph.graph.keys().collect();
+        let mut node_ids: Vec<_> = graph.graph.keys().collect();
+        node_ids.sort();
 
         assert_eq!(15, graph.node_count());
-        assert_eq!(40, graph.edge_count());
-        println!("Node IDs:");
+        assert_eq!(20, graph.edge_count());
+        println!("Nodes & edges");
         for id in node_ids.iter() {
-            println!("{:?}", id);
             let node = graph.graph.get(id).unwrap();
-            println!("{:?}", Handle::pack(**id, false));
-            let lefts: Vec<_> = node.left_edges.iter().collect();
-            println!("lefts: {:?}", lefts);
-            let rights: Vec<_> = node.right_edges.iter().collect();
-            println!("rights: {:?}", rights);
-            println!("{:?}", graph.graph.get(id));
+            let seq: &BStr = node.sequence.as_ref();
+            println!("  {:2}\t{}", u64::from(**id), seq);
+            let lefts: Vec<_> =
+                node.left_edges.iter().map(|x| u64::from(x.id())).collect();
+            println!("  Left edges:  {:?}", lefts);
+            let rights: Vec<_> =
+                node.right_edges.iter().map(|x| u64::from(x.id())).collect();
+            println!("  Right edges: {:?}", rights);
         }
     } else {
         panic!("Couldn't parse test GFA file!");
@@ -154,22 +157,6 @@ fn graph_has_edge() {
 }
 
 #[test]
-fn graph_handle_edges_iter() {
-    let mut graph = path_graph();
-
-    graph.create_edge(Edge(H1, H4));
-    graph.create_edge(Edge(H1, H6));
-
-    let mut iter = graph.handle_edges_iter(H1, Direction::Right);
-
-    assert_eq!(Some(H2), iter.next());
-    assert_eq!(Some(H3), iter.next());
-    assert_eq!(Some(H4), iter.next());
-    assert_eq!(Some(H6), iter.next());
-    assert_eq!(None, iter.next());
-}
-
-#[test]
 fn graph_neighbors_iter() {
     let mut graph = path_graph();
 
@@ -184,27 +171,6 @@ fn graph_neighbors_iter() {
     assert_eq!(Some(H4), iter.next());
     assert_eq!(Some(H6), iter.next());
     assert_eq!(None, iter.next());
-}
-
-#[test]
-fn graph_handles_iter() {
-    let graph = path_graph();
-
-    let iter = graph.handles_iter();
-
-    let nodes: Vec<_> = vec![H1, H2, H3, H4, H5, H6]
-        .into_iter()
-        .map(|x| x.id())
-        .collect();
-
-    let mut iter_nodes: Vec<NodeId> = vec![];
-
-    for h in iter {
-        iter_nodes.push(h.id())
-    }
-
-    assert!(iter_nodes.iter().all(|n| graph.get_node(n).is_some()));
-    assert!(nodes.iter().all(|n| iter_nodes.contains(n)));
 }
 
 #[test]
@@ -226,41 +192,6 @@ fn graph_all_handles_iter() {
 
     assert!(iter_nodes.iter().all(|n| graph.get_node(n).is_some()));
     assert!(nodes.iter().all(|n| iter_nodes.contains(n)));
-}
-
-#[test]
-fn graph_edges_iter() {
-    let mut graph = path_graph();
-
-    graph.create_edge(Edge(H1, H4));
-    graph.create_edge(Edge(H1, H6));
-
-    graph.create_edge(Edge(H4, H2));
-    graph.create_edge(Edge(H6, H2));
-
-    graph.create_edge(Edge(H3, H5));
-
-    let mut edges_found: Vec<_> = graph.edges_iter().collect();
-
-    edges_found.sort();
-
-    let mut edges: Vec<_> = vec![
-        Edge::edge_handle(H1, H2),
-        Edge::edge_handle(H1, H3),
-        Edge::edge_handle(H1, H4),
-        Edge::edge_handle(H1, H6),
-        Edge::edge_handle(H2, H5),
-        Edge::edge_handle(H4, H2),
-        Edge::edge_handle(H6, H2),
-        Edge::edge_handle(H3, H4),
-        Edge::edge_handle(H3, H5),
-        Edge::edge_handle(H4, H6),
-        Edge::edge_handle(H5, H6),
-    ];
-
-    edges.sort();
-
-    assert_eq!(edges, edges_found);
 }
 
 #[test]

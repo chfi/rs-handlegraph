@@ -6,6 +6,7 @@ use gfa::{
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::HandleGraph,
+    mutablehandlegraph::MutableHandleGraph,
     packed::*,
 };
 
@@ -453,15 +454,17 @@ mod tests {
 
         let hnd = |x: u64| Handle::pack(x, false);
 
-        graph.create_edge(hnd(1), hnd(2));
-        graph.create_edge(hnd(1), hnd(3));
+        let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
 
-        graph.create_edge(hnd(2), hnd(4));
+        graph.create_edge(edge(1, 2));
+        graph.create_edge(edge(1, 3));
 
-        graph.create_edge(hnd(3), hnd(4));
-        graph.create_edge(hnd(3), hnd(5));
+        graph.create_edge(edge(2, 4));
 
-        graph.create_edge(hnd(4), hnd(5));
+        graph.create_edge(edge(3, 4));
+        graph.create_edge(edge(3, 5));
+
+        graph.create_edge(edge(4, 5));
 
         let adj = |x: u64, left: bool| {
             let dir = if left {
@@ -503,8 +506,6 @@ mod tests {
         assert!(adj(5, false).is_empty());
 
         let edges = graph.all_edges().collect::<Vec<_>>();
-
-        let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
 
         assert_eq!(
             vec![
