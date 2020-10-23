@@ -15,24 +15,26 @@ use self::graph::{EdgeIx, EdgeLists, EdgeRecord, PackedSeqIter, Sequences};
 pub use self::graph::{GraphIx, PackedGraph};
 
 impl HandleGraph for PackedGraph {
+    #[inline]
     fn has_node(&self, id: NodeId) -> bool {
         self.get_node_index(id).is_some()
     }
 
     /// The length of the sequence of a given node
+    #[inline]
     fn length(&self, handle: Handle) -> usize {
-        let graph_ix = self.handle_graph_ix(handle).unwrap();
-        let seq_ix = graph_ix.to_seq_record_ix();
-        self.sequences.length(seq_ix)
+        self.sequence_iter(handle).count()
     }
 
     /// Returns the sequence of a node in the handle's local forward
     /// orientation. Copies the sequence, as the sequence in the graph
     /// may be reversed depending on orientation.
+    #[inline]
     fn sequence(&self, handle: Handle) -> Vec<u8> {
         self.sequence_iter(handle).collect()
     }
 
+    #[inline]
     fn subsequence(
         &self,
         handle: Handle,
@@ -42,10 +44,9 @@ impl HandleGraph for PackedGraph {
         self.sequence_iter(handle).skip(index).take(size).collect()
     }
 
+    #[inline]
     fn base(&self, handle: Handle, index: usize) -> u8 {
-        let g_ix = self.handle_graph_ix(handle).unwrap();
-        let seq_ix = g_ix.to_seq_record_ix();
-        self.sequences.base(seq_ix, index)
+        self.sequence_iter(handle).nth(index).unwrap()
     }
 
     #[inline]

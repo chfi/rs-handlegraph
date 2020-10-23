@@ -60,11 +60,6 @@ impl Sequences {
     }
 
     #[inline]
-    pub(super) fn get_sequence(&self, ix: usize) -> Vec<u8> {
-        self.iter(ix, false).collect()
-    }
-
-    #[inline]
     pub(super) fn length(&self, ix: usize) -> usize {
         self.lengths.get(ix) as usize
     }

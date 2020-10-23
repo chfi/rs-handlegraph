@@ -15,7 +15,7 @@ use crate::{
 
 use super::{Node, Path, PathId};
 
-#[derive(Default, Debug)]
+#[derive(Debug)]
 pub struct HashGraph {
     pub max_id: NodeId,
     pub min_id: NodeId,
@@ -24,13 +24,21 @@ pub struct HashGraph {
     pub paths: FnvHashMap<i64, Path>,
 }
 
-impl HashGraph {
-    pub fn new() -> HashGraph {
+impl Default for HashGraph {
+    fn default() -> HashGraph {
         HashGraph {
             max_id: NodeId::from(0),
             min_id: NodeId::from(std::u64::MAX),
-            ..Default::default()
+            graph: Default::default(),
+            path_id: Default::default(),
+            paths: Default::default(),
         }
+    }
+}
+
+impl HashGraph {
+    pub fn new() -> HashGraph {
+        Default::default()
     }
 
     fn add_gfa_segment<'a, 'b, T: OptFields>(

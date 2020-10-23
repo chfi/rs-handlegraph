@@ -1,3 +1,4 @@
+pub mod construction;
 pub mod handle;
 pub mod handlegraph;
 pub mod hashgraph;
