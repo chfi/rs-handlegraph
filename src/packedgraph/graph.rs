@@ -487,7 +487,7 @@ mod tests {
 
     #[test]
     fn packedgraph_create_edge() {
-        use crate::handlegraph::{HandleNeighbors, HandleSequences};
+        use crate::handlegraph::{AllEdges, HandleNeighbors, HandleSequences};
         use bstr::{BString, B};
 
         let mut graph = PackedGraph::new();
@@ -553,5 +553,21 @@ mod tests {
 
         assert_eq!(vec![4, 3], adj(5, true));
         assert!(adj(5, false).is_empty());
+
+        let edges = graph.all_edges().collect::<Vec<_>>();
+
+        let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
+
+        assert_eq!(
+            vec![
+                edge(1, 3),
+                edge(1, 2),
+                edge(2, 4),
+                edge(3, 5),
+                edge(3, 4),
+                edge(4, 5)
+            ],
+            edges
+        );
     }
 }

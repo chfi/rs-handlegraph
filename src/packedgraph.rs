@@ -88,7 +88,7 @@ impl HandleGraph for PackedGraph {
     }
 
     fn edges_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Edge> + 'a> {
-        unimplemented!();
+        Box::new(self.all_edges())
     }
 }
 
@@ -209,5 +209,15 @@ impl<'a> HandleSequences for &'a PackedGraph {
         let g_ix = self.handle_graph_ix(handle).unwrap();
         let seq_ix = g_ix.to_seq_record_ix();
         self.sequences.iter(seq_ix, handle.is_reverse())
+    }
+}
+
+use crate::handlegraph::iter::EdgesIter;
+
+impl<'a> AllEdges for &'a PackedGraph {
+    type Edges = EdgesIter<&'a PackedGraph>;
+
+    fn all_edges(self) -> Self::Edges {
+        EdgesIter::new(self)
     }
 }
