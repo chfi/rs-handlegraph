@@ -75,20 +75,12 @@ impl HandleGraph for PackedGraph {
         self.sequences.total_length()
     }
 
-    fn handle_edges_iter<'a>(
-        &'a self,
-        handle: Handle,
-        dir: Direction,
-    ) -> Box<dyn Iterator<Item = Handle> + 'a> {
-        Box::new(self.neighbors(handle, dir))
+    fn degree(&self, handle: Handle, dir: Direction) -> usize {
+        self.neighbors(handle, dir).fold(0, |a, _| a + 1)
     }
 
-    fn handles_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Handle> + 'a> {
-        Box::new(self.all_handles())
-    }
-
-    fn edges_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Edge> + 'a> {
-        Box::new(self.all_edges())
+    fn has_edge(&self, left: Handle, right: Handle) -> bool {
+        self.neighbors(left, Direction::Right).any(|h| h == right)
     }
 }
 

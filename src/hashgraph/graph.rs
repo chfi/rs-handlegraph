@@ -7,6 +7,7 @@ use gfa::{
 
 use crate::{
     handle::{Edge, Handle, NodeId},
+    handlegraph::iter::*,
     handlegraph::HandleGraph,
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,
@@ -76,7 +77,7 @@ impl HashGraph {
     }
 
     pub fn print_occurrences(&self) {
-        self.handles_iter().for_each(|h| {
+        self.all_handles().for_each(|h| {
             let node = self.get_node(&h.id()).unwrap();
             println!("{} - {:?}", node.sequence, node.occurrences);
         });

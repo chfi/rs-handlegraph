@@ -4,7 +4,8 @@ use bstr::BString;
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::{
-        AllEdges, AllHandles, HandleGraph, HandleNeighbors, HandleSequences,
+        AllEdges, AllHandles, HandleGraph, HandleGraphRef, HandleNeighbors,
+        HandleSequences,
     },
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,
@@ -37,16 +38,12 @@ impl HandleGraph for HashGraph {
         self.sequence(handle).len()
     }
 
-    fn degree(&self, handle: Handle, dir: Direction) -> usize {
-        let n = self.get_node_unchecked(&handle.id());
-        match dir {
-            Direction::Right => n.right_edges.len(),
-            Direction::Left => n.left_edges.len(),
-        }
-    }
-
     fn node_count(&self) -> usize {
         self.graph.len()
+    }
+
+    fn edge_count(&self) -> usize {
+        self.all_edges().count()
     }
 
     fn min_node_id(&self) -> NodeId {
@@ -57,39 +54,24 @@ impl HandleGraph for HashGraph {
         self.max_id
     }
 
-    fn edge_count(&self) -> usize {
-        self.graph
-            .iter()
-            .fold(0, |a, (_, v)| a + v.left_edges.len() + v.right_edges.len())
+    fn total_length(&self) -> usize {
+        self.all_handles()
+            .fold(0, |a, v| a + self.sequence(v).len())
     }
 
-    fn handle_edges_iter<'a>(
-        &'a self,
-        handle: Handle,
-        dir: Direction,
-    ) -> Box<dyn Iterator<Item = Handle> + 'a> {
-        let node = self.get_node_unchecked(&handle.id());
-
-        let handles = match (dir, handle.is_reverse()) {
-            (Direction::Left, true) => &node.right_edges,
-            (Direction::Left, false) => &node.left_edges,
-            (Direction::Right, true) => &node.left_edges,
-            (Direction::Right, false) => &node.right_edges,
-        };
-
-        Box::new(handles.iter().map(move |h| {
-            if dir == Direction::Left {
-                h.flip()
-            } else {
-                *h
-            }
-        }))
+    fn degree(&self, handle: Handle, dir: Direction) -> usize {
+        let n = self.get_node_unchecked(&handle.id());
+        match dir {
+            Direction::Right => n.right_edges.len(),
+            Direction::Left => n.left_edges.len(),
+        }
     }
 
-    fn handles_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Handle> + 'a> {
-        Box::new(self.graph.keys().map(|i| Handle::pack(*i, false)))
+    fn has_edge(&self, left: Handle, right: Handle) -> bool {
+        self.neighbors(left, Direction::Right).any(|h| h == right)
     }
 
+    /*
     fn edges_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Edge> + 'a> {
         use Direction::*;
 
@@ -123,6 +105,7 @@ impl HandleGraph for HashGraph {
 
         Box::new(handles.map(neighbors).flatten())
     }
+    */
 }
 
 impl MutableHandleGraph for HashGraph {
@@ -239,7 +222,7 @@ impl MutableHandleGraph for HashGraph {
         // update backwards references
         // first collect all the handles whose nodes we need to update
         let last_neighbors: Vec<_> = self
-            .handle_edges_iter(*result.last().unwrap(), Direction::Right)
+            .neighbors(*result.last().unwrap(), Direction::Right)
             .collect();
 
         // And perform the update

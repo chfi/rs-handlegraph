@@ -38,32 +38,27 @@ pub trait HandleGraph {
     /// Return the total number of edges in the graph
     fn edge_count(&self) -> usize;
 
-    fn degree(&self, handle: Handle, dir: Direction) -> usize {
-        self.handle_edges_iter(handle, dir).fold(0, |a, _| a + 1)
-    }
-
-    fn has_edge(&self, left: Handle, right: Handle) -> bool {
-        self.handle_edges_iter(left, Direction::Right)
-            .any(|h| h == right)
-    }
-
     /// Sum up all the sequences in the graph
-    fn total_length(&self) -> usize {
-        self.handles_iter()
-            .fold(0, |a, v| a + self.sequence(v).len())
-    }
+    fn total_length(&self) -> usize;
 
-    /// Returns an iterator over the neighbors of a handle in a
-    /// given direction
-    fn handle_edges_iter<'a>(
-        &'a self,
-        handle: Handle,
-        dir: Direction,
-    ) -> Box<dyn Iterator<Item = Handle> + 'a>;
+    fn degree(&self, handle: Handle, dir: Direction) -> usize;
 
-    /// Returns an iterator over all the handles in the graph
-    fn handles_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Handle> + 'a>;
+    fn has_edge(&self, left: Handle, right: Handle) -> bool;
+}
 
-    /// Returns an iterator over all the edges in the graph
-    fn edges_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Edge> + 'a>;
+/// Convenience trait for collecting all the HandleGraph iterator
+/// traits in a single bound. The `impl` on `&T`, which has the
+/// additional bound that `T: HandleGraph`, makes it possible to use
+/// this as the only bound in functions that are generic over
+/// `HandleGraph` implementations.
+pub trait HandleGraphRef:
+    AllEdges + AllHandles + HandleNeighbors + HandleSequences + Copy
+{
+}
+
+impl<'a, T> HandleGraphRef for &'a T
+where
+    T: HandleGraph,
+    &'a T: AllEdges + AllHandles + HandleNeighbors + HandleSequences + Copy,
+{
 }
