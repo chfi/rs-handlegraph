@@ -145,9 +145,88 @@ impl MutableHandleGraph for PackedGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,
-        offsets: Vec<usize>,
+        mut offsets: Vec<usize>,
     ) -> Vec<Handle> {
-        unimplemented!();
+        let mut result = vec![handle];
+        let node_len = self.length(handle);
+
+        let fwd_handle = handle.forward();
+
+        let seq_iter = self.sequence_iter(fwd_handle);
+
+        let mut subseqs: Vec<Vec<u8>> = Vec::with_capacity(offsets.len() + 1);
+
+        offsets.push(seq_iter.len());
+
+        let mut last_ix = if handle.is_reverse() {
+            seq_iter.len()
+        } else {
+            0
+        };
+
+        let mut seq_iter = seq_iter;
+
+        for &offset in offsets.iter().skip(1) {
+            let step = if handle.is_reverse() {
+                let v = last_ix - offset;
+                last_ix = offset;
+                v
+            } else {
+                let v = offset - last_ix;
+                last_ix = offset;
+                v
+            };
+            println!("taking {} bases", step);
+            let seq: Vec<u8> = seq_iter.by_ref().take(step).collect();
+            println!("seq length: {}", seq.len());
+            println!("pushing sequence {}", seq.as_bstr());
+            subseqs.push(seq);
+        }
+
+        // ensure the order of the subsequences is correct if the
+        // handle was reversed
+        if handle.is_reverse() {
+            subseqs.reverse();
+        }
+
+        for mut seq in subseqs {
+            let h = self.append_handle(&seq);
+            result.push(h);
+        }
+
+        // TODO shorten the original handle's sequence
+
+        // Move the right-hand edges of the original handle to the
+        // corresponding side of the new graph
+        let old_right_edges_ix =
+            self.handle_edge_record_ix(handle, Direction::Right);
+        let new_right_edges_ix = self
+            .handle_edge_record_ix(*result.last().unwrap(), Direction::Right);
+
+        self.swap_graph_record_elements(old_right_edges_ix, new_right_edges_ix);
+
+        // Update back references for the nodes connected to the
+        // right-hand side of the original handle
+        let right_neighbors = self
+            .neighbors(handle, Direction::Right)
+            .map(|h| self.handle_edge_record_ix(h, Direction::Left))
+            .collect::<Vec<_>>();
+
+        let new_right_edge = self.graph_records.get(new_right_edges_ix);
+        for ix in right_neighbors {
+            self.graph_records.set(ix, new_right_edge);
+        }
+
+        // create edges between the new segments
+        for window in result.windows(2) {
+            if let &[this, next] = window {
+                self.create_edge(Edge(this, next));
+            }
+        }
+
+        // TODO update paths and occurrences once they're implmented
+
+        result
     }
 
     fn apply_orientation(&mut self, handle: Handle) -> Handle {
@@ -282,5 +361,45 @@ impl<'a> AllEdges for &'a PackedGraph {
 
     fn all_edges(self) -> Self::Edges {
         EdgesIter::new(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packedgraph_divide_handle() {
+        let mut graph = PackedGraph::new();
+        graph.append_handle(b"GTCA");
+        graph.append_handle(b"AAGTGCTAGT");
+        graph.append_handle(b"ATA");
+
+        println!("before split");
+        for h in graph.all_handles() {
+            let seq: BString = graph.sequence(h).into();
+            println!("{:?}\t{}", h.id(), seq);
+        }
+
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
+
+        graph.create_edge(edge(1, 2));
+        graph.create_edge(edge(2, 3));
+
+        let new_hs = graph.divide_handle(hnd(2), vec![3, 7, 9]);
+
+        println!("after split");
+        println!("{:?}", new_hs);
+
+        for Edge(l, r) in graph.all_edges() {
+            println!("{:?}\t{:?}", l.id(), r.id());
+        }
+
+        for h in graph.all_handles() {
+            let seq: BString = graph.sequence(h).into();
+            println!("{:?}\t{}", h.id(), seq);
+        }
     }
 }

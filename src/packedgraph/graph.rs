@@ -111,6 +111,12 @@ impl<'a> Iterator for PackedSeqIter<'a> {
     }
 }
 
+impl<'a> std::iter::ExactSizeIterator for PackedSeqIter<'a> {
+    fn len(&self) -> usize {
+        self.length
+    }
+}
+
 impl Default for Sequences {
     fn default() -> Self {
         Sequences {
