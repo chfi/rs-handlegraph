@@ -88,12 +88,27 @@ impl Sequences {
 
         let iter = self.sequences.iter_slice(offset, len);
 
-        PackedSeqIter { iter, reverse }
+        PackedSeqIter {
+            iter,
+            length: len,
+            reverse,
+        }
+    }
+
+    pub(super) fn divide_sequence(
+        &mut self,
+        offsets: Vec<usize>,
+        reverse: bool,
+    ) -> Vec<(usize, usize)> {
+        let mut results = Vec::new();
+
+        results
     }
 }
 
 pub struct PackedSeqIter<'a> {
     iter: PackedIntVecIter<'a>,
+    length: usize,
     reverse: bool,
 }
 
@@ -181,6 +196,12 @@ impl EdgeLists {
         ix
     }
 
+    pub(super) fn null_record(&mut self, ix: EdgeIx) {
+        let ix = ix.to_edge_list_ix();
+        self.edge_lists.set(ix, 0);
+        self.edge_lists.set(ix + 1, 0);
+    }
+
     #[inline]
     pub(super) fn get_record(&self, ix: EdgeIx) -> Option<EdgeRecord> {
         if ix == EdgeIx(0) {
@@ -222,6 +243,77 @@ impl EdgeLists {
     #[inline]
     pub(super) fn next(&self, rec: EdgeRecord) -> Option<EdgeRecord> {
         self.get_record(rec.next)
+    }
+
+    pub(super) fn iter(&self, ix: EdgeIx) -> EdgeListIter<'_> {
+        EdgeListIter::new(self, ix)
+    }
+
+    /// Removes the record for a given handle from the edge list
+    /// starting at the provided index. If the handle exists in the
+    /// edge list, returns the index of the removed record.
+    pub(super) fn remove_handle_from_list(
+        &mut self,
+        ix: EdgeIx,
+        handle: Handle,
+    ) -> Option<EdgeIx> {
+        let (h_ix, e_ix) = self
+            .iter(ix)
+            .enumerate()
+            .position(|(_, r)| r.handle == handle)?;
+        let list_len = self.iter(ix).count();
+        if h_ix == 0 {
+            // Only remove the record in question
+            self.null_record(ix);
+            Some(ix);
+        } else {
+            // Remove the record and set the preceding record's
+            // pointer to the record in question's next pointer
+            let prec_ix = self.iter(ix).nth(e_ix - 1)?;
+            let prec_ix = prec_ix.to_edge_list_ix();
+            let rem_rec = self.get_record(e_ix)?;
+            let rem_next = rem_rec.next.0 as u64;
+            self.edge_lists.set(prec_ix + 1, rem_next);
+            self.null_record(e_ix);
+            Some(e_ix)
+        }
+    }
+}
+
+/// Iterator for stepping through an edge list.
+pub struct EdgeListIter<'a> {
+    edge_lists: &'a EdgeLists,
+    current: Option<EdgeRecord>,
+    finished: bool,
+}
+
+impl<'a> EdgeListIter<'a> {
+    fn new(edge_lists: &'a EdgeLists, start: EdgeIx) -> Self {
+        let current = edge_lists.get_record(start);
+        Self {
+            edge_lists,
+            current,
+            finished: false,
+        }
+    }
+}
+
+impl<'a> Iterator for EdgeListIter<'a> {
+    type Item = EdgeRecord;
+
+    #[inline]
+    fn next(&mut self) -> Option<EdgeRecord> {
+        if self.finished {
+            return None;
+        }
+        if let Some(current) = self.current {
+            let item = current;
+            self.current = self.edge_lists.next(current);
+            Some(item)
+        } else {
+            self.finished = true;
+            None
+        }
     }
 }
 

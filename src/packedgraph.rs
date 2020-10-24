@@ -285,13 +285,13 @@ impl<'a> AllHandles for &'a PackedGraph {
 }
 
 /// Iterator for stepping through an edge list, returning Handles.
-pub struct EdgeListIter<'a> {
+pub struct EdgeListHandleIter<'a> {
     edge_lists: &'a EdgeLists,
     current: Option<EdgeRecord>,
     finished: bool,
 }
 
-impl<'a> EdgeListIter<'a> {
+impl<'a> EdgeListHandleIter<'a> {
     fn new(graph: &'a PackedGraph, start: EdgeIx) -> Self {
         let edge_lists = &graph.edges;
         let current = edge_lists.get_record(start);
@@ -303,7 +303,7 @@ impl<'a> EdgeListIter<'a> {
     }
 }
 
-impl<'a> Iterator for EdgeListIter<'a> {
+impl<'a> Iterator for EdgeListHandleIter<'a> {
     type Item = Handle;
 
     #[inline]
@@ -323,7 +323,7 @@ impl<'a> Iterator for EdgeListIter<'a> {
 }
 
 impl<'a> HandleNeighbors for &'a PackedGraph {
-    type Neighbors = EdgeListIter<'a>;
+    type Neighbors = EdgeListHandleIter<'a>;
 
     #[inline]
     fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors {
@@ -339,7 +339,7 @@ impl<'a> HandleNeighbors for &'a PackedGraph {
 
         let edge_ix = self.get_edge_list_ix(edge_list_ix);
 
-        EdgeListIter::new(self, edge_ix)
+        EdgeListHandleIter::new(self, edge_ix)
     }
 }
 
