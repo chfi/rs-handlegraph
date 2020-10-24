@@ -1,4 +1,4 @@
-pub mod construction;
+pub mod conversion;
 pub mod handle;
 pub mod handlegraph;
 pub mod hashgraph;
