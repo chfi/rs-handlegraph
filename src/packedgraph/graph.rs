@@ -127,6 +127,7 @@ pub struct EdgeRecord {
     next: EdgeIx,
 }
 
+/// A newtype for indexing into the EdgeLists *by record*.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct EdgeIx(pub(super) usize);
@@ -187,6 +188,32 @@ impl EdgeLists {
     }
 
     #[inline]
+    pub(super) fn get_target_at(&self, ix: EdgeIx) -> Option<Handle> {
+        if ix == EdgeIx(0) {
+            None
+        } else {
+            let ix = ix.to_edge_list_ix();
+            let handle = Handle::from_integer(self.edge_lists.get(ix));
+            Some(handle)
+        }
+    }
+
+    #[inline]
+    pub(super) fn get_next_at(&self, ix: EdgeIx) -> Option<EdgeIx> {
+        if ix == EdgeIx(0) {
+            None
+        } else {
+            let ix = ix.to_edge_list_ix() + 1;
+            let next = self.edge_lists.get(ix);
+            if next == 0 {
+                None
+            } else {
+                Some(EdgeIx(next as usize))
+            }
+        }
+    }
+
+    #[inline]
     pub(super) fn next(&self, rec: EdgeRecord) -> Option<EdgeRecord> {
         self.get_record(rec.next)
     }
@@ -194,8 +221,8 @@ impl EdgeLists {
 
 #[derive(Default, Debug, Clone)]
 pub struct GraphRecord {
-    edges_start: usize,
-    edges_end: usize,
+    left_edges: usize,
+    right_edges: usize,
 }
 
 impl GraphRecord {
@@ -260,12 +287,12 @@ impl GraphIx {
         ix * Sequences::SIZE
     }
 
-    pub(super) fn start_edges_ix(&self) -> usize {
+    pub(super) fn left_edges_ix(&self) -> usize {
         let ix = self.0;
         (ix * GraphRecord::SIZE) + GraphRecord::START_OFFSET
     }
 
-    pub(super) fn end_edges_ix(&self) -> usize {
+    pub(super) fn right_edges_ix(&self) -> usize {
         let ix = self.0;
         (ix * GraphRecord::SIZE) + GraphRecord::END_OFFSET
     }
@@ -286,11 +313,11 @@ impl PackedGraph {
     }
 
     pub(super) fn get_graph_record(&self, ix: GraphIx) -> GraphRecord {
-        let edges_start = self.graph_records.get(ix.start_edges_ix()) as usize;
-        let edges_end = self.graph_records.get(ix.end_edges_ix()) as usize;
+        let left_edges = self.graph_records.get(ix.left_edges_ix()) as usize;
+        let right_edges = self.graph_records.get(ix.right_edges_ix()) as usize;
         GraphRecord {
-            edges_start,
-            edges_end,
+            left_edges,
+            right_edges,
         }
     }
 
@@ -345,6 +372,52 @@ impl PackedGraph {
         next_ix
     }
 
+    #[inline]
+    pub(super) fn append_graph_record_start_edge(
+        &mut self,
+        g_ix: GraphIx,
+        edge: EdgeIx,
+    ) {
+        self.graph_records.set(g_ix.left_edges_ix(), edge.0 as u64);
+    }
+
+    #[inline]
+    pub(super) fn append_graph_record_end_edge(
+        &mut self,
+        g_ix: GraphIx,
+        edge: EdgeIx,
+    ) {
+        self.graph_records.set(g_ix.right_edges_ix(), edge.0 as u64);
+    }
+
+    #[inline]
+    pub(super) fn swap_graph_record_elements(&mut self, a: usize, b: usize) {
+        let a_val = self.graph_records.get(a);
+        let b_val = self.graph_records.get(b);
+        self.graph_records.set(a, b_val);
+        self.graph_records.set(b, a_val);
+    }
+
+    #[inline]
+    pub(super) fn handle_edge_record_ix(
+        &self,
+        handle: Handle,
+        dir: Direction,
+    ) -> usize {
+        let g_ix = self.handle_graph_ix(handle).unwrap();
+
+        use Direction as Dir;
+        match (handle.is_reverse(), dir) {
+            (false, Dir::Left) => g_ix.left_edges_ix(),
+            (false, Dir::Right) => g_ix.right_edges_ix(),
+            (true, Dir::Left) => g_ix.right_edges_ix(),
+            (true, Dir::Right) => g_ix.left_edges_ix(),
+        }
+    }
+
+    /// Get the EdgeList record index at the provided graph record
+    /// *element* index. I.e. if `ix` is even, the first element of
+    /// some record will be returned, if odd, the second element.
     #[inline]
     pub(super) fn get_edge_list_ix(&self, ix: usize) -> EdgeIx {
         let entry = self.graph_records.get(ix);

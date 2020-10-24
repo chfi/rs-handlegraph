@@ -1,5 +1,5 @@
 use bio::alphabets::dna;
-use bstr::BString;
+use bstr::{BString, ByteSlice};
 
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
@@ -115,15 +115,15 @@ impl MutableHandleGraph for PackedGraph {
         let right_g_ix = self.handle_graph_ix(right).unwrap();
 
         let left_edge_g_ix = if left.is_reverse() {
-            left_g_ix.start_edges_ix()
+            left_g_ix.left_edges_ix()
         } else {
-            left_g_ix.end_edges_ix()
+            left_g_ix.right_edges_ix()
         };
 
         let right_edge_g_ix = if right.is_reverse() {
-            right_g_ix.end_edges_ix()
+            right_g_ix.right_edges_ix()
         } else {
-            right_g_ix.start_edges_ix()
+            right_g_ix.left_edges_ix()
         };
 
         let right_next = self.get_edge_list_ix(left_edge_g_ix);
@@ -252,10 +252,10 @@ impl<'a> HandleNeighbors for &'a PackedGraph {
         let g_ix = self.handle_graph_ix(handle).unwrap();
 
         let edge_list_ix = match (dir, handle.is_reverse()) {
-            (Dir::Left, true) => g_ix.end_edges_ix(),
-            (Dir::Left, false) => g_ix.start_edges_ix(),
-            (Dir::Right, true) => g_ix.start_edges_ix(),
-            (Dir::Right, false) => g_ix.end_edges_ix(),
+            (Dir::Left, true) => g_ix.right_edges_ix(),
+            (Dir::Left, false) => g_ix.left_edges_ix(),
+            (Dir::Right, true) => g_ix.left_edges_ix(),
+            (Dir::Right, false) => g_ix.right_edges_ix(),
         };
 
         let edge_ix = self.get_edge_list_ix(edge_list_ix);
