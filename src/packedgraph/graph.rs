@@ -97,10 +97,13 @@ impl Sequences {
 
     pub(super) fn divide_sequence(
         &mut self,
-        offsets: Vec<usize>,
-        reverse: bool,
+        seq_ix: usize,
+        lengths: Vec<usize>,
     ) -> Vec<(usize, usize)> {
         let mut results = Vec::new();
+
+        let offset = self.indices.get(seq_ix) as usize;
+        let len = self.lengths.get(seq_ix) as usize;
 
         results
     }
@@ -257,25 +260,32 @@ impl EdgeLists {
         ix: EdgeIx,
         handle: Handle,
     ) -> Option<EdgeIx> {
-        let (h_ix, e_ix) = self
-            .iter(ix)
-            .enumerate()
-            .position(|(_, r)| r.handle == handle)?;
+        // let (h_ix, e_ix) = self
+        let h_ix = self.iter(ix).position(|r| r.handle == handle)?;
+
         let list_len = self.iter(ix).count();
         if h_ix == 0 {
             // Only remove the record in question
             self.null_record(ix);
-            Some(ix);
+            Some(ix)
         } else {
+            /*
+            let h_record = self.iter(ix).nth(h_ix)?;
+
             // Remove the record and set the preceding record's
             // pointer to the record in question's next pointer
-            let prec_ix = self.iter(ix).nth(e_ix - 1)?;
-            let prec_ix = prec_ix.to_edge_list_ix();
+            let prec_ix = self.iter(ix).nth(h_ix - 1)?;
+            let next_ix = prec_ix.next.to_edge_list_ix();
+
+            let e_ix = h_record.
             let rem_rec = self.get_record(e_ix)?;
             let rem_next = rem_rec.next.0 as u64;
             self.edge_lists.set(prec_ix + 1, rem_next);
             self.null_record(e_ix);
             Some(e_ix)
+                */
+
+            unimplemented!();
         }
     }
 }
@@ -521,6 +531,19 @@ impl PackedGraph {
         let entry = self.graph_records.get(ix);
         EdgeIx(entry as usize)
     }
+
+    /*
+    pub(super) fn remove_handle(&mut self, handle: Handle) {
+        let g_ix = self.handle_graph_ix(handle).unwrap();
+
+        let left_neighbors = self.neighbors(handle, Direction::Left);
+        let right_neighbors = self.neighbors(handle, Direction::Left);
+
+        for other in left_neighbors {
+
+        }
+    }
+    */
 }
 
 #[cfg(test)]

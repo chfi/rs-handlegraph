@@ -126,7 +126,7 @@ where
     for path_id in graph.paths_iter() {
         let path_name: BString = graph.path_handle_to_name(path_id).into();
         let overlaps = Vec::new();
-        let segment_names: Vec<Vec<u8>> = Vec::new();
+        let mut segment_names: Vec<Vec<u8>> = Vec::new();
         for step in graph.steps_iter(path_id) {
             let handle = graph.handle_of_step(&step).unwrap();
             let segment: usize = handle.id().into();
@@ -138,13 +138,8 @@ where
         let segment_names: BString =
             segment_names.into_iter().flatten().collect();
 
-        let path: Path<usize, ()> = Path {
-            path_name,
-            segment_names,
-            overlaps,
-            optional: (),
-            _segment_names: std::marker::PhantomData,
-        };
+        let path: Path<usize, ()> =
+            Path::new(path_name, segment_names, overlaps, ());
 
         gfa.paths.push(path);
     }
