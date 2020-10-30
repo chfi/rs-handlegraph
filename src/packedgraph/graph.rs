@@ -234,6 +234,17 @@ impl EdgeLists {
         }
     }
 
+    pub(super) fn update_record<F>(&mut self, ix: EdgeIx, f: F)
+    where
+        F: Fn(EdgeRecord),
+    {
+        let record = self.get_record(ix);
+        let new_record = f(record);
+        let ix = ix.to_edge_list_ix();
+        self.edge_lists.set(ix, new_record.handle);
+        self.edge_lists.set(ix + 1, new_record.next);
+    }
+
     #[inline]
     pub(super) fn get_target_at(&self, ix: EdgeIx) -> Option<Handle> {
         if ix == EdgeIx(0) {

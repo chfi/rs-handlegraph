@@ -176,10 +176,7 @@ impl MutableHandleGraph for PackedGraph {
                 last_ix = offset;
                 v
             };
-            println!("taking {} bases", step);
             let seq: Vec<u8> = seq_iter.by_ref().take(step).collect();
-            println!("seq length: {}", seq.len());
-            println!("pushing sequence {}", seq.as_bstr());
             subseqs.push(seq);
         }
 
@@ -233,7 +230,16 @@ impl MutableHandleGraph for PackedGraph {
     }
 
     fn apply_orientation(&mut self, handle: Handle) -> Handle {
-        unimplemented!();
+        if !handle.is_reverse() {
+            return handle;
+        }
+
+        let edges = self
+            .neighbors(handle, Direction::Left)
+            .chain(self.neighbors(handle, Direction::Right))
+            .collect::<Vec<_>>();
+
+        handle.flip()
     }
 }
 
