@@ -282,25 +282,20 @@ impl EdgeLists {
 
     /// Removes the record for a given handle from the edge list
     /// starting at the provided index. If the handle exists in the
-    /// edge list, returns the index of the removed record.
+    /// edge list, returns the index that took its place, i.e. if the
+    /// corresponding graph record needs to be updated.
     pub(super) fn remove_handle_from_list(
         &mut self,
         ix: EdgeIx,
         handle: Handle,
     ) -> Option<EdgeIx> {
-        // let (h_ix, e_ix) = self
         let h_ix = self.iter(ix).position(|(_, r)| r.handle == handle)?;
 
-        for e in self.iter(ix) {
-            println!("{:?}", e);
-        }
-
-        let list_len = self.iter(ix).count();
-        println!("removing handle {:?} starting from {:?}", handle, ix);
         if h_ix == 0 {
             // Only remove the record in question
+            let next = self.get_record(ix)?.next;
             self.null_record(ix);
-            Some(ix)
+            Some(next)
         } else {
             let (h_edge_ix, h_record) = self.iter(ix).nth(h_ix)?;
 
@@ -313,7 +308,7 @@ impl EdgeLists {
             let prec_ix = prec_ix.to_edge_list_ix() + 1;
             self.edge_lists.set(prec_ix, h_record.next.0 as u64);
             self.null_record(h_edge_ix);
-            Some(e_ix)
+            Some(ix)
         }
     }
 }
@@ -563,6 +558,23 @@ impl PackedGraph {
         EdgeIx(entry as usize)
     }
 
+    pub(super) fn remove_handle_from_edge(
+        &mut self,
+        handle: Handle,
+        dir: Direction,
+        to_remove: Handle,
+    ) {
+        let graph_rec_ix = self.handle_edge_record_ix(handle, dir);
+        let edge_ix = self.get_edge_list_ix(graph_rec_ix);
+
+        if let Some(ix) = self.edges.remove_handle_from_list(edge_ix, to_remove)
+        {
+            if ix != edge_ix {
+                self.graph_records.set(graph_rec_ix, ix.0 as u64);
+            }
+        }
+    }
+
     /*
     pub(super) fn remove_handle(&mut self, handle: Handle) {
         let g_ix = self.handle_graph_ix(handle).unwrap();
@@ -730,8 +742,8 @@ mod tests {
 
     #[test]
     fn packedgraph_remove_handle_edgelist() {
-        use crate::handlegraph::{AllEdges, HandleNeighbors, HandleSequences};
-        use bstr::{BString, B};
+        use crate::handlegraph::HandleNeighbors;
+        use bstr::B;
 
         let mut graph = PackedGraph::new();
 
@@ -767,27 +779,19 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
-        let h1_right = adj(&graph, 1, false);
-        println!("{:?}", h1_right);
         assert_eq!(vec![4, 3, 2, 5], adj(&graph, 1, false));
 
-        let g_h1 = graph.handle_graph_ix(hnd(1)).unwrap();
-        let h1_edges = g_h1.right_edges_ix();
-        let h1_edges = graph.get_edge_list_ix(h1_edges);
-        graph.edges.remove_handle_from_list(h1_edges, hnd(3));
+        graph.remove_handle_from_edge(hnd(1), Direction::Right, hnd(3));
         assert_eq!(vec![4, 2, 5], adj(&graph, 1, false));
 
-        // let h1_right = adj(1, false);
-        let h1_right = adj(&graph, 1, false);
-        println!("{:?}", h1_right);
+        graph.remove_handle_from_edge(hnd(1), Direction::Right, hnd(4));
+        assert_eq!(vec![2, 5], adj(&graph, 1, false));
 
-        graph.edges.remove_handle_from_list(h1_edges, hnd(5));
-        assert_eq!(vec![4, 2], adj(&graph, 1, false));
+        graph.remove_handle_from_edge(hnd(1), Direction::Right, hnd(5));
+        assert_eq!(vec![2], adj(&graph, 1, false));
 
-        // let h1_right = adj(1, false);
-        let h1_right = adj(&graph, 1, false);
-        println!("{:?}", h1_right);
-        // assert_eq!(vec![4, 2], adj(&graph, 1, false));
+        graph.remove_handle_from_edge(hnd(1), Direction::Right, hnd(2));
+        assert!(adj(&graph, 1, false).is_empty());
     }
 
     #[test]
