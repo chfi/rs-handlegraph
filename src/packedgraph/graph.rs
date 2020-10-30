@@ -289,7 +289,7 @@ impl EdgeLists {
         handle: Handle,
     ) -> Option<EdgeIx> {
         // let (h_ix, e_ix) = self
-        let h_ix = self.iter(ix).position(|r| r.handle == handle)?;
+        let h_ix = self.iter(ix).position(|(_, r)| r.handle == handle)?;
 
         for e in self.iter(ix) {
             println!("{:?}", e);
@@ -302,27 +302,17 @@ impl EdgeLists {
             self.null_record(ix);
             Some(ix)
         } else {
-            let h_edge_ix = EdgeIx(ix.0 + h_ix);
-            println!("h_edge_ix {:?}", h_edge_ix);
-
-            let h_record = self.iter(ix).nth(h_ix)?;
+            let (h_edge_ix, h_record) = self.iter(ix).nth(h_ix)?;
 
             // Remove the record and set the preceding record's
             // pointer to the record in question's next pointer
-            let prec_rec = self.iter(ix).nth(h_ix - 1)?;
+            let (prec_ix, prec_rec) = self.iter(ix).nth(h_ix - 1)?;
             let prec_next_ix = prec_rec.next.to_edge_list_ix();
 
             let e_ix = h_record.next;
-            println!(
-                "updating record {:?} to {:?}",
-                prec_next_ix, h_record.next
-            );
-            // self.edge_lists.set(prec_next_ix, h_record.next.0 as u64);
-            let prev_ix = EdgeIx(ix.0 + h_ix);
-            let prev_ix = prev_ix.to_edge_list_ix() - 1;
-            self.edge_lists.set(prev_ix, h_record.next.0 as u64);
-            println!("removing h_edge_ix {:?}", h_edge_ix);
-            // self.null_record(EdgeIx(h_edge_ix.0 - 1));
+            let prec_ix = prec_ix.to_edge_list_ix() + 1;
+            self.edge_lists.set(prec_ix, h_record.next.0 as u64);
+            self.null_record(h_edge_ix);
             Some(e_ix)
         }
     }
@@ -331,13 +321,14 @@ impl EdgeLists {
 /// Iterator for stepping through an edge list.
 pub struct EdgeListIter<'a> {
     edge_lists: &'a EdgeLists,
-    current: Option<EdgeRecord>,
+    current: Option<(EdgeIx, EdgeRecord)>,
     finished: bool,
 }
 
 impl<'a> EdgeListIter<'a> {
     fn new(edge_lists: &'a EdgeLists, start: EdgeIx) -> Self {
-        let current = edge_lists.get_record(start);
+        let cur_rec = edge_lists.get_record(start);
+        let current = cur_rec.map(|r| (start, r));
         Self {
             edge_lists,
             current,
@@ -347,16 +338,18 @@ impl<'a> EdgeListIter<'a> {
 }
 
 impl<'a> Iterator for EdgeListIter<'a> {
-    type Item = EdgeRecord;
+    type Item = (EdgeIx, EdgeRecord);
 
     #[inline]
-    fn next(&mut self) -> Option<EdgeRecord> {
+    fn next(&mut self) -> Option<Self::Item> {
         if self.finished {
             return None;
         }
-        if let Some(current) = self.current {
-            let item = current;
-            self.current = self.edge_lists.next(current);
+        if let Some((cur_ix, cur_rec)) = self.current {
+            let item = (cur_ix, cur_rec);
+            let next_rec = self.edge_lists.next(cur_rec);
+            let next_ix = cur_rec.next;
+            self.current = next_rec.map(|r| (next_ix, r));
             Some(item)
         } else {
             self.finished = true;
@@ -782,12 +775,14 @@ mod tests {
         let h1_edges = g_h1.right_edges_ix();
         let h1_edges = graph.get_edge_list_ix(h1_edges);
         graph.edges.remove_handle_from_list(h1_edges, hnd(3));
+        assert_eq!(vec![4, 2, 5], adj(&graph, 1, false));
 
         // let h1_right = adj(1, false);
         let h1_right = adj(&graph, 1, false);
         println!("{:?}", h1_right);
 
         graph.edges.remove_handle_from_list(h1_edges, hnd(5));
+        assert_eq!(vec![4, 2], adj(&graph, 1, false));
 
         // let h1_right = adj(1, false);
         let h1_right = adj(&graph, 1, false);
