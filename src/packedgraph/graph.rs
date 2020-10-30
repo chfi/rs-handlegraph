@@ -112,12 +112,11 @@ impl Sequences {
             .collect::<Vec<_>>();
 
         // create new records
-        for (&i, &l) in indices.iter().zip(lengths.iter().skip(1)) {
-            self.lengths.append(i as u64);
-            self.indices.append(l as u64);
+        for (&i, &l) in indices.iter().skip(1).zip(lengths.iter().skip(1)) {
+            self.lengths.append(l as u64);
+            self.indices.append((i - 1) as u64);
             results.push((i, l));
         }
-        // self.add_record(ix, seq)
 
         // update the original sequence
         self.lengths.set(seq_ix, lengths[0] as u64);
@@ -804,24 +803,31 @@ mod tests {
         let h1 = graph.create_handle(b"AAA", n1);
         let h2 = graph.create_handle(b"GTGTGT", n2);
 
-        let g0 = graph.handle_graph_ix(h0);
-        let g1 = graph.handle_graph_ix(h1);
-        let g2 = graph.handle_graph_ix(h2);
-
-        let handles = vec![h0, h1, h2];
-
         use crate::handlegraph::{AllHandles, HandleGraph, HandleSequences};
 
         use bstr::{BString, B};
 
-        let sequences = vec![B("GTCCA"), B("AAA"), B("GTGTGT")];
+        let hnd = |x: u64| Handle::pack(x, false);
 
-        let s0: BString = graph.sequence(h0).into();
-        let s1: BString = graph.sequence(h1).into();
-        let s2: BString = graph.sequence(h2).into();
+        let seq_bstr = |g: &PackedGraph, h: u64| -> BString {
+            g.sequence_iter(hnd(h)).collect()
+        };
 
-        let s0_b: BString = graph.sequence_iter(h0).collect();
-        let s1_b: BString = graph.sequence_iter(h1).collect();
-        let s2_b: BString = graph.sequence_iter(h2).collect();
+        assert_eq!(seq_bstr(&graph, 1), B("GTCCA"));
+        assert_eq!(seq_bstr(&graph, 2), B("AAA"));
+        assert_eq!(seq_bstr(&graph, 3), B("GTGTGT"));
+
+        let s_ix_1 = graph.handle_graph_ix(hnd(1)).unwrap();
+        let s_ix_1 = s_ix_1.to_seq_record_ix();
+
+        let splits = graph.sequences.divide_sequence(s_ix_1, vec![2, 3]);
+
+        assert_eq!(seq_bstr(&graph, 1), B("GT"));
+        assert_eq!(seq_bstr(&graph, 2), B("AAA"));
+        assert_eq!(seq_bstr(&graph, 3), B("GTGTGT"));
+
+        let (ix, _len) = splits[0];
+        let new_seq = graph.sequences.iter(ix, false).collect::<BString>();
+        assert_eq!(new_seq, B("CCA"));
     }
 }
