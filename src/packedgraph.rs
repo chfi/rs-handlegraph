@@ -194,7 +194,10 @@ impl MutableHandleGraph for PackedGraph {
             result.push(h);
         }
 
-        // TODO shorten the original handle's sequence
+        let g_ix = self.handle_graph_ix(handle).unwrap();
+        self.sequences
+            .lengths
+            .set(g_ix.to_seq_record_ix(), offsets[0] as u64);
 
         // Move the right-hand edges of the original handle to the
         // corresponding side of the new graph

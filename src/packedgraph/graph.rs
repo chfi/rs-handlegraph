@@ -16,8 +16,8 @@ static WIDE_PAGE_WIDTH: usize = 1024;
 #[derive(Debug, Clone)]
 pub struct Sequences {
     sequences: PackedIntVec,
-    lengths: PackedIntVec,
-    indices: PagedIntVec,
+    pub(super) lengths: PackedIntVec,
+    pub(super) indices: PagedIntVec,
 }
 
 const fn encode_dna_base(base: u8) -> u64 {
