@@ -105,6 +105,23 @@ impl Sequences {
         let offset = self.indices.get(seq_ix) as usize;
         let len = self.lengths.get(seq_ix) as usize;
 
+        let indices = lengths
+            .iter()
+            .copied()
+            .map(|l| l + offset)
+            .collect::<Vec<_>>();
+
+        // create new records
+        for (&i, &l) in indices.iter().zip(lengths.iter().skip(1)) {
+            self.lengths.append(i as u64);
+            self.indices.append(l as u64);
+            results.push((i, l));
+        }
+        // self.add_record(ix, seq)
+
+        // update the original sequence
+        self.lengths.set(seq_ix, lengths[0] as u64);
+
         results
     }
 }
@@ -285,7 +302,6 @@ impl EdgeLists {
             let prec_next_ix = prec_rec.next.to_edge_list_ix();
 
             let e_ix = h_record.next;
-            let rem_rec = self.get_record(e_ix)?;
             println!(
                 "updating record {:?} to {:?}",
                 prec_next_ix, h_record.next
@@ -293,9 +309,9 @@ impl EdgeLists {
             // self.edge_lists.set(prec_next_ix, h_record.next.0 as u64);
             let prev_ix = EdgeIx(ix.0 + h_ix);
             let prev_ix = prev_ix.to_edge_list_ix() - 1;
-            // self.edge_lists.set(prev_ix, rem_rec.next.0 as u64);
             self.edge_lists.set(prev_ix, h_record.next.0 as u64);
             println!("removing h_edge_ix {:?}", h_edge_ix);
+            // self.null_record(EdgeIx(h_edge_ix.0 - 1));
             Some(e_ix)
         }
     }
@@ -766,5 +782,36 @@ mod tests {
         let h1_right = adj(&graph, 1, false);
         println!("{:?}", h1_right);
         // assert_eq!(vec![4, 2], adj(&graph, 1, false));
+    }
+
+    #[test]
+    fn packedgraph_split_sequence() {
+        let mut graph = PackedGraph::new();
+        let n0 = NodeId::from(1);
+        let n1 = NodeId::from(2);
+        let n2 = NodeId::from(3);
+        let h0 = graph.create_handle(b"GTCCA", n0);
+        let h1 = graph.create_handle(b"AAA", n1);
+        let h2 = graph.create_handle(b"GTGTGT", n2);
+
+        let g0 = graph.handle_graph_ix(h0);
+        let g1 = graph.handle_graph_ix(h1);
+        let g2 = graph.handle_graph_ix(h2);
+
+        let handles = vec![h0, h1, h2];
+
+        use crate::handlegraph::{AllHandles, HandleGraph, HandleSequences};
+
+        use bstr::{BString, B};
+
+        let sequences = vec![B("GTCCA"), B("AAA"), B("GTGTGT")];
+
+        let s0: BString = graph.sequence(h0).into();
+        let s1: BString = graph.sequence(h1).into();
+        let s2: BString = graph.sequence(h2).into();
+
+        let s0_b: BString = graph.sequence_iter(h0).collect();
+        let s1_b: BString = graph.sequence_iter(h1).collect();
+        let s2_b: BString = graph.sequence_iter(h2).collect();
     }
 }
