@@ -263,29 +263,40 @@ impl EdgeLists {
         // let (h_ix, e_ix) = self
         let h_ix = self.iter(ix).position(|r| r.handle == handle)?;
 
+        for e in self.iter(ix) {
+            println!("{:?}", e);
+        }
+
         let list_len = self.iter(ix).count();
+        println!("removing handle {:?} starting from {:?}", handle, ix);
         if h_ix == 0 {
             // Only remove the record in question
             self.null_record(ix);
             Some(ix)
         } else {
-            /*
+            let h_edge_ix = EdgeIx(ix.0 + h_ix);
+            println!("h_edge_ix {:?}", h_edge_ix);
+
             let h_record = self.iter(ix).nth(h_ix)?;
 
             // Remove the record and set the preceding record's
             // pointer to the record in question's next pointer
-            let prec_ix = self.iter(ix).nth(h_ix - 1)?;
-            let next_ix = prec_ix.next.to_edge_list_ix();
+            let prec_rec = self.iter(ix).nth(h_ix - 1)?;
+            let prec_next_ix = prec_rec.next.to_edge_list_ix();
 
-            let e_ix = h_record.
+            let e_ix = h_record.next;
             let rem_rec = self.get_record(e_ix)?;
-            let rem_next = rem_rec.next.0 as u64;
-            self.edge_lists.set(prec_ix + 1, rem_next);
-            self.null_record(e_ix);
+            println!(
+                "updating record {:?} to {:?}",
+                prec_next_ix, h_record.next
+            );
+            // self.edge_lists.set(prec_next_ix, h_record.next.0 as u64);
+            let prev_ix = EdgeIx(ix.0 + h_ix);
+            let prev_ix = prev_ix.to_edge_list_ix() - 1;
+            // self.edge_lists.set(prev_ix, rem_rec.next.0 as u64);
+            self.edge_lists.set(prev_ix, h_record.next.0 as u64);
+            println!("removing h_edge_ix {:?}", h_edge_ix);
             Some(e_ix)
-                */
-
-            unimplemented!();
         }
     }
 }
@@ -667,18 +678,6 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
-        let adj = |x: u64, left: bool| {
-            let dir = if left {
-                Direction::Left
-            } else {
-                Direction::Right
-            };
-            graph
-                .neighbors(hnd(x), dir)
-                .map(|h| u64::from(h.id()))
-                .collect::<Vec<_>>()
-        };
-
         assert!(adj(1, true).is_empty());
         assert_eq!(vec![3, 2], adj(1, false));
 
@@ -707,5 +706,65 @@ mod tests {
             ],
             edges
         );
+    }
+
+    #[test]
+    fn packedgraph_remove_handle_edgelist() {
+        use crate::handlegraph::{AllEdges, HandleNeighbors, HandleSequences};
+        use bstr::{BString, B};
+
+        let mut graph = PackedGraph::new();
+
+        let seqs =
+            vec![B("GTCCA"), B("AAA"), B("GTGTGT"), B("TTCT"), B("AGTAGT")];
+        //   node     1          2           3           4          5
+
+        let mut handles: Vec<Handle> = Vec::new();
+
+        for seq in seqs.iter() {
+            let handle = graph.append_handle(seq);
+            handles.push(handle);
+        }
+
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
+
+        graph.create_edge(edge(1, 5));
+        graph.create_edge(edge(1, 2));
+        graph.create_edge(edge(1, 3));
+        graph.create_edge(edge(1, 4));
+
+        let adj = |graph: &PackedGraph, x: u64, left: bool| {
+            let dir = if left {
+                Direction::Left
+            } else {
+                Direction::Right
+            };
+            graph
+                .neighbors(hnd(x), dir)
+                .map(|h| u64::from(h.id()))
+                .collect::<Vec<_>>()
+        };
+
+        let h1_right = adj(&graph, 1, false);
+        println!("{:?}", h1_right);
+        assert_eq!(vec![4, 3, 2, 5], adj(&graph, 1, false));
+
+        let g_h1 = graph.handle_graph_ix(hnd(1)).unwrap();
+        let h1_edges = g_h1.right_edges_ix();
+        let h1_edges = graph.get_edge_list_ix(h1_edges);
+        graph.edges.remove_handle_from_list(h1_edges, hnd(3));
+
+        // let h1_right = adj(1, false);
+        let h1_right = adj(&graph, 1, false);
+        println!("{:?}", h1_right);
+
+        graph.edges.remove_handle_from_list(h1_edges, hnd(5));
+
+        // let h1_right = adj(1, false);
+        let h1_right = adj(&graph, 1, false);
+        println!("{:?}", h1_right);
+        // assert_eq!(vec![4, 2], adj(&graph, 1, false));
     }
 }
