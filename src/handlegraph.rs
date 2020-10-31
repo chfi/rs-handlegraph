@@ -1,59 +1,97 @@
-use crate::handle::{Direction, Handle, NodeId};
+use crate::handle::{Direction, Edge, Handle, NodeId};
 
 pub mod iter;
 
 pub use self::iter::*;
 
-/// Trait encapsulating the immutable aspects of a handlegraph
-pub trait HandleGraph {
-    fn has_node(&self, node_id: NodeId) -> bool;
+/// Access all the handles in the graph as an iterator, and related
+/// methods.
+pub trait AllHandles: Sized {
+    type Handles: Iterator<Item = Handle>;
+    fn all_handles(self) -> Self::Handles;
 
-    /// The length of the sequence of a given node
-    fn length(&self, handle: Handle) -> usize;
+    #[inline]
+    fn node_count(self) -> usize {
+        self.all_handles().count()
+    }
+}
+
+/// Access all the edges in the graph as an iterator, and related
+/// methods.
+pub trait AllEdges: Sized {
+    type Edges: Iterator<Item = Edge>;
+
+    fn all_edges(self) -> Self::Edges;
+
+    #[inline]
+    fn edge_count(self) -> usize {
+        self.all_edges().count()
+    }
+}
+
+/// Access to the neighbors of any handle in the given direction, and related methods.
+///
+/// Implementors should make sure that handles are flipped correctly depending on direction, e.g. using NeighborIter
+pub trait HandleNeighbors: Sized {
+    type Neighbors: Iterator<Item = Handle>;
+
+    fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors;
+
+    #[inline]
+    fn degree(self, handle: Handle, dir: Direction) -> usize {
+        self.neighbors(handle, dir).count()
+    }
+
+    #[inline]
+    fn has_edge(self, left: Handle, right: Handle) -> bool {
+        self.neighbors(left, Direction::Right).any(|h| h == right)
+    }
+}
+
+/// Access to the sequence of any node, and related methods such as retrieving subsequences, individual bases, and node lengths.
+pub trait HandleSequences: Sized {
+    type Sequence: Iterator<Item = u8>;
+
+    fn sequence_iter(self, handle: Handle) -> Self::Sequence;
 
     /// Returns the sequence of a node in the handle's local forward
     /// orientation. Copies the sequence, as the sequence in the graph
     /// may be reversed depending on orientation.
-    fn sequence(&self, handle: Handle) -> Vec<u8>;
-
-    fn subsequence(
-        &self,
-        handle: Handle,
-        index: usize,
-        size: usize,
-    ) -> Vec<u8> {
-        self.sequence(handle)[index..index + size].into()
+    #[inline]
+    fn sequence(self, handle: Handle) -> Vec<u8> {
+        self.sequence_iter(handle.forward()).collect()
     }
 
-    fn base(&self, handle: Handle, index: usize) -> u8 {
-        self.sequence(handle)[index]
+    #[inline]
+    fn subsequence(self, handle: Handle, start: usize, len: usize) -> Vec<u8> {
+        self.sequence_iter(handle).skip(start).take(len).collect()
     }
 
-    fn min_node_id(&self) -> NodeId;
-    fn max_node_id(&self) -> NodeId;
+    #[inline]
+    fn base(self, handle: Handle, index: usize) -> u8 {
+        self.sequence_iter(handle).nth(index).unwrap()
+    }
 
-    /// Return the total number of nodes in the graph
-    fn node_count(&self) -> usize;
-
-    /// Return the total number of edges in the graph
-    fn edge_count(&self) -> usize;
-
-    /// Sum up all the sequences in the graph
-    fn total_length(&self) -> usize;
-
-    fn degree(&self, handle: Handle, dir: Direction) -> usize;
-
-    fn has_edge(&self, left: Handle, right: Handle) -> bool;
+    #[inline]
+    fn node_len(self, handle: Handle) -> usize {
+        self.sequence_iter(handle).count()
+    }
 }
 
-/// Convenience trait for collecting all the HandleGraph iterator
-/// traits in a single bound. The `impl` on `&T`, which has the
-/// additional bound that `T: HandleGraph`, makes it possible to use
-/// this as the only bound in functions that are generic over
-/// `HandleGraph` implementations.
+/// Trait denoting that implementors have access to all the immutable
+/// parts of the HandleGraph interface, and that implementors are
+/// copyable references (i.e. immutable, shared references).
+
+/// Collects all the HandleGraph iterator traits in a single bound.
+/// The `impl` on `&T`, which has the additional bound that `T:
+/// HandleGraph`, makes it possible to use this as the only bound in
+/// functions that are generic over `HandleGraph` implementations.
 pub trait HandleGraphRef:
     AllEdges + AllHandles + HandleNeighbors + HandleSequences + Copy
 {
+    fn total_length(self) -> usize {
+        self.all_handles().map(|h| self.node_len(h)).sum()
+    }
 }
 
 impl<'a, T> HandleGraphRef for &'a T
@@ -61,4 +99,14 @@ where
     T: HandleGraph,
     &'a T: AllEdges + AllHandles + HandleNeighbors + HandleSequences + Copy,
 {
+}
+
+/// Trait denoting that shared references of an implementor has access
+/// to all the HandleGraph methods.
+///
+/// Also contains some methods that don't fit into any of the other traits.
+pub trait HandleGraph {
+    fn min_node_id(&self) -> NodeId;
+
+    fn max_node_id(&self) -> NodeId;
 }

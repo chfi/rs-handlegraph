@@ -233,6 +233,7 @@ impl Sequences {
 impl Sequences {
     pub const SIZE: usize = 1;
 
+    /*
     pub(super) fn add_record(&mut self, ix: usize, seq: &[u8]) {
         unimplemented!();
         // let seq_ix = self.sequences.len();
@@ -253,15 +254,6 @@ impl Sequences {
         // self.lengths.set(rec_ix, length as u64);
     }
 
-    #[inline]
-    pub(super) fn length(&self, ix: usize) -> usize {
-        self.lengths.get(ix) as usize
-    }
-
-    #[inline]
-    pub(super) fn total_length(&self) -> usize {
-        self.lengths.iter().sum::<u64>() as usize
-    }
 
     #[inline]
     pub(super) fn base(&self, seq_ix: usize, base_ix: usize) -> u8 {
@@ -272,6 +264,7 @@ impl Sequences {
         // let base = self.sequences.get(offset + base_ix);
         // decode_dna_base(base)
     }
+    */
 
     /*
     pub(super) fn iter(
@@ -291,7 +284,6 @@ impl Sequences {
         //     reverse,
         // }
     }
-    */
 
     pub(super) fn divide_sequence(
         &mut self,
@@ -337,6 +329,7 @@ impl Sequences {
 
         // results
     }
+    */
 }
 
 pub struct PackedSeqIter<'a> {

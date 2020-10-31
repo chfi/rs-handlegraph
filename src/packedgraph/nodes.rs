@@ -272,6 +272,10 @@ impl NodeRecords {
         vec_ix.as_record_ix()
     }
 
+    pub(super) fn sequences(&self) -> &Sequences {
+        &self.sequences
+    }
+
     /// Append a new node graph record, using the provided
     /// `GraphRecordIx` no ensure that the record index is correctly
     /// synced.

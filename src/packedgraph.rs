@@ -24,9 +24,147 @@ pub use self::edges::{
     EdgeListIter, EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx,
 };
 pub use self::graph::PackedGraph;
-use self::graph::{PackedSeqIter, Sequences};
+use self::graph::{PackedSeqIter, SeqRecordIx, Sequences};
 pub use self::nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords};
 
+impl HandleGraph for PackedGraph {
+    #[inline]
+    fn min_node_id(&self) -> NodeId {
+        self.nodes.min_id().into()
+    }
+    #[inline]
+    fn max_node_id(&self) -> NodeId {
+        self.nodes.max_id().into()
+    }
+}
+
+/// Iterator over a PackedGraph's handles. For every non-zero value in
+/// the PackedDeque holding the PackedGraph's node ID mappings, the
+/// corresponding index is mapped back to the original ID and yielded
+/// by the iterator.
+pub struct PackedHandlesIter<I>
+where
+    I: Iterator<Item = u64>,
+{
+    iter: std::iter::Enumerate<I>,
+    min_id: usize,
+}
+
+impl<I> PackedHandlesIter<I>
+where
+    I: Iterator<Item = u64>,
+{
+    fn new(iter: I, min_id: usize) -> Self {
+        let iter = iter.enumerate();
+        Self { iter, min_id }
+    }
+}
+
+impl<I> Iterator for PackedHandlesIter<I>
+where
+    I: Iterator<Item = u64>,
+{
+    type Item = Handle;
+
+    #[inline]
+    fn next(&mut self) -> Option<Handle> {
+        while let Some((ix, id)) = self.iter.next() {
+            if id != 0 {
+                let n_id = ix + self.min_id;
+                return Some(Handle::pack(n_id, false));
+            }
+        }
+        None
+    }
+}
+
+impl<'a> AllHandles for &'a PackedGraph {
+    type Handles = PackedHandlesIter<crate::packed::PackedDequeIter<'a>>;
+
+    #[inline]
+    fn all_handles(self) -> Self::Handles {
+        let iter = self.nodes.nodes_iter();
+        PackedHandlesIter::new(iter, usize::from(self.min_node_id()))
+    }
+
+    #[inline]
+    fn node_count(self) -> usize {
+        self.nodes.node_count()
+    }
+}
+
+/// Iterator for stepping through an edge list, returning Handles.
+pub struct EdgeListHandleIter<'a> {
+    edge_list_iter: EdgeListIter<'a>,
+}
+
+impl<'a> EdgeListHandleIter<'a> {
+    fn new(edge_list_iter: EdgeListIter<'a>) -> Self {
+        Self { edge_list_iter }
+    }
+}
+
+impl<'a> Iterator for EdgeListHandleIter<'a> {
+    type Item = Handle;
+
+    #[inline]
+    fn next(&mut self) -> Option<Handle> {
+        let (_, (handle, _)) = self.edge_list_iter.next()?;
+        Some(handle)
+    }
+}
+
+impl<'a> HandleNeighbors for &'a PackedGraph {
+    type Neighbors = EdgeListHandleIter<'a>;
+
+    #[inline]
+    fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors {
+        use Direction as Dir;
+        let g_ix = self.nodes.handle_record(handle).unwrap();
+
+        let edge_list_ix = match (dir, handle.is_reverse()) {
+            (Dir::Left, true) => {
+                self.nodes.get_edge_list(g_ix, Direction::Right)
+            }
+            (Dir::Left, false) => {
+                self.nodes.get_edge_list(g_ix, Direction::Left)
+            }
+            (Dir::Right, true) => {
+                self.nodes.get_edge_list(g_ix, Direction::Left)
+            }
+            (Dir::Right, false) => {
+                self.nodes.get_edge_list(g_ix, Direction::Right)
+            }
+        };
+
+        let iter = self.edges.iter(edge_list_ix);
+
+        EdgeListHandleIter::new(iter)
+    }
+}
+
+impl<'a> HandleSequences for &'a PackedGraph {
+    type Sequence = PackedSeqIter<'a>;
+
+    #[inline]
+    fn sequence_iter(self, handle: Handle) -> Self::Sequence {
+        let g_ix = self.nodes.handle_record(handle).unwrap();
+        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
+        self.nodes.sequences().iter(seq_ix, handle.is_reverse())
+    }
+}
+
+use crate::handlegraph::iter::EdgesIter;
+
+impl<'a> AllEdges for &'a PackedGraph {
+    type Edges = EdgesIter<&'a PackedGraph>;
+
+    fn all_edges(self) -> Self::Edges {
+        EdgesIter::new(self)
+    }
+}
+
+/*
 impl HandleGraph for PackedGraph {
     #[inline]
     fn has_node(&self, id: NodeId) -> bool {
@@ -98,6 +236,7 @@ impl HandleGraph for PackedGraph {
         self.neighbors(left, Direction::Right).any(|h| h == right)
     }
 }
+*/
 
 impl MutableHandleGraph for PackedGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {
@@ -112,7 +251,9 @@ impl MutableHandleGraph for PackedGraph {
     ) -> Handle {
         let id = node_id.into();
         assert!(
-            id != NodeId::from(0) && !sequence.is_empty() && !self.has_node(id)
+            id != NodeId::from(0)
+                && !sequence.is_empty()
+                && !self.nodes.has_node(id)
         );
 
         let g_ix = self.nodes.create_node(id, sequence).unwrap();
@@ -296,125 +437,6 @@ impl MutableHandleGraph for PackedGraph {
             .collect::<Vec<_>>();
 
         handle.flip()
-    }
-}
-
-/// Iterator over a PackedGraph's handles. For every non-zero value in
-/// the PackedDeque holding the PackedGraph's node ID mappings, the
-/// corresponding index is mapped back to the original ID and yielded
-/// by the iterator.
-pub struct PackedHandlesIter<I>
-where
-    I: Iterator<Item = u64>,
-{
-    iter: std::iter::Enumerate<I>,
-    min_id: usize,
-}
-
-impl<I> PackedHandlesIter<I>
-where
-    I: Iterator<Item = u64>,
-{
-    fn new(iter: I, min_id: usize) -> Self {
-        let iter = iter.enumerate();
-        Self { iter, min_id }
-    }
-}
-
-impl<I> Iterator for PackedHandlesIter<I>
-where
-    I: Iterator<Item = u64>,
-{
-    type Item = Handle;
-
-    #[inline]
-    fn next(&mut self) -> Option<Handle> {
-        while let Some((ix, id)) = self.iter.next() {
-            if id != 0 {
-                let n_id = ix + self.min_id;
-                return Some(Handle::pack(n_id, false));
-            }
-        }
-        None
-    }
-}
-
-impl<'a> AllHandles for &'a PackedGraph {
-    type Handles = PackedHandlesIter<crate::packed::PackedDequeIter<'a>>;
-
-    #[inline]
-    fn all_handles(self) -> Self::Handles {
-        let iter = self.nodes.nodes_iter();
-        PackedHandlesIter::new(iter, usize::from(self.min_node_id()))
-    }
-}
-
-/// Iterator for stepping through an edge list, returning Handles.
-pub struct EdgeListHandleIter<'a> {
-    edge_list_iter: EdgeListIter<'a>,
-}
-
-impl<'a> EdgeListHandleIter<'a> {
-    fn new(edge_list_iter: EdgeListIter<'a>) -> Self {
-        Self { edge_list_iter }
-    }
-}
-
-impl<'a> Iterator for EdgeListHandleIter<'a> {
-    type Item = Handle;
-
-    #[inline]
-    fn next(&mut self) -> Option<Handle> {
-        let (_, (handle, _)) = self.edge_list_iter.next()?;
-        Some(handle)
-    }
-}
-
-impl<'a> HandleNeighbors for &'a PackedGraph {
-    type Neighbors = EdgeListHandleIter<'a>;
-
-    #[inline]
-    fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors {
-        use Direction as Dir;
-        let g_ix = self.handle_graph_ix(handle).unwrap();
-
-        let edge_list_ix = match (dir, handle.is_reverse()) {
-            (Dir::Left, true) => {
-                self.nodes.get_edge_list(g_ix, Direction::Right)
-            }
-            (Dir::Left, false) => {
-                self.nodes.get_edge_list(g_ix, Direction::Left)
-            }
-            (Dir::Right, true) => {
-                self.nodes.get_edge_list(g_ix, Direction::Left)
-            }
-            (Dir::Right, false) => {
-                self.nodes.get_edge_list(g_ix, Direction::Right)
-            }
-        };
-
-        EdgeListHandleIter::new(self, edge_list_ix)
-    }
-}
-
-impl<'a> HandleSequences for &'a PackedGraph {
-    type Sequence = PackedSeqIter<'a>;
-
-    #[inline]
-    fn sequence_iter(self, handle: Handle) -> Self::Sequence {
-        let g_ix = self.handle_graph_ix(handle).unwrap();
-        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
-        self.sequences.iter(seq_ix, handle.is_reverse())
-    }
-}
-
-use crate::handlegraph::iter::EdgesIter;
-
-impl<'a> AllEdges for &'a PackedGraph {
-    type Edges = EdgesIter<&'a PackedGraph>;
-
-    fn all_edges(self) -> Self::Edges {
-        EdgesIter::new(self)
     }
 }
 

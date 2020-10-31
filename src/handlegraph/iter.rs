@@ -1,10 +1,6 @@
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
-/// Iterator over all handles in a graph
-pub trait AllHandles {
-    type Handles: Iterator<Item = Handle>;
-    fn all_handles(self) -> Self::Handles;
-}
+use super::{AllHandles, HandleNeighbors};
 
 /// Iterator adapter to create an Iterator over `Handle`s from an
 /// iterator over &NodeId, in a way that can be used as the `Handles`
@@ -36,12 +32,6 @@ where
         let id = self.iter.next()?.to_owned();
         Some(Handle::pack(id, false))
     }
-}
-
-/// Iterator over all edges in a graph
-pub trait AllEdges {
-    type Edges: Iterator<Item = Edge>;
-    fn all_edges(self) -> Self::Edges;
 }
 
 /// Utility struct for iterating through the edges of a single handle,
@@ -200,14 +190,6 @@ impl<G> std::iter::FusedIterator for EdgesIter<G> where
 {
 }
 
-/// Iterator over the neighbors of a handle in a given direction
-///
-/// Implementors should make sure that handles are flipped correctly depending on direction, e.g. using NeighborIter
-pub trait HandleNeighbors {
-    type Neighbors: Iterator<Item = Handle>;
-    fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors;
-}
-
 /// Wrapper struct for ensuring handles are flipped correctly when
 /// iterating over the neighbors of a handle
 pub struct NeighborIter<'a, I>
@@ -244,17 +226,6 @@ where
     }
 }
 
-/// Iterator over the sequence of a node. Implementors should only
-/// define `sequence_iter_impl` that returns a DoubleEndedIterator
-/// over the sequence bases in their forward orientation, and users
-/// should only use `sequence_iter`, which automatically wraps the
-/// iterator so that it steps through the reverse complement when the
-/// handle is reversed.
-pub trait HandleSequences: Sized {
-    type Sequence: Iterator<Item = u8>;
-    fn sequence_iter(self, handle: Handle) -> Self::Sequence;
-}
-
 /// Iterator adapter that transforms an iterator over ASCII-encoded
 /// bases into an iterator over the sequence or its reverse
 /// complement.
@@ -289,6 +260,43 @@ where
             self.iter.next_back().map(bio::alphabets::dna::complement)
         } else {
             self.iter.next()
+        }
+    }
+}
+
+// This one might be more efficient? Probably not, but it'd be
+// interesting to compare this solution to NeighborIter.
+pub enum NeighborIterAlt<'a, I>
+where
+    I: Iterator<Item = &'a Handle>,
+{
+    Identity(I),
+    Flipped(I),
+}
+
+impl<'a, I> NeighborIterAlt<'a, I>
+where
+    I: Iterator<Item = &'a Handle>,
+{
+    pub fn new(iter: I, flip: bool) -> Self {
+        if flip {
+            Self::Flipped(iter)
+        } else {
+            Self::Identity(iter)
+        }
+    }
+}
+
+impl<'a, I> Iterator for NeighborIterAlt<'a, I>
+where
+    I: Iterator<Item = &'a Handle>,
+{
+    type Item = Handle;
+    #[inline]
+    fn next(&mut self) -> Option<Handle> {
+        match self {
+            Self::Identity(iter) => iter.next().copied(),
+            Self::Flipped(iter) => iter.next().copied().map(Handle::flip),
         }
     }
 }
