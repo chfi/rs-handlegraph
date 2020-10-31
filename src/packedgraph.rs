@@ -372,9 +372,10 @@ impl<'a> HandleSequences for &'a PackedGraph {
 
     #[inline]
     fn sequence_iter(self, handle: Handle) -> Self::Sequence {
-        let g_ix = self.handle_graph_ix(handle).unwrap();
-        let seq_ix = g_ix.to_seq_record_ix();
-        self.sequences.iter(seq_ix, handle.is_reverse())
+        unimplemented!();
+        // let g_ix = self.handle_graph_ix(handle).unwrap();
+        // let seq_ix = g_ix.to_seq_record_ix();
+        // self.sequences.iter(seq_ix, handle.is_reverse())
     }
 }
 

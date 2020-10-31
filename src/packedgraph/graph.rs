@@ -22,7 +22,7 @@ pub(crate) static NARROW_PAGE_WIDTH: usize = 256;
 pub(crate) static WIDE_PAGE_WIDTH: usize = 1024;
 
 pub use super::edges::{EdgeListIter, EdgeListIx, EdgeLists, EdgeVecIx};
-pub use super::sequence::{PackedSeqIter, Sequences};
+pub use super::sequence::{PackedSeqIter, SeqRecordIx, Sequences};
 
 /// The index for a graph record. Valid indices are natural numbers
 /// above zero, each denoting a 2-element record. An index of zero
@@ -98,7 +98,7 @@ impl GraphVecIx {
     /// Create a new `GraphVecIx` by wrapping a `usize`. Should only be
     /// used in the PackedGraph graph record internals.
     #[inline]
-    fn new<I: Into<usize>>(x: I) -> Self {
+    pub(super) fn new<I: Into<usize>>(x: I) -> Self {
         Self(x.into())
     }
 
@@ -120,6 +120,11 @@ impl GraphVecIx {
     #[inline]
     pub(super) fn right_edges_ix(&self) -> usize {
         self.0 + 1
+    }
+
+    #[inline]
+    pub(super) fn seq_record_ix(&self) -> usize {
+        self.0 / 2
     }
 }
 
@@ -202,7 +207,8 @@ impl NodeIdIndexMap {
 pub struct NodeRecords {
     records_vec: PagedIntVec,
     id_index_map: NodeIdIndexMap,
-    // sequences: Sequences,
+    sequences: Sequences,
+    removed_nodes: Vec<NodeId>,
 }
 
 impl Default for NodeRecords {
@@ -210,6 +216,8 @@ impl Default for NodeRecords {
         Self {
             records_vec: PagedIntVec::new(NARROW_PAGE_WIDTH),
             id_index_map: Default::default(),
+            sequences: Default::default(),
+            removed_nodes: Vec::new(),
         }
     }
 }
@@ -258,9 +266,10 @@ impl NodeRecords {
 
         let next_ix = self.next_graph_ix();
 
-        // TODO also add the sequence records
-
-        if !self.id_index_map.append_node_id(n_id, next_ix) {
+        // TODO it's possible for only of these to fail, which would bad
+        if !self.id_index_map.append_node_id(n_id, next_ix)
+            || !self.sequences.append_empty_record(next_ix)
+        {
             return None;
         }
         let record_ix = self.append_node_graph_record(next_ix)?;
@@ -268,29 +277,7 @@ impl NodeRecords {
     }
 
     #[inline]
-    pub(super) fn get_left_edge_list(
-        &self,
-        g_ix: GraphRecordIx,
-    ) -> Option<EdgeListIx> {
-        let vec_ix = g_ix.as_vec_ix()?;
-        let left = vec_ix.left_edges_ix();
-        let left = EdgeListIx::from_vec_value(self.records_vec.get(left));
-        Some(left)
-    }
-
-    #[inline]
-    pub(super) fn get_right_edge_list(
-        &self,
-        g_ix: GraphRecordIx,
-    ) -> Option<EdgeListIx> {
-        let vec_ix = g_ix.as_vec_ix()?;
-        let right = vec_ix.right_edges_ix();
-        let right = EdgeListIx::from_vec_value(self.records_vec.get(right));
-        Some(right)
-    }
-
-    #[inline]
-    pub(super) fn get_graph_record(
+    pub(super) fn get_node_edge_lists(
         &self,
         g_ix: GraphRecordIx,
     ) -> Option<(EdgeListIx, EdgeListIx)> {
@@ -329,7 +316,7 @@ impl NodeRecords {
         F: Fn(EdgeListIx, EdgeListIx) -> (EdgeListIx, EdgeListIx),
     {
         let vec_ix = g_ix.as_vec_ix()?;
-        let (left_rec, right_rec) = self.get_graph_record(g_ix)?;
+        let (left_rec, right_rec) = self.get_node_edge_lists(g_ix)?;
 
         let (new_left, new_right) = f(left_rec, right_rec);
 
@@ -429,9 +416,11 @@ impl PackedGraph {
         let new_ix = self.graph_records.len();
         self.graph_records.append(0);
         self.graph_records.append(0);
-        self.sequences.lengths.append(0);
-        self.sequences.indices.append(0);
-        GraphIx::from_graph_records_ix(new_ix)
+        unimplemented!();
+
+        // self.sequences.lengths.append(0);
+        // self.sequences.indices.append(0);
+        // GraphIx::from_graph_records_ix(new_ix)
     }
 
     pub(super) fn get_graph_record(&self, ix: GraphIx) -> GraphRecord {
@@ -598,19 +587,6 @@ impl PackedGraph {
         Handle::pack(id, false)
         // graph_ix
     }
-
-    /*
-    pub(super) fn remove_handle(&mut self, handle: Handle) {
-        let g_ix = self.handle_graph_ix(handle).unwrap();
-
-        let left_neighbors = self.neighbors(handle, Direction::Left);
-        let right_neighbors = self.neighbors(handle, Direction::Left);
-
-        for other in left_neighbors {
-
-        }
-    }
-    */
 }
 
 #[cfg(test)]
@@ -764,6 +740,7 @@ mod tests {
         );
     }
 
+    /*
     #[test]
     fn packedgraph_remove_handle_edgelist() {
         use crate::handlegraph::HandleNeighbors;
@@ -818,61 +795,5 @@ mod tests {
         assert!(adj(&graph, 1, false).is_empty());
     }
 
-    #[test]
-    fn packedgraph_split_sequence() {
-        let mut graph = PackedGraph::new();
-        let n0 = NodeId::from(1);
-        let n1 = NodeId::from(2);
-        let n2 = NodeId::from(3);
-        let h0 = graph.create_handle(b"GTCCA", n0);
-        let h1 = graph.create_handle(b"AAA", n1);
-        let h2 = graph.create_handle(b"GTGTGT", n2);
-
-        use crate::handlegraph::{AllHandles, HandleGraph, HandleSequences};
-
-        use bstr::{BString, B};
-
-        let hnd = |x: u64| Handle::pack(x, false);
-
-        let seq_bstr = |g: &PackedGraph, h: u64| -> BString {
-            g.sequence_iter(hnd(h)).collect()
-        };
-
-        assert_eq!(seq_bstr(&graph, 1), B("GTCCA"));
-        assert_eq!(seq_bstr(&graph, 2), B("AAA"));
-        assert_eq!(seq_bstr(&graph, 3), B("GTGTGT"));
-
-        println!("{}", seq_bstr(&graph, 1));
-        println!("{}", seq_bstr(&graph, 2));
-        println!("{}", seq_bstr(&graph, 3));
-
-        let s_ix_1 = graph.handle_graph_ix(hnd(1)).unwrap();
-        let s_ix_1 = s_ix_1.to_seq_record_ix();
-        println!("seq rec ix {}", s_ix_1);
-
-        let splits = graph.sequences.divide_sequence(s_ix_1, vec![2, 3]);
-
-        println!("{:?}", splits);
-
-        // assert_eq!(seq_bstr(&graph, 1), B("GT"));
-        // assert_eq!(seq_bstr(&graph, 2), B("AAA"));
-        // assert_eq!(seq_bstr(&graph, 3), B("GTGTGT"));
-
-        println!("{}", seq_bstr(&graph, 1));
-        println!("{}", seq_bstr(&graph, 2));
-        println!("{}", seq_bstr(&graph, 3));
-
-        println!("all sequences");
-        // let indices = graph.sequences.indices.iter().collect::<Vec<_>>();
-        let indices = vec![0, 1, 2, 3, 4];
-        for &ix in indices.iter() {
-            let new_seq = graph.sequences.iter(ix, false).collect::<BString>();
-            println!("{}", new_seq);
-        }
-
-        // let (ix, _len) = splits[0];
-        // let new_seq = graph.sequences.iter(ix, false).collect::<BString>();
-        // assert_eq!(new_seq, B("CCA"));
-        // println!("{}", new_seq);
-    }
+    */
 }
