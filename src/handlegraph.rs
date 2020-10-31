@@ -1,4 +1,4 @@
-use crate::handle::{Direction, Edge, Handle, NodeId};
+use crate::handle::{Direction, Handle, NodeId};
 
 pub mod iter;
 

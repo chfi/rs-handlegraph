@@ -1,3 +1,9 @@
+#![allow(dead_code)]
+#![allow(unused_assignments)]
+#![allow(unused_variables)]
+#![allow(unused_mut)]
+#![allow(unused_imports)]
+
 use bio::alphabets::dna;
 use bstr::{BString, ByteSlice};
 
@@ -9,8 +15,10 @@ use crate::{
     mutablehandlegraph::MutableHandleGraph,
 };
 
+pub mod edges;
 pub mod graph;
 
+pub use self::edges::EdgeListIx;
 use self::graph::{EdgeIx, EdgeLists, EdgeRecord, PackedSeqIter, Sequences};
 pub use self::graph::{GraphIx, PackedGraph};
 

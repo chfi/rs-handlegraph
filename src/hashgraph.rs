@@ -4,8 +4,7 @@ use bstr::BString;
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::{
-        AllEdges, AllHandles, HandleGraph, HandleGraphRef, HandleNeighbors,
-        HandleSequences,
+        AllEdges, AllHandles, HandleGraph, HandleNeighbors, HandleSequences,
     },
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,

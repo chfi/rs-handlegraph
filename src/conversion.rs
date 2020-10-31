@@ -1,6 +1,6 @@
 use crate::{
     handle::{Edge, Handle, NodeId},
-    handlegraph::{HandleGraph, HandleGraphRef},
+    handlegraph::HandleGraphRef,
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,
 };
