@@ -127,12 +127,14 @@ impl EdgeVecIx {
 #[derive(Debug, Clone)]
 pub struct EdgeLists {
     record_vec: PagedIntVec,
+    removed_records: Vec<EdgeListIx>,
 }
 
 impl Default for EdgeLists {
     fn default() -> Self {
         EdgeLists {
             record_vec: PagedIntVec::new(WIDE_PAGE_WIDTH),
+            removed_records: Vec::new(),
         }
     }
 }
@@ -177,10 +179,24 @@ impl EdgeLists {
     }
 
     /// Create a new *empty* record and return its `EdgeListIx`.
-    fn append_record(&mut self) -> EdgeListIx {
+    #[must_use]
+    pub(super) fn append_empty(&mut self) -> EdgeListIx {
         let vec_ix = EdgeVecIx::new(self.record_vec.len());
         self.record_vec.append(0);
         self.record_vec.append(0);
+        vec_ix.as_list_ix()
+    }
+
+    /// Create a new record with the provided contents and return its
+    /// `EdgeListIx`.
+    pub(super) fn append_record(
+        &mut self,
+        handle: Handle,
+        next: EdgeListIx,
+    ) -> EdgeListIx {
+        let vec_ix = EdgeVecIx::new(self.record_vec.len());
+        self.record_vec.append(handle.as_integer());
+        self.record_vec.append(next.as_vec_value());
         vec_ix.as_list_ix()
     }
 
@@ -213,6 +229,52 @@ impl EdgeLists {
     /// at the provided index.
     pub fn iter(&self, ix: EdgeListIx) -> EdgeListIter<'_> {
         EdgeListIter::new(self, ix)
+    }
+
+    /// In the linked list that starts at the provided index, find the
+    /// first edge record that fulfills the provided predicate, and
+    /// remove it if it exists. Returns the index of the new start of
+    /// the edge list.
+    ///
+    /// Since the new start of the index is returned, the output of
+    /// this method can be directly used to update the corresponding
+    /// GraphRecord.
+    #[must_use]
+    pub(super) fn remove_edge_record<P>(
+        &mut self,
+        start: EdgeListIx,
+        pred: P,
+    ) -> Option<EdgeListIx>
+    where
+        P: Fn(EdgeRecord) -> bool,
+    {
+        let list_step = self.iter(start).position(|(_, rec)| pred(rec))?;
+
+        if list_step == 0 {
+            // If the edge record to remove is the very first, the new
+            // start of the list is the second record.
+            let next = self.get_next(start)?;
+            self.removed_records.push(start);
+            Some(next)
+        } else {
+            // If the edge record is at position I for I in [1..N],
+            // the start of the list is the same, but we need to
+            // change the `next` pointer of the preceding record in
+            // the list, to that of the record to remove.
+
+            let (prec_ix, _prec_record) =
+                self.iter(start).nth(list_step - 1)?;
+            let (curr_ix, curr_record) = self.iter(start).nth(list_step)?;
+
+            let prec_next_vec_ix = prec_ix.as_vec_ix()?.next_ix();
+            // Update the previous `next` pointer
+            self.record_vec
+                .set(prec_next_vec_ix, curr_record.1.as_vec_value());
+            // Mark the record in question as removed
+            self.removed_records.push(curr_ix);
+            // The start of the edge list hasn't changed
+            Some(start)
+        }
     }
 }
 
@@ -252,4 +314,50 @@ impl<'a> Iterator for EdgeListIter<'a> {
         Some((this_ix, (handle, next)))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packedgraph_edges_iter() {
+        let mut edges = EdgeLists::default();
+
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let e_1 = edges.append_empty();
+        let e_2 = edges.append_empty();
+
+        let e_3 = edges.append_empty();
+        let e_4 = edges.append_empty();
+        let e_5 = edges.append_empty();
+
+        // edge list one, starting with e_1
+        //  /- hnd(1)
+        // A
+        //  \- hnd(2)
+        edges.set_record(e_1, hnd(1), e_2);
+        edges.set_record(e_2, hnd(2), EdgeListIx::empty());
+
+        // edge list two, starting with e_3
+        //  /- hnd(4)
+        // B - hnd(5)
+        //  \- hnd(6)
+        edges.set_record(e_3, hnd(4), e_4);
+        edges.set_record(e_4, hnd(5), e_5);
+        edges.set_record(e_5, hnd(6), EdgeListIx::empty());
+
+        let l_1 = edges.iter(e_1).map(|(_, (h, _))| h).collect::<Vec<_>>();
+        let l_2 = edges.iter(e_2).map(|(_, (h, _))| h).collect::<Vec<_>>();
+        assert_eq!(vec![hnd(1), hnd(2)], l_1);
+        assert_eq!(vec![hnd(2)], l_2);
+
+        let l_3 = edges.iter(e_3).map(|(_, (h, _))| h).collect::<Vec<_>>();
+        let l_4 = edges.iter(e_4).map(|(_, (h, _))| h).collect::<Vec<_>>();
+        let l_5 = edges.iter(e_5).map(|(_, (h, _))| h).collect::<Vec<_>>();
+        assert_eq!(vec![hnd(4), hnd(5), hnd(6)], l_3);
+        assert_eq!(vec![hnd(5), hnd(6)], l_4);
+        assert_eq!(vec![hnd(6)], l_5);
+    }
+
 }
