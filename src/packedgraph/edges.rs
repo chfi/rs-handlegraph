@@ -39,6 +39,13 @@ impl EdgeListIx {
         Self(NonZeroUsize::new(x.into()))
     }
 
+    /// Returns the "null", or empty `EdgeListIx`, i.e. the one that
+    /// represents the empty list when used as a pointer in an edge
+    /// list.
+    pub(super) fn empty() -> Self {
+        Self(None)
+    }
+
     /// Unwrap the `EdgeListIx` into a `u64` for use in a packed
     /// vector. Should never be used other than when setting the
     /// `next` field of an edge list record.
@@ -63,7 +70,7 @@ impl EdgeListIx {
     ///
     /// `x -> (x - 1) * 2`
     #[inline]
-    pub fn as_vec_ix(&self) -> Option<EdgeVecIx> {
+    pub(super) fn as_vec_ix(&self) -> Option<EdgeVecIx> {
         let x = self.0?.get();
         Some(EdgeVecIx((x - 1) * 2))
     }
@@ -93,7 +100,7 @@ impl EdgeVecIx {
     ///
     /// `x -> (x / 2) + 1`
     #[inline]
-    pub fn as_list_ix(&self) -> EdgeListIx {
+    pub(super) fn as_list_ix(&self) -> EdgeListIx {
         EdgeListIx::new((self.0 / 2) + 1)
     }
 
@@ -141,7 +148,8 @@ impl EdgeLists {
         self.record_vec.len() / Self::RECORD_SIZE
     }
 
-    /// Get the handle for the record at the index, if the index is not null
+    /// Get the handle for the record at the index, if the index is
+    /// not null.
     #[inline]
     fn get_handle(&self, ix: EdgeListIx) -> Option<Handle> {
         let h_ix = ix.as_vec_ix()?.handle_ix();
@@ -162,7 +170,7 @@ impl EdgeLists {
 
     /// Get the handle and next pointer for the given record index.
     #[inline]
-    fn get_record(&self, ix: EdgeListIx) -> Option<EdgeRecord> {
+    pub(super) fn get_record(&self, ix: EdgeListIx) -> Option<EdgeRecord> {
         let handle = self.get_handle(ix)?;
         let next = self.get_next(ix)?;
         Some((handle, next))
@@ -200,4 +208,48 @@ impl EdgeLists {
     fn next(&self, record: EdgeRecord) -> Option<EdgeRecord> {
         self.get_record(record.1)
     }
+
+    /// Return an iterator that walks through the edge list starting
+    /// at the provided index.
+    pub fn iter(&self, ix: EdgeListIx) -> EdgeListIter<'_> {
+        EdgeListIter::new(self, ix)
+    }
+}
+
+/// An iterator through a linked list of edge records. Yields the
+/// current `EdgeListIx`, as well as its record, until the end of the
+/// list has been reached.
+pub struct EdgeListIter<'a> {
+    edge_lists: &'a EdgeLists,
+    current_index: EdgeListIx,
+    current_record: Option<EdgeRecord>,
+}
+
+impl<'a> EdgeListIter<'a> {
+    fn new(edge_lists: &'a EdgeLists, start: EdgeListIx) -> Self {
+        let current_record = edge_lists.get_record(start);
+        let current_index = start;
+        Self {
+            edge_lists,
+            current_index,
+            current_record,
+        }
+    }
+}
+
+impl<'a> Iterator for EdgeListIter<'a> {
+    // (EdgeListIx, (Handle, EdgeListIx));
+    type Item = (EdgeListIx, EdgeRecord);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let record = self.current_record?;
+        let next_record = self.edge_lists.next(record);
+        let this_ix = self.current_index;
+        let (handle, next) = record;
+        self.current_record = next_record;
+        self.current_index = next;
+        Some((this_ix, (handle, next)))
+    }
+}
 }
