@@ -30,7 +30,7 @@ pub use self::nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords};
 impl HandleGraph for PackedGraph {
     #[inline]
     fn has_node(&self, id: NodeId) -> bool {
-        self.get_node_index(id).is_some()
+        self.nodes.has_node(id)
     }
 
     /// The length of the sequence of a given node
@@ -64,18 +64,19 @@ impl HandleGraph for PackedGraph {
 
     #[inline]
     fn min_node_id(&self) -> NodeId {
-        self.min_id.into()
+        self.nodes.min_id().into()
     }
     #[inline]
     fn max_node_id(&self) -> NodeId {
-        self.max_id.into()
+        self.nodes.max_id().into()
     }
 
     /// Return the total number of nodes in the graph
     #[inline]
     fn node_count(&self) -> usize {
-        // need to make sure this is correct, especially once I add deletion
-        self.id_graph_map.len()
+        // need to make sure this is correct, especially once I add
+        // deletion; it should also not count zero elements
+        self.nodes.node_count()
     }
 
     /// Return the total number of edges in the graph
@@ -86,7 +87,7 @@ impl HandleGraph for PackedGraph {
 
     /// Sum up all the sequences in the graph
     fn total_length(&self) -> usize {
-        self.sequences.total_length()
+        self.nodes.total_length()
     }
 
     fn degree(&self, handle: Handle, dir: Direction) -> usize {
@@ -100,7 +101,7 @@ impl HandleGraph for PackedGraph {
 
 impl MutableHandleGraph for PackedGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {
-        let id = NodeId::from(self.max_id + 1);
+        let id = NodeId::from(self.max_node_id() + 1);
         self.create_handle(sequence, id)
     }
 
@@ -114,47 +115,62 @@ impl MutableHandleGraph for PackedGraph {
             id != NodeId::from(0) && !sequence.is_empty() && !self.has_node(id)
         );
 
-        let graph_ix = self.push_node_record(id);
-        let seq_ix = graph_ix.to_seq_record_ix();
-
-        self.sequences.add_record(seq_ix, sequence);
+        let g_ix = self.nodes.create_node(id, sequence).unwrap();
 
         Handle::pack(id, false)
     }
 
     fn create_edge(&mut self, Edge(left, right): Edge) {
-        let left_g_ix = self.handle_graph_ix(left).unwrap();
-        let right_g_ix = self.handle_graph_ix(right).unwrap();
+        let left_gix = self.nodes.handle_record(left).unwrap();
+        let right_gix = self.nodes.handle_record(right).unwrap();
 
-        let left_edge_g_ix = if left.is_reverse() {
-            left_g_ix.left_edges_ix()
+        let left_edge_ix = if left.is_reverse() {
+            left_gix.as_vec_ix().unwrap().left_edges_ix()
         } else {
-            left_g_ix.right_edges_ix()
+            left_gix.as_vec_ix().unwrap().right_edges_ix()
         };
 
-        let right_edge_g_ix = if right.is_reverse() {
-            right_g_ix.right_edges_ix()
+        let right_edge_ix = if right.is_reverse() {
+            right_gix.as_vec_ix().unwrap().right_edges_ix()
         } else {
-            right_g_ix.left_edges_ix()
+            right_gix.as_vec_ix().unwrap().left_edges_ix()
         };
 
-        unimplemented!();
-        /*
-        let right_next = self.get_edge_list_ix(left_edge_g_ix);
-        let edge_ix = self.edges.append_record(right, right_next);
+        let left_edge_dir = if left.is_reverse() {
+            Direction::Left
+        } else {
+            Direction::Right
+        };
 
-        self.graph_records.set(left_edge_g_ix, edge_ix.0 as u64);
+        let right_edge_dir = if right.is_reverse() {
+            Direction::Right
+        } else {
+            Direction::Left
+        };
 
-        if left_edge_g_ix == right_edge_g_ix {
-            // todo reversing self edge records?
-            return;
-        }
+        let left_edge_list = self.nodes.get_edge_list(left_gix, left_edge_dir);
 
-        let left_next = self.get_edge_list_ix(right_edge_g_ix);
-        let edge_ix = self.edges.append_record(left.flip(), left_next);
+        // create the record for the edge from the left handle to the right
+        let left_to_right = self.edges.append_record(right, left_edge_list);
 
-        self.graph_records.set(right_edge_g_ix, edge_ix.0 as u64);
-        */
+        // set the `next` pointer of the new record to the old head of
+        // the left handle
+        self.nodes
+            .set_edge_list(left_gix, left_edge_dir, left_to_right);
+        // self.records_vec
+        //     .set(left_edge_ix, left_to_right.as_vec_value());
+
+        let right_edge_list =
+            self.nodes.get_edge_list(right_gix, right_edge_dir);
+
+        // create the record for the edge from the right handle to the left
+        let right_to_left = self.edges.append_record(left, right_edge_list);
+
+        // set the `next` pointer of the new record to the old head of
+        // the right handle
+
+        self.nodes
+            .set_edge_list(right_gix, right_edge_dir, right_to_left);
     }
 
     fn divide_handle(
@@ -163,6 +179,10 @@ impl MutableHandleGraph for PackedGraph {
         mut offsets: Vec<usize>,
     ) -> Vec<Handle> {
         let mut result = vec![handle];
+
+        unimplemented!();
+
+        /*
         let node_len = self.length(handle);
 
         let fwd_handle = handle.forward();
@@ -210,6 +230,7 @@ impl MutableHandleGraph for PackedGraph {
             let h = self.append_record_handle();
             result.push(h);
         }
+        */
 
         /*
         // ensure the order of the subsequences is correct if the
@@ -228,6 +249,7 @@ impl MutableHandleGraph for PackedGraph {
             .lengths
             .set(g_ix.to_seq_record_ix(), offsets[0] as u64);
         */
+        /*
 
         // Move the right-hand edges of the original handle to the
         // corresponding side of the new graph
@@ -260,6 +282,7 @@ impl MutableHandleGraph for PackedGraph {
         // TODO update paths and occurrences once they're implmented
 
         result
+            */
     }
 
     fn apply_orientation(&mut self, handle: Handle) -> Handle {
@@ -321,8 +344,8 @@ impl<'a> AllHandles for &'a PackedGraph {
 
     #[inline]
     fn all_handles(self) -> Self::Handles {
-        let iter = self.id_graph_map.iter();
-        PackedHandlesIter::new(iter, self.min_id as usize)
+        let iter = self.nodes.nodes_iter();
+        PackedHandlesIter::new(iter, usize::from(self.min_node_id()))
     }
 }
 
@@ -356,16 +379,21 @@ impl<'a> HandleNeighbors for &'a PackedGraph {
         let g_ix = self.handle_graph_ix(handle).unwrap();
 
         let edge_list_ix = match (dir, handle.is_reverse()) {
-            (Dir::Left, true) => g_ix.right_edges_ix(),
-            (Dir::Left, false) => g_ix.left_edges_ix(),
-            (Dir::Right, true) => g_ix.left_edges_ix(),
-            (Dir::Right, false) => g_ix.right_edges_ix(),
+            (Dir::Left, true) => {
+                self.nodes.get_edge_list(g_ix, Direction::Right)
+            }
+            (Dir::Left, false) => {
+                self.nodes.get_edge_list(g_ix, Direction::Left)
+            }
+            (Dir::Right, true) => {
+                self.nodes.get_edge_list(g_ix, Direction::Left)
+            }
+            (Dir::Right, false) => {
+                self.nodes.get_edge_list(g_ix, Direction::Right)
+            }
         };
-        unimplemented!();
 
-        // let edge_ix = self.get_edge_list_ix(edge_list_ix);
-
-        // EdgeListHandleIter::new(self, edge_ix)
+        EdgeListHandleIter::new(self, edge_list_ix)
     }
 }
 
@@ -374,10 +402,9 @@ impl<'a> HandleSequences for &'a PackedGraph {
 
     #[inline]
     fn sequence_iter(self, handle: Handle) -> Self::Sequence {
-        unimplemented!();
-        // let g_ix = self.handle_graph_ix(handle).unwrap();
-        // let seq_ix = g_ix.to_seq_record_ix();
-        // self.sequences.iter(seq_ix, handle.is_reverse())
+        let g_ix = self.handle_graph_ix(handle).unwrap();
+        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
+        self.sequences.iter(seq_ix, handle.is_reverse())
     }
 }
 

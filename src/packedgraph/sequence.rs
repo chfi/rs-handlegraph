@@ -202,6 +202,16 @@ impl Sequences {
         Some(results)
     }
 
+    #[inline]
+    pub(super) fn length(&self, ix: usize) -> usize {
+        self.lengths.get(ix) as usize
+    }
+
+    #[inline]
+    pub(super) fn total_length(&self) -> usize {
+        self.lengths.iter().sum::<u64>() as usize
+    }
+
     pub(super) fn iter(
         &self,
         seq_ix: SeqRecordIx,
@@ -245,14 +255,12 @@ impl Sequences {
 
     #[inline]
     pub(super) fn length(&self, ix: usize) -> usize {
-        unimplemented!();
-        // self.lengths.get(ix) as usize
+        self.lengths.get(ix) as usize
     }
 
     #[inline]
     pub(super) fn total_length(&self) -> usize {
-        unimplemented!();
-        // self.lengths.iter().sum::<u64>() as usize
+        self.lengths.iter().sum::<u64>() as usize
     }
 
     #[inline]

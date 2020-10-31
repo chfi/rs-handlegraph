@@ -29,8 +29,8 @@ pub use super::sequence::{PackedSeqIter, SeqRecordIx, Sequences};
 
 #[derive(Debug, Clone)]
 pub struct PackedGraph {
-    nodes: NodeRecords,
-    edges: EdgeLists,
+    pub(super) nodes: NodeRecords,
+    pub(super) edges: EdgeLists,
 }
 
 impl Default for PackedGraph {
