@@ -22,388 +22,22 @@ pub(crate) static NARROW_PAGE_WIDTH: usize = 256;
 pub(crate) static WIDE_PAGE_WIDTH: usize = 1024;
 
 pub use super::edges::{EdgeListIter, EdgeListIx, EdgeLists, EdgeVecIx};
+pub use super::nodes::{
+    GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords,
+};
 pub use super::sequence::{PackedSeqIter, SeqRecordIx, Sequences};
-
-/// The index for a graph record. Valid indices are natural numbers
-/// above zero, each denoting a 2-element record. An index of zero
-/// denotes a record that doesn't exist.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct GraphRecordIx(Option<NonZeroUsize>);
-
-impl GraphRecordIx {
-    /// Create a new `GraphRecordIx` by wrapping a `usize`. Should only
-    /// be used in the PackedGraph graph record internals.
-    ///
-    /// If `x` is zero, the result will be `GraphRecordIx(None)`.
-    #[inline]
-    fn new<I: Into<usize>>(x: I) -> Self {
-        Self(NonZeroUsize::new(x.into()))
-    }
-
-    /// Returns the "null", or empty `GraphRecordIx`, i.e. the one that
-    /// is used for yet-to-be-filled elements in the graph NodeId map.
-    #[inline]
-    pub(super) fn empty() -> Self {
-        Self(None)
-    }
-
-    /// Returns `true` if the provided `GraphRecordIx` represents the
-    /// null record.
-    #[inline]
-    pub(super) fn is_null(&self) -> bool {
-        self.0.is_none()
-    }
-
-    /// Unwrap the `GraphRecordIx` into a `u64` for use as a value in
-    /// a packed vector.
-    #[inline]
-    pub(super) fn as_vec_value(&self) -> u64 {
-        match self.0 {
-            None => 0,
-            Some(v) => v.get() as u64,
-        }
-    }
-
-    /// Wrap a `u64`, e.g. an element from a packed vector, as a
-    /// `GraphRecordIx`.
-    #[inline]
-    pub(super) fn from_vec_value(x: u64) -> Self {
-        Self(NonZeroUsize::new(x as usize))
-    }
-
-    /// Transforms the `GraphRecordIx` into an index that can be used
-    /// to get the first element of a record from the graph record
-    /// vector. Returns None if the `GraphRecordIx` points to the
-    /// empty record.
-    ///
-    /// `x -> (x - 1) * 2`
-    #[inline]
-    pub(super) fn as_vec_ix(&self) -> Option<GraphVecIx> {
-        let x = self.0?.get();
-        Some(GraphVecIx((x - 1) * 2))
-    }
-}
-
-/// The index into the underlying packed vector that is used to
-/// represent the graph records that hold pointers to the two edge
-/// lists for each node.
-
-/// Each graph record takes up two elements, so a `GraphVecIx` is
-/// always even.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct GraphVecIx(usize);
-
-impl GraphVecIx {
-    /// Create a new `GraphVecIx` by wrapping a `usize`. Should only be
-    /// used in the PackedGraph graph record internals.
-    #[inline]
-    pub(super) fn new<I: Into<usize>>(x: I) -> Self {
-        Self(x.into())
-    }
-
-    /// Transforms the `GraphVecIx` into an index that denotes a graph
-    /// record. The resulting `GraphRecordIx` will always contain a
-    /// value, never `None`.
-    ///
-    /// `x -> (x / 2) + 1`
-    #[inline]
-    pub(super) fn as_record_ix(&self) -> GraphRecordIx {
-        GraphRecordIx::new((self.0 / 2) + 1)
-    }
-
-    #[inline]
-    pub(super) fn left_edges_ix(&self) -> usize {
-        self.0
-    }
-
-    #[inline]
-    pub(super) fn right_edges_ix(&self) -> usize {
-        self.0 + 1
-    }
-
-    #[inline]
-    pub(super) fn seq_record_ix(&self) -> usize {
-        self.0 / 2
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct NodeIdIndexMap {
-    deque: PackedDeque,
-    max_id: u64,
-    min_id: u64,
-}
-
-impl Default for NodeIdIndexMap {
-    fn default() -> Self {
-        Self {
-            deque: Default::default(),
-            max_id: 0,
-            min_id: std::u64::MAX,
-        }
-    }
-}
-
-impl NodeIdIndexMap {
-    fn new() -> Self {
-        Default::default()
-    }
-
-    /// Appends the provided NodeId to the Node id -> Graph index map,
-    /// with the given target `GraphRecordIx`.
-    ///
-    /// Returns `true` if the NodeId was successfully appended.
-    fn append_node_id(&mut self, id: NodeId, next_ix: GraphRecordIx) -> bool {
-        let id = u64::from(id);
-        if id == 0 {
-            return false;
-        }
-
-        if self.deque.is_empty() {
-            self.deque.push_back(0);
-        } else {
-            if id < self.min_id {
-                let to_prepend = self.min_id - id;
-                for _ in 0..to_prepend {
-                    self.deque.push_front(0);
-                }
-            }
-
-            if id > self.max_id {
-                let ix = (id - self.min_id) as usize;
-                if let Some(to_append) = ix.checked_sub(self.deque.len()) {
-                    for _ in 0..=to_append {
-                        self.deque.push_back(0);
-                    }
-                }
-            }
-        }
-
-        self.min_id = self.min_id.min(id);
-        self.max_id = self.max_id.max(id);
-
-        let index = id - self.min_id;
-        let value = next_ix;
-
-        self.deque.set(index as usize, value.as_vec_value());
-
-        true
-    }
-
-    fn has_node<I: Into<NodeId>>(&self, id: I) -> bool {
-        let id = u64::from(id.into());
-        if id < self.min_id || id > self.max_id {
-            return false;
-        }
-        let index = u64::from(id) - self.min_id;
-        let value = self.deque.get(index as usize);
-        let rec_ix = GraphRecordIx::from_vec_value(value);
-        rec_ix.is_null()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct NodeRecords {
-    records_vec: PagedIntVec,
-    id_index_map: NodeIdIndexMap,
-    sequences: Sequences,
-    removed_nodes: Vec<NodeId>,
-}
-
-impl Default for NodeRecords {
-    fn default() -> NodeRecords {
-        Self {
-            records_vec: PagedIntVec::new(NARROW_PAGE_WIDTH),
-            id_index_map: Default::default(),
-            sequences: Default::default(),
-            removed_nodes: Vec::new(),
-        }
-    }
-}
-
-impl NodeRecords {
-    pub fn min_id(&self) -> u64 {
-        self.id_index_map.min_id
-    }
-
-    pub fn max_id(&self) -> u64 {
-        self.id_index_map.max_id
-    }
-
-    /// Return the `GraphRecordIx` that will be used by the next node
-    /// that's inserted into the graph.
-    fn next_graph_ix(&self) -> GraphRecordIx {
-        let rec_count = self.records_vec.len();
-        let vec_ix = GraphVecIx::new(rec_count);
-        vec_ix.as_record_ix()
-    }
-
-    /// Append a new node graph record, using the provided
-    /// `GraphRecordIx` no ensure that the record index is correctly
-    /// synced.
-    #[must_use]
-    fn append_node_graph_record(
-        &mut self,
-        g_rec_ix: GraphRecordIx,
-    ) -> Option<GraphRecordIx> {
-        if self.next_graph_ix() != g_rec_ix {
-            return None;
-        }
-        self.records_vec.append(0);
-        self.records_vec.append(0);
-        Some(g_rec_ix)
-    }
-
-    pub(super) fn insert_node(
-        &mut self,
-        n_id: NodeId,
-    ) -> Option<GraphRecordIx> {
-        let id = u64::from(n_id);
-        if id == 0 {
-            return None;
-        }
-
-        let next_ix = self.next_graph_ix();
-
-        // TODO it's possible for only of these to fail, which would bad
-        if !self.id_index_map.append_node_id(n_id, next_ix)
-            || !self.sequences.append_empty_record(next_ix)
-        {
-            return None;
-        }
-        let record_ix = self.append_node_graph_record(next_ix)?;
-        Some(record_ix)
-    }
-
-    #[inline]
-    pub(super) fn get_node_edge_lists(
-        &self,
-        g_ix: GraphRecordIx,
-    ) -> Option<(EdgeListIx, EdgeListIx)> {
-        let vec_ix = g_ix.as_vec_ix()?;
-
-        let left = vec_ix.left_edges_ix();
-        let left = EdgeListIx::from_vec_value(self.records_vec.get(left));
-
-        let right = vec_ix.right_edges_ix();
-        let right = EdgeListIx::from_vec_value(self.records_vec.get(right));
-
-        Some((left, right))
-    }
-
-    pub(super) fn set_node_edge_lists(
-        &mut self,
-        g_ix: GraphRecordIx,
-        left: EdgeListIx,
-        right: EdgeListIx,
-    ) -> Option<()> {
-        let vec_ix = g_ix.as_vec_ix()?;
-        let left_ix = vec_ix.left_edges_ix();
-        let right_ix = vec_ix.right_edges_ix();
-        self.records_vec.set(left_ix, left.as_vec_value());
-        self.records_vec.set(right_ix, right.as_vec_value());
-        Some(())
-    }
-
-    #[inline]
-    pub(super) fn update_node_edge_lists<F>(
-        &mut self,
-        g_ix: GraphRecordIx,
-        f: F,
-    ) -> Option<()>
-    where
-        F: Fn(EdgeListIx, EdgeListIx) -> (EdgeListIx, EdgeListIx),
-    {
-        let vec_ix = g_ix.as_vec_ix()?;
-        let (left_rec, right_rec) = self.get_node_edge_lists(g_ix)?;
-
-        let (new_left, new_right) = f(left_rec, right_rec);
-
-        let left = vec_ix.left_edges_ix();
-        let right = vec_ix.right_edges_ix();
-        self.records_vec.set(left, new_left.as_vec_value());
-        self.records_vec.set(right, new_right.as_vec_value());
-        Some(())
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct GraphRecord {
-    left_edges: EdgeListIx,
-    right_edges: EdgeListIx,
-}
-
-impl GraphRecord {
-    pub(super) const SIZE: usize = 2;
-    pub(super) const START_OFFSET: usize = 0;
-    pub(super) const END_OFFSET: usize = 1;
-}
 
 #[derive(Debug, Clone)]
 pub struct PackedGraph {
-    pub(super) graph_records: PagedIntVec,
-    pub(super) sequences: Sequences,
-    pub(super) edges: EdgeLists,
-    pub(super) id_graph_map: PackedDeque,
-    pub(super) max_id: u64,
-    pub(super) min_id: u64,
+    nodes: NodeRecords,
+    edges: EdgeLists,
 }
 
 impl Default for PackedGraph {
     fn default() -> Self {
-        let sequences = Default::default();
+        let nodes = Default::default();
         let edges = Default::default();
-        let id_graph_map = Default::default();
-        let graph_records = PagedIntVec::new(NARROW_PAGE_WIDTH);
-        let max_id = 0;
-        let min_id = std::u64::MAX;
-        PackedGraph {
-            sequences,
-            edges,
-            graph_records,
-            id_graph_map,
-            max_id,
-            min_id,
-        }
-    }
-}
-
-#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-#[repr(transparent)]
-pub struct GraphIx(usize);
-
-impl GraphIx {
-    pub(super) fn to_id_map_entry(&self) -> u64 {
-        let ix = self.0 as u64;
-        ix + 1
-    }
-
-    pub(super) fn from_id_map_entry(ix: u64) -> Option<Self> {
-        if ix == 0 {
-            None
-        } else {
-            Some(GraphIx((ix - 1) as usize))
-        }
-    }
-
-    pub(super) fn from_graph_records_ix(ix: usize) -> Self {
-        GraphIx(ix / GraphRecord::SIZE)
-    }
-
-    pub(super) fn to_seq_record_ix(&self) -> usize {
-        let ix = self.0;
-        ix * Sequences::SIZE
-    }
-
-    pub(super) fn left_edges_ix(&self) -> usize {
-        let ix = self.0;
-        (ix * GraphRecord::SIZE) + GraphRecord::START_OFFSET
-    }
-
-    pub(super) fn right_edges_ix(&self) -> usize {
-        let ix = self.0;
-        (ix * GraphRecord::SIZE) + GraphRecord::END_OFFSET
+        PackedGraph { nodes, edges }
     }
 }
 
@@ -412,41 +46,7 @@ impl PackedGraph {
         Default::default()
     }
 
-    pub(super) fn new_record_ix(&mut self) -> GraphIx {
-        let new_ix = self.graph_records.len();
-        self.graph_records.append(0);
-        self.graph_records.append(0);
-        unimplemented!();
-
-        // self.sequences.lengths.append(0);
-        // self.sequences.indices.append(0);
-        // GraphIx::from_graph_records_ix(new_ix)
-    }
-
-    pub(super) fn get_graph_record(&self, ix: GraphIx) -> GraphRecord {
-        unimplemented!();
-        // let left_edges = self.graph_records.get(ix.left_edges_ix()) as usize;
-        // let right_edges = self.graph_records.get(ix.right_edges_ix()) as usize;
-        // GraphRecord {
-        //     left_edges,
-        //     right_edges,
-        // }
-    }
-
     /*
-    pub(super) fn graph_ix_left_edges(&self, ix: GraphIx) -> EdgeListIx {
-        let left_edges_start =
-            self.graph_records.get(ix.left_edges_ix()) as usize;
-        EdgeListIx::new(left_edges_start)
-    }
-
-    pub(super) fn graph_ix_right_edges(&self, ix: GraphIx) -> EdgeListIx {
-        let left_edges_start =
-            self.graph_records.get(ix.left_edges_ix()) as usize;
-        EdgeListIx::new(left_edges_start)
-    }
-    */
-
     pub(super) fn get_node_index(&self, id: NodeId) -> Option<GraphIx> {
         let id = u64::from(id);
         if id < self.min_id || id > self.max_id {
@@ -498,35 +98,6 @@ impl PackedGraph {
         next_ix
     }
 
-    /*
-    #[inline]
-    pub(super) fn append_graph_record_start_edge(
-        &mut self,
-        g_ix: GraphIx,
-        edge: EdgeIx,
-    ) {
-        self.graph_records.set(g_ix.left_edges_ix(), edge.0 as u64);
-    }
-
-    #[inline]
-    pub(super) fn append_graph_record_end_edge(
-        &mut self,
-        g_ix: GraphIx,
-        edge: EdgeIx,
-    ) {
-        self.graph_records.set(g_ix.right_edges_ix(), edge.0 as u64);
-    }
-
-    */
-
-    #[inline]
-    pub(super) fn swap_graph_record_elements(&mut self, a: usize, b: usize) {
-        let a_val = self.graph_records.get(a);
-        let b_val = self.graph_records.get(b);
-        self.graph_records.set(a, b_val);
-        self.graph_records.set(b, a_val);
-    }
-
     #[inline]
     pub(super) fn handle_edge_record_ix(
         &self,
@@ -543,56 +114,14 @@ impl PackedGraph {
             (true, Dir::Right) => g_ix.left_edges_ix(),
         }
     }
-
-    /*
-    /// Get the EdgeList record index at the provided graph record
-    /// *element* index. I.e. if `ix` is even, the first element of
-    /// some record will be returned, if odd, the second element.
-    #[inline]
-    pub(super) fn get_edge_list_ix(&self, ix: usize) -> EdgeIx {
-        let entry = self.graph_records.get(ix);
-        EdgeIx(entry as usize)
-    }
     */
-
-    /*
-    pub(super) fn remove_handle_from_edge(
-        &mut self,
-        handle: Handle,
-        dir: Direction,
-        to_remove: Handle,
-    ) {
-        let graph_rec_ix = self.handle_edge_record_ix(handle, dir);
-        let edge_ix = self.get_edge_list_ix(graph_rec_ix);
-
-        if let Some(ix) = self.edges.remove_handle_from_list(edge_ix, to_remove)
-        {
-            if ix != edge_ix {
-                self.graph_records.set(graph_rec_ix, ix.0 as u64);
-            }
-        }
-    }
-    */
-
-    pub(super) fn append_record_handle(&mut self) -> Handle {
-        let id = NodeId::from(self.max_id + 1);
-
-        let new_ix = self.graph_records.len();
-        self.graph_records.append(0);
-        self.graph_records.append(0);
-
-        // let graph_ix = self.push_node_record(id);
-        // let rec_ix = graph_ix.to_seq_record_ix();
-        // self.sequences.set_record(rec_ix, seq_ix, length);
-        Handle::pack(id, false)
-        // graph_ix
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    /*
     #[test]
     fn packedgraph_node_record_indices() {
         let mut graph = PackedGraph::new();
@@ -739,6 +268,7 @@ mod tests {
             edges
         );
     }
+    */
 
     /*
     #[test]

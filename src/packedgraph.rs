@@ -17,13 +17,15 @@ use crate::{
 
 pub mod edges;
 pub mod graph;
+pub mod nodes;
 pub mod sequence;
 
 pub use self::edges::{
     EdgeListIter, EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx,
 };
-pub use self::graph::{GraphIx, PackedGraph};
+pub use self::graph::PackedGraph;
 use self::graph::{PackedSeqIter, Sequences};
+pub use self::nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords};
 
 impl HandleGraph for PackedGraph {
     #[inline]

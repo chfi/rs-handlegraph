@@ -108,6 +108,11 @@ impl Sequences {
         true
     }
 
+    pub(super) fn expected_next_record(&self) -> GraphRecordIx {
+        let seq_ix = SeqRecordIx::new(self.lengths.len());
+        seq_ix.as_graph_record_ix()
+    }
+
     fn append_record(&mut self, offset: usize, length: usize) -> SeqRecordIx {
         let seq_ix = SeqRecordIx::new(self.lengths.len());
 
