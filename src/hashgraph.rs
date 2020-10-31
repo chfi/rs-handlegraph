@@ -3,9 +3,7 @@ use bstr::BString;
 
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::{
-        AllEdges, AllHandles, HandleGraph, HandleNeighbors, HandleSequences,
-    },
+    handlegraph::*,
     mutablehandlegraph::MutableHandleGraph,
     pathgraph::PathHandleGraph,
 };
@@ -18,23 +16,76 @@ pub use self::graph::HashGraph;
 pub use self::node::Node;
 pub use self::path::{Path, PathId, PathStep};
 
-impl HandleGraph for HashGraph {
-    fn min_node_id(&self) -> NodeId {
-        self.min_id
+impl<'a> AllHandles for &'a HashGraph {
+    type Handles = NodeIdRefHandles<
+        'a,
+        std::collections::hash_map::Keys<'a, NodeId, Node>,
+    >;
+
+    #[inline]
+    fn all_handles(self) -> Self::Handles {
+        let keys = self.graph.keys();
+        NodeIdRefHandles::new(keys)
     }
 
-    fn max_node_id(&self) -> NodeId {
-        self.max_id
+    #[inline]
+    fn node_count(self) -> usize {
+        self.graph.len()
+    }
+
+    #[inline]
+    fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
+        self.graph.contains_key(&n_id.into())
     }
 }
 
-/*
-impl HandleGraph for HashGraph {
-    fn has_node(&self, node_id: NodeId) -> bool {
-        self.graph.contains_key(&node_id)
+impl<'a> AllEdges for &'a HashGraph {
+    type Edges = EdgesIter<&'a HashGraph>;
+
+    #[inline]
+    fn all_edges(self) -> Self::Edges {
+        EdgesIter::new(self)
+    }
+}
+
+impl<'a> HandleNeighbors for &'a HashGraph {
+    type Neighbors = NeighborIter<'a, std::slice::Iter<'a, Handle>>;
+
+    #[inline]
+    fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors {
+        let node = self.get_node_unchecked(&handle.id());
+
+        let handles = match (dir, handle.is_reverse()) {
+            (Direction::Left, true) => &node.right_edges,
+            (Direction::Left, false) => &node.left_edges,
+            (Direction::Right, true) => &node.left_edges,
+            (Direction::Right, false) => &node.right_edges,
+        };
+
+        NeighborIter::new(handles.iter(), dir == Direction::Left)
     }
 
-    fn sequence(&self, handle: Handle) -> Vec<u8> {
+    #[inline]
+    fn degree(self, handle: Handle, dir: Direction) -> usize {
+        let n = self.get_node_unchecked(&handle.id());
+        match dir {
+            Direction::Right => n.right_edges.len(),
+            Direction::Left => n.left_edges.len(),
+        }
+    }
+}
+
+impl<'a> HandleSequences for &'a HashGraph {
+    type Sequence = SequenceIter<std::iter::Copied<std::slice::Iter<'a, u8>>>;
+
+    #[inline]
+    fn sequence_iter(self, handle: Handle) -> Self::Sequence {
+        let seq: &[u8] =
+            &self.get_node_unchecked(&handle.id()).sequence.as_ref();
+        SequenceIter::new(seq.iter().copied(), handle.is_reverse())
+    }
+
+    fn sequence(self, handle: Handle) -> Vec<u8> {
         let seq: &[u8] =
             &self.get_node_unchecked(&handle.id()).sequence.as_ref();
         if handle.is_reverse() {
@@ -44,80 +95,29 @@ impl HandleGraph for HashGraph {
         }
     }
 
-    fn length(&self, handle: Handle) -> usize {
-        self.sequence(handle).len()
+    #[inline]
+    fn node_len(self, handle: Handle) -> usize {
+        self.get_node_unchecked(&handle.id()).sequence.len()
     }
+}
 
-    fn node_count(&self) -> usize {
-        self.graph.len()
-    }
-
-    fn edge_count(&self) -> usize {
-        self.all_edges().count()
-    }
-
+impl HandleGraph for HashGraph {
+    #[inline]
     fn min_node_id(&self) -> NodeId {
         self.min_id
     }
 
+    #[inline]
     fn max_node_id(&self) -> NodeId {
         self.max_id
     }
-
-    fn total_length(&self) -> usize {
-        self.all_handles()
-            .fold(0, |a, v| a + self.sequence(v).len())
-    }
-
-    fn degree(&self, handle: Handle, dir: Direction) -> usize {
-        let n = self.get_node_unchecked(&handle.id());
-        match dir {
-            Direction::Right => n.right_edges.len(),
-            Direction::Left => n.left_edges.len(),
-        }
-    }
-
-    fn has_edge(&self, left: Handle, right: Handle) -> bool {
-        self.neighbors(left, Direction::Right).any(|h| h == right)
-    }
-*/
-
-/*
-fn edges_iter<'a>(&'a self) -> Box<dyn Iterator<Item = Edge> + 'a> {
-    use Direction::*;
-
-    let handles = self.handles_iter();
-
-    let neighbors = move |handle: Handle| {
-        let right_neighbors = self
-            .handle_edges_iter(handle, Right)
-            .filter_map(move |next| {
-                if handle.id() <= next.id() {
-                    Some(Edge::edge_handle(handle, next))
-                } else {
-                    None
-                }
-            });
-
-        let left_neighbors = self
-            .handle_edges_iter(handle, Left)
-            .filter_map(move |prev| {
-                if (handle.id() < prev.id())
-                    || (handle.id() == prev.id() && prev.is_reverse())
-                {
-                    Some(Edge::edge_handle(prev, handle))
-                } else {
-                    None
-                }
-            });
-
-        right_neighbors.chain(left_neighbors)
-    };
-
-    Box::new(handles.map(neighbors).flatten())
 }
-*/
-// }
+
+impl<'a> HandleGraphRef for &'a HashGraph {
+    fn total_length(self) -> usize {
+        self.graph.values().map(|n| n.sequence.len()).sum()
+    }
+}
 
 impl MutableHandleGraph for HashGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {
@@ -572,56 +572,5 @@ impl PathHandleGraph for HashGraph {
                 .enumerate()
                 .map(move |(i, _)| PathStep::Step(*path_handle, i)),
         )
-    }
-}
-
-use crate::handlegraph::iter::{
-    EdgesIter, NeighborIter, NodeIdRefHandles, SequenceIter,
-};
-
-impl<'a> HandleNeighbors for &'a HashGraph {
-    type Neighbors = NeighborIter<'a, std::slice::Iter<'a, Handle>>;
-
-    fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors {
-        let node = self.get_node_unchecked(&handle.id());
-
-        let handles = match (dir, handle.is_reverse()) {
-            (Direction::Left, true) => &node.right_edges,
-            (Direction::Left, false) => &node.left_edges,
-            (Direction::Right, true) => &node.left_edges,
-            (Direction::Right, false) => &node.right_edges,
-        };
-
-        NeighborIter::new(handles.iter(), dir == Direction::Left)
-    }
-}
-
-impl<'a> AllHandles for &'a HashGraph {
-    type Handles = NodeIdRefHandles<
-        'a,
-        std::collections::hash_map::Keys<'a, NodeId, Node>,
-    >;
-
-    fn all_handles(self) -> Self::Handles {
-        let keys = self.graph.keys();
-        NodeIdRefHandles::new(keys)
-    }
-}
-
-impl<'a> AllEdges for &'a HashGraph {
-    type Edges = EdgesIter<&'a HashGraph>;
-
-    fn all_edges(self) -> Self::Edges {
-        EdgesIter::new(self)
-    }
-}
-
-impl<'a> HandleSequences for &'a HashGraph {
-    type Sequence = SequenceIter<std::iter::Copied<std::slice::Iter<'a, u8>>>;
-
-    fn sequence_iter(self, handle: Handle) -> Self::Sequence {
-        let seq: &[u8] =
-            &self.get_node_unchecked(&handle.id()).sequence.as_ref();
-        SequenceIter::new(seq.iter().copied(), handle.is_reverse())
     }
 }

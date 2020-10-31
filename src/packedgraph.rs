@@ -9,14 +9,13 @@ use bstr::{BString, ByteSlice};
 
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::{
-        AllEdges, AllHandles, HandleGraph, HandleNeighbors, HandleSequences,
-    },
+    handlegraph::*,
     mutablehandlegraph::MutableHandleGraph,
 };
 
 pub mod edges;
 pub mod graph;
+pub mod iter;
 pub mod nodes;
 pub mod sequence;
 
@@ -25,58 +24,8 @@ pub use self::edges::{
 };
 pub use self::graph::PackedGraph;
 use self::graph::{PackedSeqIter, SeqRecordIx, Sequences};
+pub use self::iter::{EdgeListHandleIter, PackedHandlesIter};
 pub use self::nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords};
-
-impl HandleGraph for PackedGraph {
-    #[inline]
-    fn min_node_id(&self) -> NodeId {
-        self.nodes.min_id().into()
-    }
-    #[inline]
-    fn max_node_id(&self) -> NodeId {
-        self.nodes.max_id().into()
-    }
-}
-
-/// Iterator over a PackedGraph's handles. For every non-zero value in
-/// the PackedDeque holding the PackedGraph's node ID mappings, the
-/// corresponding index is mapped back to the original ID and yielded
-/// by the iterator.
-pub struct PackedHandlesIter<I>
-where
-    I: Iterator<Item = u64>,
-{
-    iter: std::iter::Enumerate<I>,
-    min_id: usize,
-}
-
-impl<I> PackedHandlesIter<I>
-where
-    I: Iterator<Item = u64>,
-{
-    fn new(iter: I, min_id: usize) -> Self {
-        let iter = iter.enumerate();
-        Self { iter, min_id }
-    }
-}
-
-impl<I> Iterator for PackedHandlesIter<I>
-where
-    I: Iterator<Item = u64>,
-{
-    type Item = Handle;
-
-    #[inline]
-    fn next(&mut self) -> Option<Handle> {
-        while let Some((ix, id)) = self.iter.next() {
-            if id != 0 {
-                let n_id = ix + self.min_id;
-                return Some(Handle::pack(n_id, false));
-            }
-        }
-        None
-    }
-}
 
 impl<'a> AllHandles for &'a PackedGraph {
     type Handles = PackedHandlesIter<crate::packed::PackedDequeIter<'a>>;
@@ -91,26 +40,23 @@ impl<'a> AllHandles for &'a PackedGraph {
     fn node_count(self) -> usize {
         self.nodes.node_count()
     }
-}
 
-/// Iterator for stepping through an edge list, returning Handles.
-pub struct EdgeListHandleIter<'a> {
-    edge_list_iter: EdgeListIter<'a>,
-}
-
-impl<'a> EdgeListHandleIter<'a> {
-    fn new(edge_list_iter: EdgeListIter<'a>) -> Self {
-        Self { edge_list_iter }
+    #[inline]
+    fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
+        self.nodes.has_node(n_id)
     }
 }
 
-impl<'a> Iterator for EdgeListHandleIter<'a> {
-    type Item = Handle;
+impl<'a> AllEdges for &'a PackedGraph {
+    type Edges = EdgesIter<&'a PackedGraph>;
+
+    fn all_edges(self) -> Self::Edges {
+        EdgesIter::new(self)
+    }
 
     #[inline]
-    fn next(&mut self) -> Option<Handle> {
-        let (_, (handle, _)) = self.edge_list_iter.next()?;
-        Some(handle)
+    fn edge_count(self) -> usize {
+        self.edges.len()
     }
 }
 
@@ -152,54 +98,15 @@ impl<'a> HandleSequences for &'a PackedGraph {
         let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
         self.nodes.sequences().iter(seq_ix, handle.is_reverse())
     }
-}
 
-use crate::handlegraph::iter::EdgesIter;
-
-impl<'a> AllEdges for &'a PackedGraph {
-    type Edges = EdgesIter<&'a PackedGraph>;
-
-    fn all_edges(self) -> Self::Edges {
-        EdgesIter::new(self)
+    #[inline]
+    fn node_len(self, handle: Handle) -> usize {
+        let g_ix = self.nodes.handle_record(handle).unwrap();
+        self.nodes.sequences().length(g_ix)
     }
 }
 
-/*
 impl HandleGraph for PackedGraph {
-    #[inline]
-    fn has_node(&self, id: NodeId) -> bool {
-        self.nodes.has_node(id)
-    }
-
-    /// The length of the sequence of a given node
-    #[inline]
-    fn length(&self, handle: Handle) -> usize {
-        self.sequence_iter(handle).count()
-    }
-
-    /// Returns the sequence of a node in the handle's local forward
-    /// orientation. Copies the sequence, as the sequence in the graph
-    /// may be reversed depending on orientation.
-    #[inline]
-    fn sequence(&self, handle: Handle) -> Vec<u8> {
-        self.sequence_iter(handle).collect()
-    }
-
-    #[inline]
-    fn subsequence(
-        &self,
-        handle: Handle,
-        index: usize,
-        size: usize,
-    ) -> Vec<u8> {
-        self.sequence_iter(handle).skip(index).take(size).collect()
-    }
-
-    #[inline]
-    fn base(&self, handle: Handle, index: usize) -> u8 {
-        self.sequence_iter(handle).nth(index).unwrap()
-    }
-
     #[inline]
     fn min_node_id(&self) -> NodeId {
         self.nodes.min_id().into()
@@ -208,35 +115,14 @@ impl HandleGraph for PackedGraph {
     fn max_node_id(&self) -> NodeId {
         self.nodes.max_id().into()
     }
+}
 
-    /// Return the total number of nodes in the graph
+impl<'a> HandleGraphRef for &'a PackedGraph {
     #[inline]
-    fn node_count(&self) -> usize {
-        // need to make sure this is correct, especially once I add
-        // deletion; it should also not count zero elements
-        self.nodes.node_count()
-    }
-
-    /// Return the total number of edges in the graph
-    #[inline]
-    fn edge_count(&self) -> usize {
-        self.edges.len()
-    }
-
-    /// Sum up all the sequences in the graph
-    fn total_length(&self) -> usize {
-        self.nodes.total_length()
-    }
-
-    fn degree(&self, handle: Handle, dir: Direction) -> usize {
-        self.neighbors(handle, dir).fold(0, |a, _| a + 1)
-    }
-
-    fn has_edge(&self, left: Handle, right: Handle) -> bool {
-        self.neighbors(left, Direction::Right).any(|h| h == right)
+    fn total_length(self) -> usize {
+        self.nodes.sequences().total_length()
     }
 }
-*/
 
 impl MutableHandleGraph for PackedGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {

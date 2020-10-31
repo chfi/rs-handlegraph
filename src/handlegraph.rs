@@ -14,6 +14,12 @@ pub trait AllHandles: Sized {
     fn node_count(self) -> usize {
         self.all_handles().count()
     }
+
+    #[inline]
+    fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
+        let n_id = n_id.into();
+        self.all_handles().any(|h| h.id() == n_id)
+    }
 }
 
 /// Access all the edges in the graph as an iterator, and related
@@ -94,12 +100,14 @@ pub trait HandleGraphRef:
     }
 }
 
+/*
 impl<'a, T> HandleGraphRef for &'a T
 where
     T: HandleGraph,
     &'a T: AllEdges + AllHandles + HandleNeighbors + HandleSequences + Copy,
 {
 }
+*/
 
 /// Trait denoting that shared references of an implementor has access
 /// to all the HandleGraph methods.

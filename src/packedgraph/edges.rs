@@ -151,10 +151,12 @@ pub type EdgeRecord = (Handle, EdgeListIx);
 impl EdgeLists {
     const RECORD_SIZE: usize = 2;
 
-    /// Returns the number of edge records -- *not* the number of elements.
+    /// Returns the number of edge records, i.e. the total number of
+    /// edges. Subtracts the number of removed records.
     #[inline]
     pub(super) fn len(&self) -> usize {
-        self.record_vec.len() / Self::RECORD_SIZE
+        let num_records = self.record_vec.len() / Self::RECORD_SIZE;
+        num_records - self.removed_records.len()
     }
 
     /// Get the handle for the record at the index, if the index is

@@ -18,6 +18,7 @@ use crate::{
 
 use super::graph::{GraphRecordIx, GraphVecIx};
 
+#[inline]
 const fn encode_dna_base(base: u8) -> u64 {
     match base {
         b'a' | b'A' => 0,
@@ -28,6 +29,7 @@ const fn encode_dna_base(base: u8) -> u64 {
     }
 }
 
+#[inline]
 const fn encoded_complement(val: u64) -> u64 {
     if val == 4 {
         4
@@ -36,6 +38,7 @@ const fn encoded_complement(val: u64) -> u64 {
     }
 }
 
+#[inline]
 const fn decode_dna_base(byte: u64) -> u8 {
     match byte {
         0 => b'A',
@@ -58,16 +61,19 @@ impl SeqRecordIx {
         Self(x.into())
     }
 
+    #[inline]
     pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Option<Self> {
         let vec_ix = g_ix.as_vec_ix()?;
         Some(Self(vec_ix.seq_record_ix()))
     }
 
+    #[inline]
     pub(super) fn as_graph_record_ix(&self) -> GraphRecordIx {
         let vec_ix = GraphVecIx::new(self.0);
         vec_ix.as_record_ix()
     }
 
+    #[inline]
     fn as_vec_ix(&self) -> usize {
         self.0
     }
@@ -203,8 +209,9 @@ impl Sequences {
     }
 
     #[inline]
-    pub(super) fn length(&self, ix: usize) -> usize {
-        self.lengths.get(ix) as usize
+    pub(super) fn length(&self, g_ix: GraphRecordIx) -> usize {
+        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
+        self.lengths.get(seq_ix.as_vec_ix()) as usize
     }
 
     #[inline]
@@ -341,6 +348,7 @@ pub struct PackedSeqIter<'a> {
 impl<'a> Iterator for PackedSeqIter<'a> {
     type Item = u8;
 
+    #[inline]
     fn next(&mut self) -> Option<u8> {
         if self.reverse {
             let base = self.iter.next_back()?;
@@ -353,6 +361,7 @@ impl<'a> Iterator for PackedSeqIter<'a> {
 }
 
 impl<'a> std::iter::ExactSizeIterator for PackedSeqIter<'a> {
+    #[inline]
     fn len(&self) -> usize {
         self.length
     }
