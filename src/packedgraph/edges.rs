@@ -26,7 +26,7 @@ use super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH};
 ///
 /// As zero is used to represent no edge/the empty edge list,
 /// `Option<NonZeroUsize>` is a natural fit for representing this.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EdgeListIx(Option<NonZeroUsize>);
 
 impl EdgeListIx {
@@ -82,7 +82,7 @@ impl EdgeListIx {
 /// Each edge list record takes up two elements, so an `EdgeVecIx` is
 /// always even. They also start from zero, so there's an offset by one
 /// compared to `EdgeListIx`, besides the record size.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct EdgeVecIx(usize);
 
@@ -360,4 +360,56 @@ mod tests {
         assert_eq!(vec![hnd(6)], l_5);
     }
 
+    #[test]
+    fn packedgraph_edges_remove_record() {
+        let mut edges = EdgeLists::default();
+
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let e_1 = edges.append_empty();
+        let e_2 = edges.append_empty();
+        let e_3 = edges.append_empty();
+        let e_4 = edges.append_empty();
+        let e_5 = edges.append_empty();
+
+        // A single edge list, all edges have the same source and
+        // different targets
+
+        edges.set_record(e_1, hnd(1), e_2);
+        edges.set_record(e_2, hnd(2), e_3);
+        edges.set_record(e_3, hnd(3), e_4);
+        edges.set_record(e_4, hnd(4), e_5);
+        edges.set_record(e_5, hnd(5), EdgeListIx::empty());
+
+        let edgevec = |es: &EdgeLists, ix: EdgeListIx| {
+            es.iter(ix).map(|(_, (h, _))| h).collect::<Vec<_>>()
+        };
+
+        let orig_edges = edgevec(&edges, e_1);
+
+        // Remove the first edge with an even handle
+        let rem_1 = edges
+            .remove_edge_record(e_1, |(h, _)| usize::from(h.id()) % 2 == 0);
+        let mod_edges = edgevec(&edges, e_1);
+        // The start of the list is still the same
+        assert_eq!(rem_1, Some(e_1));
+        assert_eq!(vec![hnd(1), hnd(3), hnd(4), hnd(5)], mod_edges);
+
+        // Remove handle 5
+        let rem_last = edges.remove_edge_record(e_1, |(h, _)| h == hnd(5));
+        let mod_edges = edgevec(&edges, e_1);
+        // The start of the list is still the same
+        assert_eq!(rem_last, Some(e_1));
+        assert_eq!(vec![hnd(1), hnd(3), hnd(4)], mod_edges);
+
+        // Remove the first record
+        // Remove the first edge with an even handle, again
+        let rem_1st = edges.remove_edge_record(e_1, |(h, _)| h == hnd(1));
+        // e_1 is still in the edge list, but marked as removed;
+        // the start of the list is the value in rem_1st, which is now equal to e_3
+        let mod_edges = edgevec(&edges, rem_1st.unwrap());
+        // The start of the list has changed
+        assert_eq!(rem_1st, Some(e_3));
+        assert_eq!(vec![hnd(3), hnd(4)], mod_edges);
+    }
 }
