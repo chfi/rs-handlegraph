@@ -296,20 +296,26 @@ impl NodeRecords {
         &mut self,
         n_id: NodeId,
     ) -> Option<GraphRecordIx> {
-        let id = u64::from(n_id);
-        if id == 0 {
+        if n_id == NodeId::from(0) {
             return None;
         }
 
         let next_ix = self.next_graph_ix();
 
-        // TODO it's possible for only of these to fail, which would bad
-        if !self.id_index_map.append_node_id(n_id, next_ix)
-            || (self.sequences.expected_next_record() != next_ix)
-        {
+        // Make sure the sequences and graph record indices are synced
+        if self.sequences.expected_next_record() != next_ix {
             return None;
         }
+
+        // Make sure the node ID is valid and doesn't already exist
+        if !self.id_index_map.append_node_id(n_id, next_ix) {
+            return None;
+        }
+
+        // append the sequence and graph records
+        self.sequences.append_empty_record(next_ix);
         let record_ix = self.append_node_graph_record(next_ix)?;
+
         Some(record_ix)
     }
 
