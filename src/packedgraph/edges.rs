@@ -46,11 +46,18 @@ impl EdgeListIx {
         Self(None)
     }
 
+    /// Returns `true` if the provided `EdgeListIx` represents the
+    /// empty list.
+    #[inline]
+    pub(super) fn is_empty(&self) -> bool {
+        self.0.is_none()
+    }
+
     /// Unwrap the `EdgeListIx` into a `u64` for use in a packed
     /// vector. Should never be used other than when setting the
     /// `next` field of an edge list record.
     #[inline]
-    fn as_vec_value(&self) -> u64 {
+    pub(super) fn as_vec_value(&self) -> u64 {
         match self.0 {
             None => 0,
             Some(v) => v.get() as u64,
@@ -60,7 +67,7 @@ impl EdgeListIx {
     /// Wrap a `u64`, e.g. a value from a packed vector element, as an
     /// `EdgeListIx`.
     #[inline]
-    fn from_vec_value(x: u64) -> Self {
+    pub(super) fn from_vec_value(x: u64) -> Self {
         Self(NonZeroUsize::new(x as usize))
     }
 
@@ -105,12 +112,12 @@ impl EdgeVecIx {
     }
 
     #[inline]
-    fn handle_ix(&self) -> usize {
+    pub(super) fn handle_ix(&self) -> usize {
         self.0
     }
 
     #[inline]
-    fn next_ix(&self) -> usize {
+    pub(super) fn next_ix(&self) -> usize {
         self.0 + 1
     }
 }

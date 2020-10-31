@@ -17,10 +17,13 @@ use crate::{
 
 pub mod edges;
 pub mod graph;
+pub mod sequence;
 
-pub use self::edges::EdgeListIx;
-use self::graph::{EdgeIx, EdgeLists, EdgeRecord, PackedSeqIter, Sequences};
+pub use self::edges::{
+    EdgeListIter, EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx,
+};
 pub use self::graph::{GraphIx, PackedGraph};
+use self::graph::{PackedSeqIter, Sequences};
 
 impl HandleGraph for PackedGraph {
     #[inline]
@@ -76,8 +79,7 @@ impl HandleGraph for PackedGraph {
     /// Return the total number of edges in the graph
     #[inline]
     fn edge_count(&self) -> usize {
-        self.edges.edge_lists.len() / EdgeLists::RECORD_SIZE
-        // need to make sure this is correct!
+        self.edges.len()
     }
 
     /// Sum up all the sequences in the graph
@@ -134,6 +136,8 @@ impl MutableHandleGraph for PackedGraph {
             right_g_ix.left_edges_ix()
         };
 
+        unimplemented!();
+        /*
         let right_next = self.get_edge_list_ix(left_edge_g_ix);
         let edge_ix = self.edges.append_record(right, right_next);
 
@@ -148,6 +152,7 @@ impl MutableHandleGraph for PackedGraph {
         let edge_ix = self.edges.append_record(left.flip(), left_next);
 
         self.graph_records.set(right_edge_g_ix, edge_ix.0 as u64);
+        */
     }
 
     fn divide_handle(
@@ -174,7 +179,10 @@ impl MutableHandleGraph for PackedGraph {
 
         let mut seq_iter = seq_iter;
 
-        for &offset in offsets.iter().skip(1) {
+        let mut lengths = Vec::with_capacity(offsets.len());
+
+        // for &offset in offsets.iter().skip(1) {
+        for &offset in offsets.iter() {
             let step = if handle.is_reverse() {
                 let v = last_ix - offset;
                 last_ix = offset;
@@ -184,10 +192,24 @@ impl MutableHandleGraph for PackedGraph {
                 last_ix = offset;
                 v
             };
-            let seq: Vec<u8> = seq_iter.by_ref().take(step).collect();
-            subseqs.push(seq);
+            lengths.push(step);
+            // let seq: Vec<u8> = seq_iter.by_ref().take(step).collect();
+            // subseqs.push(seq);
         }
 
+        let sec_ix = self.handle_graph_ix(handle).unwrap();
+        let sec_ix = sec_ix.to_seq_record_ix();
+
+        println!("{:?}", lengths);
+        let subseq_recs = self.sequences.divide_sequence(sec_ix, lengths);
+        println!("{:?}", subseq_recs);
+
+        for &i in subseq_recs.iter() {
+            let h = self.append_record_handle();
+            result.push(h);
+        }
+
+        /*
         // ensure the order of the subsequences is correct if the
         // handle was reversed
         if handle.is_reverse() {
@@ -203,6 +225,7 @@ impl MutableHandleGraph for PackedGraph {
         self.sequences
             .lengths
             .set(g_ix.to_seq_record_ix(), offsets[0] as u64);
+        */
 
         // Move the right-hand edges of the original handle to the
         // corresponding side of the new graph
@@ -303,20 +326,12 @@ impl<'a> AllHandles for &'a PackedGraph {
 
 /// Iterator for stepping through an edge list, returning Handles.
 pub struct EdgeListHandleIter<'a> {
-    edge_lists: &'a EdgeLists,
-    current: Option<EdgeRecord>,
-    finished: bool,
+    edge_list_iter: EdgeListIter<'a>,
 }
 
 impl<'a> EdgeListHandleIter<'a> {
-    fn new(graph: &'a PackedGraph, start: EdgeIx) -> Self {
-        let edge_lists = &graph.edges;
-        let current = edge_lists.get_record(start);
-        Self {
-            edge_lists,
-            current,
-            finished: false,
-        }
+    fn new(edge_list_iter: EdgeListIter<'a>) -> Self {
+        Self { edge_list_iter }
     }
 }
 
@@ -325,17 +340,8 @@ impl<'a> Iterator for EdgeListHandleIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<Handle> {
-        if self.finished {
-            return None;
-        }
-        if let Some(current) = self.current {
-            let item = current.handle;
-            self.current = self.edge_lists.next(current);
-            Some(item)
-        } else {
-            self.finished = true;
-            None
-        }
+        let (_, (handle, _)) = self.edge_list_iter.next()?;
+        Some(handle)
     }
 }
 
@@ -353,10 +359,11 @@ impl<'a> HandleNeighbors for &'a PackedGraph {
             (Dir::Right, true) => g_ix.left_edges_ix(),
             (Dir::Right, false) => g_ix.right_edges_ix(),
         };
+        unimplemented!();
 
-        let edge_ix = self.get_edge_list_ix(edge_list_ix);
+        // let edge_ix = self.get_edge_list_ix(edge_list_ix);
 
-        EdgeListHandleIter::new(self, edge_ix)
+        // EdgeListHandleIter::new(self, edge_ix)
     }
 }
 
