@@ -8,7 +8,7 @@ use gfa::{
 use crate::{
     handle::{Edge, Handle, NodeId},
     handlegraph::*,
-    mutablehandlegraph::MutableHandleGraph,
+    mutablehandlegraph::*,
     pathgraph::PathHandleGraph,
 };
 

@@ -1,7 +1,7 @@
 use crate::{
     handle::{Edge, Handle, NodeId},
     handlegraph::HandleGraphRef,
-    mutablehandlegraph::MutableHandleGraph,
+    mutablehandlegraph::*,
     pathgraph::PathHandleGraph,
 };
 
@@ -15,7 +15,7 @@ use bstr::BString;
 
 pub fn from_gfa<G, T>(gfa: &GFA<usize, T>) -> G
 where
-    G: Default + MutableHandleGraph + PathHandleGraph,
+    G: Default + AdditiveHandleGraph + PathHandleGraph,
     T: OptFields,
 {
     let mut graph: G = Default::default();
@@ -46,7 +46,7 @@ where
 
 pub fn fill_gfa_lines<G, I, T>(graph: &mut G, gfa_lines: I) -> GFAResult<()>
 where
-    G: MutableHandleGraph + PathHandleGraph,
+    G: AdditiveHandleGraph + PathHandleGraph,
     I: Iterator<Item = GFAResult<Line<usize, T>>>,
     T: OptFields,
 {

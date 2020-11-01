@@ -4,7 +4,7 @@ use bstr::BString;
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
-    mutablehandlegraph::MutableHandleGraph,
+    mutablehandlegraph::*,
     pathgraph::PathHandleGraph,
 };
 
@@ -119,7 +119,7 @@ impl<'a> HandleGraphRef for &'a HashGraph {
     }
 }
 
-impl MutableHandleGraph for HashGraph {
+impl AdditiveHandleGraph for HashGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {
         self.create_handle(sequence, self.max_id + 1)
     }
@@ -173,7 +173,9 @@ impl MutableHandleGraph for HashGraph {
             }
         }
     }
+}
 
+impl MutableHandleGraph for HashGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,

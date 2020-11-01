@@ -1,7 +1,7 @@
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
-    mutablehandlegraph::MutableHandleGraph,
+    mutablehandlegraph::{AdditiveHandleGraph, MutableHandleGraph},
 };
 
 pub mod edges;
@@ -120,7 +120,7 @@ impl<'a> HandleGraphRef for &'a PackedGraph {
     }
 }
 
-impl MutableHandleGraph for PackedGraph {
+impl AdditiveHandleGraph for PackedGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {
         let id = self.max_node_id() + 1;
         self.create_handle(sequence, id)
@@ -183,7 +183,9 @@ impl MutableHandleGraph for PackedGraph {
         self.nodes
             .set_edge_list(right_gix, right_edge_dir, right_to_left);
     }
+}
 
+impl MutableHandleGraph for PackedGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,

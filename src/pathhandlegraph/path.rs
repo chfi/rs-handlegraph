@@ -35,7 +35,7 @@ impl PathStep {
 }
 
 /// A step along a specific path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct StepHandle {
     path: PathId,
     step: PathStep,
