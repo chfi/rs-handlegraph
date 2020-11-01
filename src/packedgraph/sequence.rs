@@ -1,6 +1,6 @@
 use crate::packed::*;
 
-use super::graph::GraphRecordIx;
+use super::graph::{GraphRecordIx, NodeRecordId, RecordIndex};
 
 #[inline]
 const fn encode_dna_base(base: u8) -> u64 {
@@ -45,6 +45,7 @@ impl SeqRecordIx {
         Self(x.into())
     }
 
+    /*
     #[inline]
     pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Option<Self> {
         if g_ix.is_null() {
@@ -54,9 +55,29 @@ impl SeqRecordIx {
 
         Some(Self(s_ix))
     }
+    */
 
     #[inline]
     fn as_vec_ix(&self) -> usize {
+        self.0
+    }
+}
+
+impl RecordIndex for SeqRecordIx {
+    const RECORD_WIDTH: usize = 1;
+
+    #[inline]
+    fn from_node_record_id(id: NodeRecordId) -> Option<Self> {
+        id.to_zero_based().map(SeqRecordIx)
+    }
+
+    #[inline]
+    fn to_node_record_id(self) -> NodeRecordId {
+        NodeRecordId::from_zero_based(self.0)
+    }
+
+    #[inline]
+    fn to_vector_index(self, _: usize) -> usize {
         self.0
     }
 }
@@ -100,10 +121,10 @@ impl Sequences {
     #[must_use]
     pub(super) fn add_sequence(
         &mut self,
-        g_ix: GraphRecordIx,
+        rec_id: NodeRecordId,
         seq: &[u8],
     ) -> Option<SeqRecordIx> {
-        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix)?;
+        let seq_ix = SeqRecordIx::from_node_record_id(rec_id)?;
 
         let seq_len = seq.len() as u64;
         let seq_offset = self.sequences.len();
@@ -122,13 +143,13 @@ impl Sequences {
     /// as the old one.
     pub(super) fn overwrite_sequence(
         &mut self,
-        g_ix: GraphRecordIx,
+        rec_id: NodeRecordId,
         seq: &[u8],
     ) {
-        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
+        let seq_ix = SeqRecordIx::from_node_record_id(rec_id).unwrap();
 
-        let old_len = self.lengths.get(seq_ix.as_vec_ix()) as usize;
-        let offset = self.offsets.get(seq_ix.as_vec_ix()) as usize;
+        let old_len = self.lengths.get(seq_ix.to_vector_index(0)) as usize;
+        let offset = self.offsets.get(seq_ix.to_vector_index(0)) as usize;
 
         assert!(old_len == seq.len());
 
@@ -196,8 +217,8 @@ impl Sequences {
     }
 
     #[inline]
-    pub(super) fn length(&self, g_ix: GraphRecordIx) -> usize {
-        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
+    pub(super) fn length(&self, rec_id: NodeRecordId) -> usize {
+        let seq_ix = SeqRecordIx::from_node_record_id(rec_id).unwrap();
         self.lengths.get(seq_ix.as_vec_ix()) as usize
     }
 

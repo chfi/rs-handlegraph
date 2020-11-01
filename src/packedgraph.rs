@@ -6,6 +6,7 @@ use crate::{
 
 pub mod edges;
 pub mod graph;
+pub mod index;
 pub mod iter;
 pub mod nodes;
 pub mod paths;
@@ -14,6 +15,7 @@ pub mod sequence;
 pub use self::{
     edges::{EdgeListIter, EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx},
     graph::PackedGraph,
+    index::*,
     iter::{EdgeListHandleIter, PackedHandlesIter},
     nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords},
     paths::*,
@@ -88,8 +90,8 @@ impl<'a> HandleSequences for &'a PackedGraph {
 
     #[inline]
     fn sequence_iter(self, handle: Handle) -> Self::Sequence {
-        let g_ix = self.nodes.handle_record(handle).unwrap();
-        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix);
+        let rec_id = self.nodes.handle_record(handle).unwrap();
+        let seq_ix = SeqRecordIx::from_node_record_id(rec_id);
         self.nodes
             .sequences()
             .iter(seq_ix.unwrap(), handle.is_reverse())
@@ -224,7 +226,7 @@ impl MutableHandleGraph for PackedGraph {
         let seq_ix = self
             .nodes
             .handle_record(handle)
-            .and_then(SeqRecordIx::from_graph_record_ix)
+            .and_then(SeqRecordIx::from_node_record_id)
             .unwrap();
 
         // Split the sequence and get the new sequence records

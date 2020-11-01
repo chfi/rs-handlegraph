@@ -6,7 +6,7 @@ use crate::{
 
 use std::num::NonZeroUsize;
 
-use super::GraphRecordIx;
+use super::graph::{GraphRecordIx, NodeRecordId, RecordIndex};
 
 use crate::pathhandlegraph::*;
 
@@ -209,19 +209,20 @@ impl PathNameIx {
     pub(super) fn new<I: Into<usize>>(x: I) -> Self {
         Self(x.into())
     }
+}
 
-    #[inline]
-    pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Option<Self> {
-        if g_ix.is_null() {
-            return None;
-        }
-        let s_ix = (g_ix.as_vec_value() - 1) as usize;
+impl RecordIndex for PathNameIx {
+    const RECORD_WIDTH: usize = 1;
 
-        Some(Self(s_ix))
+    fn from_node_record_id(id: NodeRecordId) -> Option<Self> {
+        id.to_zero_based().map(PathNameIx)
     }
 
-    #[inline]
-    fn as_vec_ix(&self) -> usize {
+    fn to_node_record_id(self) -> NodeRecordId {
+        NodeRecordId::from_zero_based(self.0)
+    }
+
+    fn to_vector_index(self, _: usize) -> usize {
         self.0
     }
 }
@@ -260,7 +261,7 @@ impl PathNames {
         &self,
         ix: PathNameIx,
     ) -> Option<PackedIntVecIter<'_>> {
-        let vec_ix = ix.as_vec_ix();
+        let vec_ix = ix.to_vector_index(0);
         if vec_ix >= self.lengths.len() {
             return None;
         }
@@ -302,6 +303,7 @@ impl PackedGraphPaths {
     }
 }
 
+/*
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct NodeOccurIx(Option<NonZeroUsize>);
 
@@ -310,53 +312,77 @@ impl NodeOccurIx {
     fn new<I: Into<usize>>(x: I) -> Self {
         Self(NonZeroUsize::new(x.into()))
     }
+*/
 
-    #[inline]
-    fn from_zero_based<I: Into<usize>>(x: I) -> Self {
-        let x = x.into() + 1;
-        Self::new(x)
-    }
+/*
+#[inline]
+fn from_zero_based<I: Into<usize>>(x: I) -> Self {
+    let x = x.into() + 1;
+    Self::new(x)
+}
 
-    #[inline]
-    #[allow(dead_code)]
-    pub(super) fn empty() -> Self {
-        Self(None)
-    }
+#[inline]
+#[allow(dead_code)]
+pub(super) fn empty() -> Self {
+    Self(None)
+}
 
-    #[inline]
-    pub(super) fn is_null(&self) -> bool {
-        self.0.is_none()
-    }
+#[inline]
+pub(super) fn is_null(&self) -> bool {
+    self.0.is_none()
+}
 
-    #[inline]
-    pub(super) fn as_vec_value(&self) -> u64 {
-        match self.0 {
-            None => 0,
-            Some(v) => v.get() as u64,
-        }
-    }
-
-    #[inline]
-    pub(super) fn from_vec_value(x: u64) -> Self {
-        Self(NonZeroUsize::new(x as usize))
-    }
-
-    #[inline]
-    pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Self {
-        if g_ix.is_null() {
-            Self::empty()
-        } else {
-            let x = g_ix.as_vec_value() as usize;
-            Self::new(x)
-        }
-    }
-
-    #[inline]
-    pub(super) fn as_vec_ix(&self) -> Option<usize> {
-        let x = self.0?.get();
-        Some(x - 1)
+#[inline]
+pub(super) fn as_vec_value(&self) -> u64 {
+    match self.0 {
+        None => 0,
+        Some(v) => v.get() as u64,
     }
 }
+
+#[inline]
+pub(super) fn from_vec_value(x: u64) -> Self {
+    Self(NonZeroUsize::new(x as usize))
+}
+
+#[inline]
+pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Self {
+    if g_ix.is_null() {
+        Self::empty()
+    } else {
+        let x = g_ix.as_vec_value() as usize;
+        Self::new(x)
+    }
+}
+
+#[inline]
+pub(super) fn as_vec_ix(&self) -> Option<usize> {
+    let x = self.0?.get();
+    Some(x - 1)
+}
+*/
+// }
+
+/*
+impl RecordIndex for NodeOccurIx {
+    const RECORD_WIDTH: usize = 1;
+
+    #[inline]
+    fn from_node_record_id(id: NodeRecordId) -> Option<Self> {
+        id.to_zero_based().map(NodeOccurIx)
+    }
+
+    #[inline]
+    fn to_node_record_id(self) -> NodeRecordId {
+        NodeRecordId::from_zero_based(self.0)
+    }
+
+    #[inline]
+    fn to_vector_index(self, _: usize) -> usize {
+        self.0
+    }
+}
+*/
 
 pub struct OccurRecord {
     path_id: PathId,
@@ -387,7 +413,7 @@ pub type NodeOccurRecordIx = usize;
 impl NodeOccurrences {
     pub(super) fn append_record(
         &mut self,
-        g_ix: GraphRecordIx,
+        rec_id: NodeRecordId,
     ) -> Option<NodeOccurRecordIx> {
         let node_rec_ix = self.path_ids.len();
 

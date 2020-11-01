@@ -5,8 +5,13 @@ use crate::{
 
 use std::num::NonZeroUsize;
 
-use super::paths::{NodeOccurIx, NodeOccurRecordIx};
-use super::{edges::EdgeListIx, graph::NARROW_PAGE_WIDTH, sequence::Sequences};
+use super::paths::NodeOccurRecordIx;
+use super::{
+    edges::EdgeListIx,
+    graph::NARROW_PAGE_WIDTH,
+    index::{NodeRecordId, RecordIndex},
+    sequence::Sequences,
+};
 
 /// The index for a graph record. Valid indices are natural numbers
 /// above zero, each denoting a 2-element record. An index of zero
@@ -14,6 +19,7 @@ use super::{edges::EdgeListIx, graph::NARROW_PAGE_WIDTH, sequence::Sequences};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GraphRecordIx(Option<NonZeroUsize>);
 
+/*
 impl GraphRecordIx {
     /// Create a new `GraphRecordIx` by wrapping a `usize`. Should only
     /// be used in the PackedGraph graph record internals.
@@ -68,6 +74,7 @@ impl GraphRecordIx {
         Some(GraphVecIx((x - 1) * 2))
     }
 }
+*/
 
 /// The index into the underlying packed vector that is used to
 /// represent the graph records that hold pointers to the two edge
@@ -79,24 +86,26 @@ impl GraphRecordIx {
 #[repr(transparent)]
 pub struct GraphVecIx(usize);
 
+impl RecordIndex for GraphVecIx {
+    const RECORD_WIDTH: usize = 2;
+
+    #[inline]
+    fn from_node_record_id(id: NodeRecordId) -> Option<Self> {
+        id.to_record_ix(Self::RECORD_WIDTH).map(GraphVecIx)
+    }
+
+    #[inline]
+    fn to_node_record_id(self) -> NodeRecordId {
+        NodeRecordId::from_record_ix(self.0, Self::RECORD_WIDTH)
+    }
+
+    #[inline]
+    fn to_vector_index(self, offset: usize) -> usize {
+        self.0 + offset
+    }
+}
+
 impl GraphVecIx {
-    /// Create a new `GraphVecIx` by wrapping a `usize`. Should only be
-    /// used in the PackedGraph graph record internals.
-    #[inline]
-    pub(super) fn new<I: Into<usize>>(x: I) -> Self {
-        Self(x.into())
-    }
-
-    /// Transforms the `GraphVecIx` into an index that denotes a graph
-    /// record. The resulting `GraphRecordIx` will always contain a
-    /// value, never `None`.
-    ///
-    /// `x -> (x / 2) + 1`
-    #[inline]
-    pub(super) fn as_record_ix(&self) -> GraphRecordIx {
-        GraphRecordIx::new((self.0 / 2) + 1)
-    }
-
     #[inline]
     pub(super) fn left_edges_ix(&self) -> usize {
         self.0
@@ -106,13 +115,6 @@ impl GraphVecIx {
     pub(super) fn right_edges_ix(&self) -> usize {
         self.0 + 1
     }
-
-    /*
-    #[inline]
-    pub(super) fn seq_record_ix(&self) -> usize {
-        self.0 / 2
-    }
-    */
 }
 
 #[derive(Debug, Clone)]
@@ -145,7 +147,7 @@ impl NodeIdIndexMap {
     /// with the given target `GraphRecordIx`.
     ///
     /// Returns `true` if the NodeId was successfully appended.
-    fn append_node_id(&mut self, id: NodeId, next_ix: GraphRecordIx) -> bool {
+    fn append_node_id(&mut self, id: NodeId, next_ix: NodeRecordId) -> bool {
         let id = u64::from(id);
         if id == 0 {
             return false;
@@ -177,7 +179,7 @@ impl NodeIdIndexMap {
         let index = id - self.min_id;
         let value = next_ix;
 
-        self.deque.set(index as usize, value.as_vec_value());
+        self.deque.set(index as usize, value.to_vector_value());
 
         true
     }
@@ -188,15 +190,15 @@ impl NodeIdIndexMap {
     }
 
     #[inline]
-    fn get_index<I: Into<NodeId>>(&self, id: I) -> Option<GraphRecordIx> {
+    fn get_index<I: Into<NodeId>>(&self, id: I) -> Option<NodeRecordId> {
         let id = u64::from(id.into());
         if id < self.min_id || id > self.max_id {
             return None;
         }
         let index = id - self.min_id;
         let value = self.deque.get(index as usize);
-        let rec_ix = GraphRecordIx::from_vec_value(value);
-        Some(rec_ix)
+        let rec_id = NodeRecordId::from_vector_value(value);
+        Some(rec_id)
     }
 }
 
@@ -255,10 +257,10 @@ impl NodeRecords {
 
     /// Return the `GraphRecordIx` that will be used by the next node
     /// that's inserted into the graph.
-    fn next_graph_ix(&self) -> GraphRecordIx {
+    fn next_graph_ix(&self) -> NodeRecordId {
         let rec_count = self.records_vec.len();
-        let vec_ix = GraphVecIx::new(rec_count);
-        vec_ix.as_record_ix()
+        let rec_id = NodeRecordId::from_zero_based(rec_count);
+        rec_id
     }
 
     pub(super) fn sequences(&self) -> &Sequences {
@@ -270,13 +272,13 @@ impl NodeRecords {
     }
 
     /// Append a new node graph record, using the provided
-    /// `GraphRecordIx` no ensure that the record index is correctly
+    /// `NodeRecordId` no ensure that the record index is correctly
     /// synced.
     #[must_use]
     fn append_node_graph_record(
         &mut self,
-        g_rec_ix: GraphRecordIx,
-    ) -> Option<GraphRecordIx> {
+        g_rec_ix: NodeRecordId,
+    ) -> Option<NodeRecordId> {
         if self.next_graph_ix() != g_rec_ix {
             return None;
         }
@@ -315,10 +317,7 @@ impl NodeRecords {
     }
     */
 
-    pub(super) fn insert_node(
-        &mut self,
-        n_id: NodeId,
-    ) -> Option<GraphRecordIx> {
+    pub(super) fn insert_node(&mut self, n_id: NodeId) -> Option<NodeRecordId> {
         if n_id == NodeId::from(0) {
             return None;
         }
@@ -340,10 +339,10 @@ impl NodeRecords {
     #[inline]
     pub(super) fn get_edge_list(
         &self,
-        g_ix: GraphRecordIx,
+        rec_id: NodeRecordId,
         dir: Direction,
     ) -> EdgeListIx {
-        match g_ix.as_vec_ix() {
+        match GraphVecIx::from_node_record_id(rec_id) {
             None => EdgeListIx::empty(),
             Some(vec_ix) => {
                 let ix = match dir {
@@ -359,11 +358,11 @@ impl NodeRecords {
     #[inline]
     pub(super) fn set_edge_list(
         &mut self,
-        g_ix: GraphRecordIx,
+        rec_id: NodeRecordId,
         dir: Direction,
         new_edge: EdgeListIx,
     ) -> Option<()> {
-        let vec_ix = g_ix.as_vec_ix()?;
+        let vec_ix = GraphVecIx::from_node_record_id(rec_id)?;
 
         let ix = match dir {
             Direction::Right => vec_ix.right_edges_ix(),
@@ -377,9 +376,9 @@ impl NodeRecords {
     #[inline]
     pub(super) fn get_node_edge_lists(
         &self,
-        g_ix: GraphRecordIx,
+        rec_id: NodeRecordId,
     ) -> Option<(EdgeListIx, EdgeListIx)> {
-        let vec_ix = g_ix.as_vec_ix()?;
+        let vec_ix = GraphVecIx::from_node_record_id(rec_id)?;
 
         let left = vec_ix.left_edges_ix();
         let left = EdgeListIx::from_vec_value(self.records_vec.get(left));
@@ -393,11 +392,12 @@ impl NodeRecords {
     #[allow(dead_code)]
     pub(super) fn set_node_edge_lists(
         &mut self,
-        g_ix: GraphRecordIx,
+        rec_id: NodeRecordId,
         left: EdgeListIx,
         right: EdgeListIx,
     ) -> Option<()> {
-        let vec_ix = g_ix.as_vec_ix()?;
+        let vec_ix = GraphVecIx::from_node_record_id(rec_id)?;
+
         let left_ix = vec_ix.left_edges_ix();
         let right_ix = vec_ix.right_edges_ix();
         self.records_vec.set(left_ix, left.as_vec_value());
@@ -408,14 +408,15 @@ impl NodeRecords {
     #[inline]
     pub(super) fn update_node_edge_lists<F>(
         &mut self,
-        g_ix: GraphRecordIx,
+        rec_id: NodeRecordId,
         f: F,
     ) -> Option<()>
     where
         F: Fn(EdgeListIx, EdgeListIx) -> (EdgeListIx, EdgeListIx),
     {
-        let vec_ix = g_ix.as_vec_ix()?;
-        let (left_rec, right_rec) = self.get_node_edge_lists(g_ix)?;
+        let vec_ix = GraphVecIx::from_node_record_id(rec_id)?;
+
+        let (left_rec, right_rec) = self.get_node_edge_lists(rec_id)?;
 
         let (new_left, new_right) = f(left_rec, right_rec);
 
@@ -430,7 +431,7 @@ impl NodeRecords {
         &mut self,
         n_id: I,
         seq: &[u8],
-    ) -> Option<GraphRecordIx> {
+    ) -> Option<NodeRecordId> {
         let n_id = n_id.into();
         // update the node ID/graph index map
         let g_ix = self.insert_node(n_id)?;
@@ -448,7 +449,7 @@ impl NodeRecords {
     }
 
     #[inline]
-    pub(super) fn handle_record(&self, h: Handle) -> Option<GraphRecordIx> {
+    pub(super) fn handle_record(&self, h: Handle) -> Option<NodeRecordId> {
         self.id_index_map.get_index(h.id())
     }
 }
