@@ -5,6 +5,7 @@ use crate::{
 
 use std::num::NonZeroUsize;
 
+use super::paths::{NodeOccurIx, NodeOccurRecordIx};
 use super::{edges::EdgeListIx, graph::NARROW_PAGE_WIDTH, sequence::Sequences};
 
 /// The index for a graph record. Valid indices are natural numbers
@@ -205,6 +206,7 @@ pub struct NodeRecords {
     id_index_map: NodeIdIndexMap,
     sequences: Sequences,
     removed_nodes: Vec<NodeId>,
+    node_occurrence_map: PagedIntVec,
 }
 
 impl Default for NodeRecords {
@@ -214,6 +216,9 @@ impl Default for NodeRecords {
             id_index_map: Default::default(),
             sequences: Default::default(),
             removed_nodes: Vec::new(),
+            node_occurrence_map: PagedIntVec::new(
+                super::graph::NARROW_PAGE_WIDTH,
+            ),
         }
     }
 }
@@ -277,8 +282,38 @@ impl NodeRecords {
         }
         self.records_vec.append(0);
         self.records_vec.append(0);
+        self.node_occurrence_map.append(0);
         Some(g_rec_ix)
     }
+
+    /*
+    pub(super) fn handle_occurrence_link(
+        &self,
+        handle: Handle,
+    ) -> Option<NodeOccurIx> {
+        let g_ix = self.handle_record(handle)?;
+
+        Some(NodeOccurIx::from_graph_record_ix(g_ix))
+    }
+
+    pub(super) fn handle_occurrence_record_ix(
+        &self,
+        handle: Handle,
+    ) -> Option<NodeOccurRecordIx> {
+        let occur_ix = self.handle_occurrence_link(handle)?;
+        let rec_ix = self.node_occurrence_map.get(occur_ix) as usize;
+        Some(rec_ix)
+    }
+
+    pub(super) fn set_handle_occurrence_record_head(
+        &mut self,
+        handle: Handle,
+        record_ix: NodeOccurRecordIx,
+    ) {
+        let occur_ix = self.handle_occurrence_link(handle).unwrap();
+        self.node_occurrence_map.set(occur_ix, record_ix as u64);
+    }
+    */
 
     pub(super) fn insert_node(
         &mut self,
