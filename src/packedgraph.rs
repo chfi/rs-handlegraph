@@ -95,8 +95,10 @@ impl<'a> HandleSequences for &'a PackedGraph {
     #[inline]
     fn sequence_iter(self, handle: Handle) -> Self::Sequence {
         let g_ix = self.nodes.handle_record(handle).unwrap();
-        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
-        self.nodes.sequences().iter(seq_ix, handle.is_reverse())
+        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix);
+        self.nodes
+            .sequences()
+            .iter(seq_ix.unwrap(), handle.is_reverse())
     }
 
     #[inline]
@@ -207,96 +209,105 @@ impl MutableHandleGraph for PackedGraph {
     ) -> Vec<Handle> {
         let mut result = vec![handle];
 
-        unimplemented!();
-
-        /*
-        let node_len = self.length(handle);
+        let node_len = self.node_len(handle);
 
         let fwd_handle = handle.forward();
 
-        let seq_iter = self.sequence_iter(fwd_handle);
+        let mut lengths = Vec::with_capacity(offsets.len() + 1);
 
-        let mut subseqs: Vec<Vec<u8>> = Vec::with_capacity(offsets.len() + 1);
+        let mut last_offset = 0;
+        let mut total_len = 0;
 
-        offsets.push(seq_iter.len());
-
-        let mut last_ix = if handle.is_reverse() {
-            seq_iter.len()
-        } else {
-            0
-        };
-
-        let mut seq_iter = seq_iter;
-
-        let mut lengths = Vec::with_capacity(offsets.len());
-
-        // for &offset in offsets.iter().skip(1) {
         for &offset in offsets.iter() {
-            let step = if handle.is_reverse() {
-                let v = last_ix - offset;
-                last_ix = offset;
-                v
-            } else {
-                let v = offset - last_ix;
-                last_ix = offset;
-                v
-            };
-            lengths.push(step);
-            // let seq: Vec<u8> = seq_iter.by_ref().take(step).collect();
-            // subseqs.push(seq);
+            let len = offset - last_offset;
+            total_len += len;
+            lengths.push(len);
+            last_offset = offset;
         }
 
-        let sec_ix = self.handle_graph_ix(handle).unwrap();
-        let sec_ix = sec_ix.to_seq_record_ix();
-
-        println!("{:?}", lengths);
-        let subseq_recs = self.sequences.divide_sequence(sec_ix, lengths);
-        println!("{:?}", subseq_recs);
-
-        for &i in subseq_recs.iter() {
-            let h = self.append_record_handle();
-            result.push(h);
+        if total_len < node_len {
+            let len = node_len - total_len;
+            lengths.push(len);
         }
-        */
 
-        /*
-        // ensure the order of the subsequences is correct if the
-        // handle was reversed
         if handle.is_reverse() {
-            subseqs.reverse();
+            lengths.reverse();
         }
 
-        for mut seq in subseqs {
-            let h = self.append_handle(&seq);
+        // let g_ix = self.nodes.handle_record(handle).unwrap();
+        // let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
+
+        let seq_ix = self
+            .nodes
+            .handle_record(handle)
+            .and_then(SeqRecordIx::from_graph_record_ix)
+            .unwrap();
+
+        // Split the sequence and get the new sequence records
+        let new_seq_ixs =
+            self.nodes.sequences_mut().split_sequence(seq_ix, &lengths);
+
+        if new_seq_ixs.is_none() {
+            panic!(
+                "Something went wrong when \
+                 dividing the handle {:?} with offsets {:#?}",
+                handle, offsets
+            );
+        }
+
+        let new_seq_ixs = new_seq_ixs.unwrap();
+
+        // Add new nodes and graph records for the new sequence records
+
+        for &s_ix in new_seq_ixs.iter() {
+            let n_id = self.nodes.append_empty_node();
+            let h = Handle::pack(n_id, false);
             result.push(h);
         }
 
-        let g_ix = self.handle_graph_ix(handle).unwrap();
-        self.sequences
-            .lengths
-            .set(g_ix.to_seq_record_ix(), offsets[0] as u64);
-        */
-        /*
+        let handle_gix = self.nodes.handle_record(handle).unwrap();
+
+        let last_handle = *result.last().unwrap();
+        let last_gix = self.nodes.handle_record(last_handle).unwrap();
 
         // Move the right-hand edges of the original handle to the
         // corresponding side of the new graph
-        let old_right_edges_ix =
-            self.handle_edge_record_ix(handle, Direction::Right);
-        let new_right_edges_ix = self
-            .handle_edge_record_ix(*result.last().unwrap(), Direction::Right);
+        let old_right_record_edges =
+            self.nodes.get_edge_list(handle_gix, Direction::Right);
 
-        self.swap_graph_record_elements(old_right_edges_ix, new_right_edges_ix);
+        let new_right_edges_head = self.nodes.set_edge_list(
+            last_gix,
+            Direction::Right,
+            old_right_record_edges,
+        );
+
+        // Remove the right-hand edges of the original handle
+        self.nodes.set_edge_list(
+            handle_gix,
+            Direction::Right,
+            EdgeListIx::empty(),
+        );
 
         // Update back references for the nodes connected to the
         // right-hand side of the original handle
+
+        // Get the edge lists with the back references
         let right_neighbors = self
-            .neighbors(handle, Direction::Right)
-            .map(|h| self.handle_edge_record_ix(h, Direction::Left))
+            .neighbors(last_handle, Direction::Right)
+            .map(|h| {
+                let g_ix = self.nodes.handle_record(h).unwrap();
+                self.nodes.get_edge_list(g_ix, Direction::Left)
+            })
             .collect::<Vec<_>>();
 
-        let new_right_edge = self.graph_records.get(new_right_edges_ix);
-        for ix in right_neighbors {
-            self.graph_records.set(ix, new_right_edge);
+        // Update the corresponding edge record in each of the
+        // neighbor back reference lists
+        for edge_list in right_neighbors {
+            self.edges.update_edge_record(
+                edge_list,
+                |_, (h, _)| h == handle,
+                |(_, n)| (last_handle, n),
+            );
         }
 
         // create edges between the new segments
@@ -309,7 +320,6 @@ impl MutableHandleGraph for PackedGraph {
         // TODO update paths and occurrences once they're implmented
 
         result
-            */
     }
 
     fn apply_orientation(&mut self, handle: Handle) -> Handle {
@@ -332,36 +342,66 @@ mod tests {
 
     #[test]
     fn packedgraph_divide_handle() {
-        let mut graph = PackedGraph::new();
-        graph.append_handle(b"GTCA");
-        graph.append_handle(b"AAGTGCTAGT");
-        graph.append_handle(b"ATA");
+        use bstr::B;
 
-        println!("before split");
-        for h in graph.all_handles() {
-            let seq: BString = graph.sequence(h).into();
-            println!("{:?}\t{}", h.id(), seq);
-        }
+        let mut graph = PackedGraph::new();
+        let h1 = graph.append_handle(b"GTCA");
+        let h2 = graph.append_handle(b"AAGTGCTAGT");
+        let h3 = graph.append_handle(b"ATA");
+        let h4 = graph.append_handle(b"AA");
+        let h5 = graph.append_handle(b"GG");
 
         let hnd = |x: u64| Handle::pack(x, false);
+        let r_hnd = |x: u64| Handle::pack(x, true);
 
         let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
+        let r_edge = |l: u64, r: u64| Edge(r_hnd(l), r_hnd(r));
+
+        let bseq =
+            |g: &PackedGraph, x: u64| -> BString { g.sequence(hnd(x)).into() };
+
+        /*
+           1-
+             \ /-----3
+              2     /
+             / \   /
+           4-   -5-
+        */
 
         graph.create_edge(edge(1, 2));
+        graph.create_edge(edge(4, 2));
+
         graph.create_edge(edge(2, 3));
+        graph.create_edge(edge(2, 5));
+
+        graph.create_edge(edge(5, 3));
 
         let new_hs = graph.divide_handle(hnd(2), vec![3, 7, 9]);
 
-        println!("after split");
-        println!("{:?}", new_hs);
+        assert_eq!(bseq(&graph, 2), B("AAG"));
 
-        for Edge(l, r) in graph.all_edges() {
-            println!("{:?}\t{:?}", l.id(), r.id());
-        }
+        let new_seqs: Vec<BString> =
+            new_hs.iter().map(|h| graph.sequence(*h).into()).collect();
 
-        for h in graph.all_handles() {
-            let seq: BString = graph.sequence(h).into();
-            println!("{:?}\t{}", h.id(), seq);
-        }
+        // The sequence is correctly split
+        assert_eq!(new_seqs, vec![B("AAG"), B("TGCT"), B("AG"), B("T")]);
+
+        let mut edges = graph.all_edges().collect::<Vec<_>>();
+        edges.sort();
+
+        // The edges are all correct
+        assert_eq!(
+            edges,
+            vec![
+                edge(1, 2),
+                edge(2, 6),
+                r_edge(2, 4),
+                r_edge(3, 5),
+                r_edge(3, 8),
+                r_edge(5, 8),
+                edge(6, 7),
+                edge(7, 8)
+            ]
+        );
     }
 }

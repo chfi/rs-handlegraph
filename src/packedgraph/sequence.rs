@@ -63,8 +63,12 @@ impl SeqRecordIx {
 
     #[inline]
     pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Option<Self> {
-        let vec_ix = g_ix.as_vec_ix()?;
-        Some(Self(vec_ix.seq_record_ix()))
+        if g_ix.is_null() {
+            return None;
+        }
+        let s_ix = (g_ix.as_vec_value() - 1) as usize;
+
+        Some(Self(s_ix))
     }
 
     #[inline]
@@ -99,16 +103,8 @@ impl Default for Sequences {
 }
 
 impl Sequences {
-    /// Add a new, empty sequence record if the next sequence record
-    /// index matches the provided graph record index. If they do not
-    /// match, abort and return `false`, return `true` if the records
-    /// were successfully appended.
-    pub(super) fn append_empty_record(&mut self, g_ix: GraphRecordIx) -> bool {
-        let seq_ix = SeqRecordIx::new(self.lengths.len());
-        let seq_g_ix = seq_ix.as_graph_record_ix();
-        if seq_g_ix != g_ix {
-            return false;
-        }
+    /// Add a new, empty sequence record.
+    pub(super) fn append_empty_record(&mut self) -> bool {
         self.lengths.append(0);
         self.offsets.append(0);
         true
@@ -127,22 +123,19 @@ impl Sequences {
         seq_ix
     }
 
+    /// Adds a sequence and updates the sequence records for the provided `GraphRecordIx` to the correct length and offset.
     #[must_use]
-    pub(super) fn append_sequence(
+    pub(super) fn add_sequence(
         &mut self,
         g_ix: GraphRecordIx,
         seq: &[u8],
     ) -> Option<SeqRecordIx> {
-        let seq_ix = SeqRecordIx::new(self.lengths.len());
-
-        if !self.append_empty_record(g_ix) {
-            return None;
-        }
+        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix)?;
 
         let seq_len = seq.len() as u64;
-        self.lengths.set(seq_ix.as_vec_ix(), seq_len as u64);
-
         let seq_offset = self.sequences.len();
+
+        self.lengths.set(seq_ix.as_vec_ix(), seq_len);
         self.offsets.set(seq_ix.as_vec_ix(), seq_offset as u64);
 
         seq.iter()
@@ -375,8 +368,9 @@ mod tests {
     fn packedgraph_split_sequence() {
         let mut seqs = Sequences::default();
         let g0 = GraphRecordIx::from_vec_value(1);
+        seqs.append_empty_record();
 
-        let s0 = seqs.append_sequence(g0, b"GTCCACTTTGTGT").unwrap();
+        let s0 = seqs.add_sequence(g0, b"GTCCACTTTGTGT").unwrap();
         use bstr::{BString, B};
 
         let hnd = |x: u64| Handle::pack(x, false);

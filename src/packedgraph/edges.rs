@@ -240,6 +240,32 @@ impl EdgeLists {
         EdgeListIter::new(self, ix)
     }
 
+    /// Updates the first edge record in the provided edge list that
+    /// fulfills the predicate `pred`, using the provided update
+    /// function `f`.
+    ///
+    /// If no edge record fulfills the predicate, does nothing and
+    /// return `false`. Returns `true` if a record was updated.
+    pub(super) fn update_edge_record<P, F>(
+        &mut self,
+        start: EdgeListIx,
+        pred: P,
+        f: F,
+    ) -> bool
+    where
+        P: Fn(EdgeListIx, EdgeRecord) -> bool,
+        F: Fn(EdgeRecord) -> EdgeRecord,
+    {
+        let entry = self.iter(start).find(|&(ix, rec)| pred(ix, rec));
+        if let Some((edge_ix, record)) = entry {
+            let (handle, next) = f(record);
+            self.set_record(edge_ix, handle, next);
+            true
+        } else {
+            false
+        }
+    }
+
     /// In the linked list that starts at the provided index, find the
     /// first edge record that fulfills the provided predicate, and
     /// remove it if it exists. Returns the index of the new start of

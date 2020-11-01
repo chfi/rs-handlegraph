@@ -16,6 +16,8 @@ use crate::{
     packed::*,
 };
 
+use bstr::{ByteSlice, ByteVec};
+
 use std::num::NonZeroUsize;
 
 use super::edges::{EdgeListIter, EdgeListIx, EdgeLists, EdgeVecIx};
@@ -276,6 +278,10 @@ impl NodeRecords {
         &self.sequences
     }
 
+    pub(super) fn sequences_mut(&mut self) -> &mut Sequences {
+        &mut self.sequences
+    }
+
     /// Append a new node graph record, using the provided
     /// `GraphRecordIx` no ensure that the record index is correctly
     /// synced.
@@ -302,18 +308,13 @@ impl NodeRecords {
 
         let next_ix = self.next_graph_ix();
 
-        // Make sure the sequences and graph record indices are synced
-        if self.sequences.expected_next_record() != next_ix {
-            return None;
-        }
-
         // Make sure the node ID is valid and doesn't already exist
         if !self.id_index_map.append_node_id(n_id, next_ix) {
             return None;
         }
 
         // append the sequence and graph records
-        self.sequences.append_empty_record(next_ix);
+        self.sequences.append_empty_record();
         let record_ix = self.append_node_graph_record(next_ix)?;
 
         Some(record_ix)
@@ -417,9 +418,15 @@ impl NodeRecords {
         let g_ix = self.insert_node(n_id)?;
 
         // insert the sequence
-        let s_ix = self.sequences.append_sequence(g_ix, seq)?;
+        let s_ix = self.sequences.add_sequence(g_ix, seq)?;
 
         Some(g_ix)
+    }
+
+    pub(super) fn append_empty_node(&mut self) -> NodeId {
+        let n_id = NodeId::from(self.id_index_map.max_id + 1);
+        let _g_ix = self.insert_node(n_id).unwrap();
+        n_id
     }
 
     #[inline]
