@@ -8,6 +8,7 @@ pub mod edges;
 pub mod graph;
 pub mod iter;
 pub mod nodes;
+pub mod paths;
 pub mod sequence;
 
 pub use self::{
@@ -15,6 +16,7 @@ pub use self::{
     graph::PackedGraph,
     iter::{EdgeListHandleIter, PackedHandlesIter},
     nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords},
+    paths::*,
 };
 
 use self::graph::{PackedSeqIter, SeqRecordIx};
