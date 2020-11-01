@@ -92,13 +92,15 @@ impl PackedPath {
             self.tail = self.head;
         }
 
-        self.links.append(ix as u64);
+        self.links.append(ix.as_vec_value());
         self.links.append(0);
 
         if !self.tail.is_null() {
             // this is definitely super wrong
-            self.links
-                .set(ix - 1, self.tail.to_zero_based().unwrap() as u64);
+            self.links.set(
+                (ix.as_vec_value() - 1) as usize,
+                self.tail.to_zero_based().unwrap() as u64,
+            );
         }
 
         ix
@@ -120,8 +122,10 @@ impl PackedPath {
 
         // if !self.tail.is_null() {
         // this is definitely super wrong
-        self.links
-            .set(ix - 1, self.tail.to_zero_based().unwrap() as u64);
+        self.links.set(
+            (ix.as_vec_value() - 1) as usize,
+            self.tail.to_zero_based().unwrap() as u64,
+        );
         // }
 
         ix
@@ -155,6 +159,147 @@ impl<'a> PackedPathSteps<'a> {
         let link = self.current_step += 1;
     }
     */
+}
+
+pub struct PathPropertyRecord {
+    head_ptr: usize,
+    tail_ptr: usize,
+    deleted: bool,
+    circular: bool,
+    deleted_steps: usize,
+}
+
+pub struct PathProperties {
+    heads: PagedIntVec,
+    tails: PagedIntVec,
+    deleted: PackedIntVec,
+    circular: PackedIntVec,
+    deleted_steps: PackedIntVec,
+}
+
+impl Default for PathProperties {
+    fn default() -> PathProperties {
+        Self {
+            heads: PagedIntVec::new(super::graph::WIDE_PAGE_WIDTH),
+            tails: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
+            deleted: Default::default(),
+            circular: Default::default(),
+            deleted_steps: Default::default(),
+        }
+    }
+}
+
+impl PathProperties {
+    fn append_record(&mut self) {
+        self.heads.append(0);
+        self.tails.append(0);
+        self.deleted.append(0);
+        self.circular.append(0);
+        self.deleted_steps.append(0);
+    }
+}
+
+// An index into both the offset record and the length record for some
+// path name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PathNameIx(usize);
+
+impl PathNameIx {
+    #[inline]
+    pub(super) fn new<I: Into<usize>>(x: I) -> Self {
+        Self(x.into())
+    }
+
+    #[inline]
+    pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Option<Self> {
+        if g_ix.is_null() {
+            return None;
+        }
+        let s_ix = (g_ix.as_vec_value() - 1) as usize;
+
+        Some(Self(s_ix))
+    }
+
+    #[inline]
+    fn as_vec_ix(&self) -> usize {
+        self.0
+    }
+}
+
+pub struct PathNames {
+    names: PackedIntVec,
+    lengths: PackedIntVec,
+    offsets: PagedIntVec,
+}
+
+impl Default for PathNames {
+    fn default() -> Self {
+        PathNames {
+            names: Default::default(),
+            lengths: Default::default(),
+            offsets: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
+        }
+    }
+}
+
+impl PathNames {
+    pub(super) fn add_name(&mut self, name: &[u8]) -> PathNameIx {
+        let name_ix = PathNameIx::new(self.lengths.len());
+
+        let name_len = name.len() as u64;
+        let name_offset = self.lengths.len() as u64;
+        self.lengths.append(name_len);
+        self.offsets.append(name_offset);
+
+        name.iter().for_each(|&b| self.names.append(b as u64));
+
+        name_ix
+    }
+
+    pub(super) fn name_iter(
+        &self,
+        ix: PathNameIx,
+    ) -> Option<PackedIntVecIter<'_>> {
+        let vec_ix = ix.as_vec_ix();
+        if vec_ix >= self.lengths.len() {
+            return None;
+        }
+
+        let offset = self.offsets.get(vec_ix) as usize;
+        let len = self.lengths.get(vec_ix) as usize;
+        let iter = self.names.iter_slice(offset, len);
+
+        Some(iter)
+    }
+}
+
+pub struct PackedGraphPaths {
+    paths: Vec<PackedPath>,
+    path_props: PathProperties,
+    path_names: PathNames,
+}
+
+impl Default for PackedGraphPaths {
+    fn default() -> Self {
+        Self {
+            paths: Vec::new(),
+            path_props: Default::default(),
+            path_names: Default::default(),
+        }
+    }
+}
+
+impl PackedGraphPaths {
+    pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
+        let path_id = self.path_names.lengths.len() as u64;
+        let packed_path = PackedPath::new(PathId(path_id));
+        self.paths.push(packed_path);
+
+        self.path_props.append_record();
+        let name_ix = self.path_names.add_name(name);
+
+        PathId(path_id)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -197,7 +342,7 @@ impl NodeOccurIx {
     }
 
     #[inline]
-    fn from_graph_record_ix(g_ix: GraphRecordIx) -> Self {
+    pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Self {
         if g_ix.is_null() {
             Self::empty()
         } else {
@@ -265,8 +410,8 @@ impl NodeOccurrences {
         }
 
         self.path_ids.set(ix, path_id.0);
-        self.node_occur_offsets.set(offset as u64);
-        self.node_occur_next.set(next as u64);
+        self.node_occur_offsets.set(ix, offset as u64);
+        self.node_occur_next.set(ix, next as u64);
 
         true
     }
