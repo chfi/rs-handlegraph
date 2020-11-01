@@ -17,61 +17,6 @@ pub struct EdgeListIx(Option<NonZeroUsize>);
 
 crate::impl_one_based_index!(EdgeListIx);
 
-impl EdgeListIx {
-    /// Create a new `EdgeListIx` by wrapping a `usize`. Should only
-    /// be used in the PackedGraph edge list internals.
-    ///
-    /// If `x` is zero, the result will be `EdgeListIx(None)`.
-    #[inline]
-    fn new<I: Into<usize>>(x: I) -> Self {
-        Self(NonZeroUsize::new(x.into()))
-    }
-
-    /// Returns the "null", or empty `EdgeListIx`, i.e. the one that
-    /// represents the empty list when used as a pointer in an edge
-    /// list.
-    pub(super) fn empty() -> Self {
-        Self(None)
-    }
-
-    /// Returns `true` if the provided `EdgeListIx` represents the
-    /// empty list.
-    #[inline]
-    #[allow(dead_code)]
-    pub(super) fn is_empty(&self) -> bool {
-        self.0.is_none()
-    }
-
-    /// Unwrap the `EdgeListIx` into a `u64` for use in a packed
-    /// vector. Should never be used other than when setting the
-    /// `next` field of an edge list record.
-    #[inline]
-    pub(super) fn as_vec_value(&self) -> u64 {
-        match self.0 {
-            None => 0,
-            Some(v) => v.get() as u64,
-        }
-    }
-
-    /// Wrap a `u64`, e.g. a value from a packed vector element, as an
-    /// `EdgeListIx`.
-    #[inline]
-    pub(super) fn from_vec_value(x: u64) -> Self {
-        Self(NonZeroUsize::new(x as usize))
-    }
-
-    /// Transforms the `EdgeListIx` into an index that can be used to
-    /// get the first element of a record from an edge list vector.
-    /// Returns None if the `EdgeListIx` is None.
-    ///
-    /// `x -> (x - 1) * 2`
-    #[inline]
-    pub(super) fn as_vec_ix(&self) -> Option<EdgeVecIx> {
-        let x = self.0?.get();
-        Some(EdgeVecIx((x - 1) * 2))
-    }
-}
-
 /// The index into the underlying packed vector that is used to
 /// represent the edge lists.
 
@@ -101,35 +46,6 @@ impl RecordIndex for EdgeVecIx {
     }
 }
 
-impl EdgeVecIx {
-    /// Create a new `EdgeVecIx` by wrapping a `usize`. Should only be
-    /// used in the PackedGraph edge list internals.
-    #[inline]
-    fn new<I: Into<usize>>(x: I) -> Self {
-        Self(x.into())
-    }
-
-    /// Transforms the `EdgeVecIx` into an index that denotes a record
-    /// in the edge list. The resulting `EdgeListIx` will always
-    /// contain a value, never `None`.
-    ///
-    /// `x -> (x / 2) + 1`
-    #[inline]
-    pub(super) fn as_list_ix(&self) -> EdgeListIx {
-        EdgeListIx::new((self.0 / 2) + 1)
-    }
-
-    #[inline]
-    pub(super) fn handle_ix(&self) -> usize {
-        self.0
-    }
-
-    #[inline]
-    pub(super) fn next_ix(&self) -> usize {
-        self.0 + 1
-    }
-}
-
 /// A packed vector containing the edges of the graph encoded as
 /// multiple linked lists.
 ///
@@ -151,14 +67,19 @@ impl PackedList for EdgeLists {
     type ListPtr = EdgeListIx;
     type ListRecord = EdgeRecord;
 
+    #[inline]
     fn record_pointer(rec: &EdgeRecord) -> EdgeListIx {
         rec.1
     }
 
-    fn get_record_for(&self, ptr: EdgeListIx) -> Option<EdgeRecord> {
-        self.get_record(ptr)
+    #[inline]
+    fn get_record(&self, ptr: EdgeListIx) -> Option<EdgeRecord> {
+        let handle = self.get_handle(ptr)?;
+        let next = self.get_next(ptr)?;
+        Some((handle, next))
     }
 
+    #[inline]
     fn next_record(&self, rec: &EdgeRecord) -> Option<EdgeRecord> {
         self.next(*rec)
     }
@@ -174,13 +95,11 @@ impl Default for EdgeLists {
 }
 
 impl EdgeLists {
-    const RECORD_SIZE: usize = 2;
-
     /// Returns the number of edge records, i.e. the total number of
     /// edges. Subtracts the number of removed records.
     #[inline]
     pub(super) fn len(&self) -> usize {
-        let num_records = self.record_vec.len() / Self::RECORD_SIZE;
+        let num_records = self.record_vec.len() / EdgeVecIx::RECORD_WIDTH;
         num_records - self.removed_records.len()
     }
 
@@ -188,7 +107,7 @@ impl EdgeLists {
     /// not null.
     #[inline]
     fn get_handle(&self, ix: EdgeListIx) -> Option<Handle> {
-        let h_ix = ix.as_vec_ix()?.handle_ix();
+        let h_ix = ix.to_record_ix(0)?;
         let handle = Handle::from_integer(self.record_vec.get(h_ix));
         Some(handle)
     }
@@ -199,17 +118,9 @@ impl EdgeLists {
     /// instead be null.
     #[inline]
     fn get_next(&self, ix: EdgeListIx) -> Option<EdgeListIx> {
-        let n_ix = ix.as_vec_ix()?.next_ix();
-        let next = EdgeListIx::from_vec_value(self.record_vec.get(n_ix));
+        let n_ix = ix.to_record_ix(1)?;
+        let next = EdgeListIx::from_vector_value(self.record_vec.get(n_ix));
         Some(next)
-    }
-
-    /// Get the handle and next pointer for the given record index.
-    #[inline]
-    pub(super) fn get_record(&self, ix: EdgeListIx) -> Option<EdgeRecord> {
-        let handle = self.get_handle(ix)?;
-        let next = self.get_next(ix)?;
-        Some((handle, next))
     }
 
     /// Create a new record with the provided contents and return its
@@ -219,20 +130,19 @@ impl EdgeLists {
         handle: Handle,
         next: EdgeListIx,
     ) -> EdgeListIx {
-        let vec_ix = EdgeVecIx::new(self.record_vec.len());
+        let rec_ix = EdgeListIx::from_record_ix(self.record_vec.len(), 2);
         self.record_vec.append(handle.as_integer());
-        self.record_vec.append(next.as_vec_value());
-        vec_ix.as_list_ix()
+        self.record_vec.append(next.to_vector_value());
+        rec_ix
     }
 
     /// Create a new *empty* record and return its `EdgeListIx`.
-    #[allow(dead_code)]
     #[must_use]
     pub(super) fn append_empty(&mut self) -> EdgeListIx {
-        let vec_ix = EdgeVecIx::new(self.record_vec.len());
+        let rec_ix = EdgeListIx::from_record_ix(self.record_vec.len(), 2);
         self.record_vec.append(0);
         self.record_vec.append(0);
-        vec_ix.as_list_ix()
+        rec_ix
     }
 
     /// Update the `Handle` and pointer to the next `EdgeListIx` in
@@ -245,11 +155,11 @@ impl EdgeLists {
         handle: Handle,
         next: EdgeListIx,
     ) -> Option<()> {
-        let h_ix = ix.as_vec_ix()?.handle_ix();
-        let n_ix = ix.as_vec_ix()?.next_ix();
+        let h_ix = ix.to_record_ix(0)?;
+        let n_ix = ix.to_record_ix(1)?;
 
         self.record_vec.set(h_ix, handle.as_integer());
-        self.record_vec.set(n_ix, next.as_vec_value());
+        self.record_vec.set(n_ix, next.to_vector_value());
 
         Some(())
     }
@@ -262,8 +172,8 @@ impl EdgeLists {
 
     /// Return an iterator that walks through the edge list starting
     /// at the provided index.
-    pub fn iter(&self, ix: EdgeListIx) -> EdgeListIter<'_> {
-        EdgeListIter::new(self, ix)
+    pub fn iter(&self, ix: EdgeListIx) -> PackedListIter<'_, Self> {
+        PackedListIter::new(self, ix)
     }
 
     /// Updates the first edge record in the provided edge list that
@@ -328,52 +238,15 @@ impl EdgeLists {
                 self.iter(start).nth(list_step - 1)?;
             let (curr_ix, curr_record) = self.iter(start).nth(list_step)?;
 
-            let prec_next_vec_ix = prec_ix.as_vec_ix()?.next_ix();
+            let prec_next_vec_ix = prec_ix.to_record_ix(1)?;
             // Update the previous `next` pointer
             self.record_vec
-                .set(prec_next_vec_ix, curr_record.1.as_vec_value());
+                .set(prec_next_vec_ix, curr_record.1.to_vector_value());
             // Mark the record in question as removed
             self.removed_records.push(curr_ix);
             // The start of the edge list hasn't changed
             Some(start)
         }
-    }
-}
-
-/// An iterator through a linked list of edge records. Yields the
-/// current `EdgeListIx`, as well as its record, until the end of the
-/// list has been reached.
-pub struct EdgeListIter<'a> {
-    edge_lists: &'a EdgeLists,
-    current_index: EdgeListIx,
-    current_record: Option<EdgeRecord>,
-}
-
-impl<'a> EdgeListIter<'a> {
-    fn new(edge_lists: &'a EdgeLists, start: EdgeListIx) -> Self {
-        let current_record = edge_lists.get_record(start);
-        let current_index = start;
-        Self {
-            edge_lists,
-            current_index,
-            current_record,
-        }
-    }
-}
-
-impl<'a> Iterator for EdgeListIter<'a> {
-    // (EdgeListIx, (Handle, EdgeListIx));
-    type Item = (EdgeListIx, EdgeRecord);
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        let record = self.current_record?;
-        let next_record = self.edge_lists.next(record);
-        let this_ix = self.current_index;
-        let (handle, next) = record;
-        self.current_record = next_record;
-        self.current_index = next;
-        Some((this_ix, (handle, next)))
     }
 }
 

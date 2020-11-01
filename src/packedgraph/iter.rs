@@ -1,6 +1,6 @@
 use crate::handle::Handle;
 
-use super::edges::EdgeListIter;
+use super::{EdgeLists, PackedListIter};
 
 /// Iterator over a PackedGraph's handles. For every non-zero value in
 /// the PackedDeque holding the PackedGraph's node ID mappings, the
@@ -44,11 +44,11 @@ where
 
 /// Iterator for stepping through an edge list, returning Handles.
 pub struct EdgeListHandleIter<'a> {
-    edge_list_iter: EdgeListIter<'a>,
+    edge_list_iter: PackedListIter<'a, EdgeLists>,
 }
 
 impl<'a> EdgeListHandleIter<'a> {
-    pub(super) fn new(edge_list_iter: EdgeListIter<'a>) -> Self {
+    pub(super) fn new(edge_list_iter: PackedListIter<'a, EdgeLists>) -> Self {
         Self { edge_list_iter }
     }
 }

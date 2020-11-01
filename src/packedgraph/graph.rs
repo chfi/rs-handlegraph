@@ -2,7 +2,7 @@ pub(crate) static NARROW_PAGE_WIDTH: usize = 256;
 pub(crate) static WIDE_PAGE_WIDTH: usize = 1024;
 
 pub use super::{
-    edges::{EdgeListIter, EdgeListIx, EdgeLists, EdgeVecIx},
+    edges::{EdgeListIx, EdgeLists, EdgeVecIx},
     index::{NodeRecordId, RecordIndex},
     nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords},
     sequence::{PackedSeqIter, SeqRecordIx, Sequences},

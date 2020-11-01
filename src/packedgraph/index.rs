@@ -75,19 +75,28 @@ pub trait RecordIndex: Copy {
     fn to_vector_index(self, offset: usize) -> usize;
 }
 
+/// A collection of linked lists implemented using one or more
+/// vector-like collections.
 pub trait PackedList {
     type ListPtr: Copy;
     type ListRecord: Copy;
 
+    /// Extract the pointer for a record
     fn record_pointer(rec: &Self::ListRecord) -> Self::ListPtr;
 
-    fn get_record_for(&self, ptr: Self::ListPtr) -> Option<Self::ListRecord>;
+    /// Retrieve the record for the given pointer, if the pointer is
+    /// not the empty list
+    fn get_record(&self, ptr: Self::ListPtr) -> Option<Self::ListRecord>;
 
+    /// Return the record that comes after the provided record, if
+    /// we're not already at the end of the list
+    #[inline]
     fn next_record(&self, rec: &Self::ListRecord) -> Option<Self::ListRecord> {
-        self.get_record_for(Self::record_pointer(rec))
+        self.get_record(Self::record_pointer(rec))
     }
 }
 
+/// An iterator through linked lists represented using PackedList
 pub struct PackedListIter<'a, T: PackedList> {
     list: &'a T,
     current_ptr: T::ListPtr,
@@ -102,9 +111,9 @@ impl<'a, T: PackedList> PackedListIter<'a, T> {
 impl<'a, T: PackedList> Iterator for PackedListIter<'a, T> {
     type Item = (T::ListPtr, T::ListRecord);
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let record = self.list.get_record_for(self.current_ptr)?;
-        let next_record = self.list.next_record(&record);
+        let record = self.list.get_record(self.current_ptr)?;
         let this_ptr = self.current_ptr;
         self.current_ptr = T::record_pointer(&record);
         Some((this_ptr, record))

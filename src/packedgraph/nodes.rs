@@ -343,14 +343,14 @@ impl NodeRecords {
         dir: Direction,
     ) -> EdgeListIx {
         match GraphVecIx::from_one_based_ix(rec_id) {
-            None => EdgeListIx::empty(),
+            None => EdgeListIx::null(),
             Some(vec_ix) => {
                 let ix = match dir {
                     Direction::Right => vec_ix.right_edges_ix(),
                     Direction::Left => vec_ix.left_edges_ix(),
                 };
 
-                EdgeListIx::from_vec_value(self.records_vec.get(ix))
+                EdgeListIx::from_vector_value(self.records_vec.get(ix))
             }
         }
     }
@@ -369,7 +369,7 @@ impl NodeRecords {
             Direction::Left => vec_ix.left_edges_ix(),
         };
 
-        self.records_vec.set(ix, new_edge.as_vec_value());
+        self.records_vec.set(ix, new_edge.to_vector_value());
         Some(())
     }
 
@@ -381,10 +381,10 @@ impl NodeRecords {
         let vec_ix = GraphVecIx::from_one_based_ix(rec_id)?;
 
         let left = vec_ix.left_edges_ix();
-        let left = EdgeListIx::from_vec_value(self.records_vec.get(left));
+        let left = EdgeListIx::from_vector_value(self.records_vec.get(left));
 
         let right = vec_ix.right_edges_ix();
-        let right = EdgeListIx::from_vec_value(self.records_vec.get(right));
+        let right = EdgeListIx::from_vector_value(self.records_vec.get(right));
 
         Some((left, right))
     }
@@ -400,8 +400,8 @@ impl NodeRecords {
 
         let left_ix = vec_ix.left_edges_ix();
         let right_ix = vec_ix.right_edges_ix();
-        self.records_vec.set(left_ix, left.as_vec_value());
-        self.records_vec.set(right_ix, right.as_vec_value());
+        self.records_vec.set(left_ix, left.to_vector_value());
+        self.records_vec.set(right_ix, right.to_vector_value());
         Some(())
     }
 
@@ -422,8 +422,8 @@ impl NodeRecords {
 
         let left = vec_ix.left_edges_ix();
         let right = vec_ix.right_edges_ix();
-        self.records_vec.set(left, new_left.as_vec_value());
-        self.records_vec.set(right, new_right.as_vec_value());
+        self.records_vec.set(left, new_left.to_vector_value());
+        self.records_vec.set(right, new_right.to_vector_value());
         Some(())
     }
 

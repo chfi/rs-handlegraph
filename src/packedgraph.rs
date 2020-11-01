@@ -13,7 +13,7 @@ pub mod paths;
 pub mod sequence;
 
 pub use self::{
-    edges::{EdgeListIter, EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx},
+    edges::{EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx},
     graph::PackedGraph,
     index::*,
     iter::{EdgeListHandleIter, PackedHandlesIter},
@@ -271,7 +271,7 @@ impl MutableHandleGraph for PackedGraph {
         self.nodes.set_edge_list(
             handle_gix,
             Direction::Right,
-            EdgeListIx::empty(),
+            EdgeListIx::null(),
         );
 
         // Update back references for the nodes connected to the
