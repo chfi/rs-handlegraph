@@ -310,6 +310,7 @@ impl PagedIntVec {
 
     #[inline]
     pub fn resize(&mut self, new_size: usize) {
+        #[allow(clippy::comparison_chain)]
         if new_size < self.num_entries {
             let num_pages = if new_size == 0 {
                 0
@@ -397,6 +398,7 @@ impl PagedIntVec {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     #[inline]
     const fn to_diff(value: u64, anchor: u64) -> u64 {
         if value == 0 {
@@ -409,6 +411,7 @@ impl PagedIntVec {
         }
     }
 
+    #[allow(clippy::wrong_self_convention)]
     #[inline]
     const fn from_diff(diff: u64, anchor: u64) -> u64 {
         if diff == 0 {

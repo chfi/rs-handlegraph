@@ -1,28 +1,11 @@
-#![allow(dead_code)]
-#![allow(unused_assignments)]
-#![allow(unused_variables)]
-#![allow(unused_mut)]
-#![allow(unused_imports)]
-
-use gfa::{
-    gfa::{Link, Orientation, Segment, GFA},
-    optfields::OptFields,
-};
-
 use crate::{
-    handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::HandleGraph,
-    mutablehandlegraph::MutableHandleGraph,
+    handle::{Direction, Handle, NodeId},
     packed::*,
 };
 
-use bstr::{ByteSlice, ByteVec};
-
 use std::num::NonZeroUsize;
 
-use super::edges::{EdgeListIter, EdgeListIx, EdgeLists, EdgeVecIx};
-use super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH};
-use super::sequence::{PackedSeqIter, SeqRecordIx, Sequences};
+use super::{edges::EdgeListIx, graph::NARROW_PAGE_WIDTH, sequence::Sequences};
 
 /// The index for a graph record. Valid indices are natural numbers
 /// above zero, each denoting a 2-element record. An index of zero
@@ -43,6 +26,7 @@ impl GraphRecordIx {
     /// Returns the "null", or empty `GraphRecordIx`, i.e. the one that
     /// is used for yet-to-be-filled elements in the graph NodeId map.
     #[inline]
+    #[allow(dead_code)]
     pub(super) fn empty() -> Self {
         Self(None)
     }
@@ -122,10 +106,12 @@ impl GraphVecIx {
         self.0 + 1
     }
 
+    /*
     #[inline]
     pub(super) fn seq_record_ix(&self) -> usize {
         self.0 / 2
     }
+    */
 }
 
 #[derive(Debug, Clone)]
@@ -146,10 +132,6 @@ impl Default for NodeIdIndexMap {
 }
 
 impl NodeIdIndexMap {
-    fn new() -> Self {
-        Default::default()
-    }
-
     pub(super) fn iter(&self) -> PackedDequeIter<'_> {
         self.deque.iter()
     }
@@ -210,7 +192,7 @@ impl NodeIdIndexMap {
         if id < self.min_id || id > self.max_id {
             return None;
         }
-        let index = u64::from(id) - self.min_id;
+        let index = id - self.min_id;
         let value = self.deque.get(index as usize);
         let rec_ix = GraphRecordIx::from_vec_value(value);
         Some(rec_ix)
@@ -373,6 +355,7 @@ impl NodeRecords {
         Some((left, right))
     }
 
+    #[allow(dead_code)]
     pub(super) fn set_node_edge_lists(
         &mut self,
         g_ix: GraphRecordIx,
@@ -418,7 +401,7 @@ impl NodeRecords {
         let g_ix = self.insert_node(n_id)?;
 
         // insert the sequence
-        let s_ix = self.sequences.add_sequence(g_ix, seq)?;
+        let _s_ix = self.sequences.add_sequence(g_ix, seq)?;
 
         Some(g_ix)
     }
@@ -433,50 +416,4 @@ impl NodeRecords {
     pub(super) fn handle_record(&self, h: Handle) -> Option<GraphRecordIx> {
         self.id_index_map.get_index(h.id())
     }
-
-    /*
-    pub(super) fn insert_edge(
-        &mut self,
-        left: Handle,
-        right: Handle,
-    ) -> Option<()> {
-        let left_gix = self.handle_record(left)?;
-        let right_gix = self.handle_record(right)?;
-
-        let left_edge_ix = if left.is_reverse() {
-            left_gix.as_vec_ix().left_edges_ix()
-        } else {
-            left_gix.as_vec_ix().right_edges_ix()
-        };
-
-        let right_edge_ix = if right.is_reverse() {
-            right_gix.as_vec_ix().right_edges_ix()
-        } else {
-            right_gix.as_vec_ix().left_edges_ix()
-        };
-
-        let left_edge_list =
-            EdgeListIx::from_vec_value(self.records_vec.get(left_edge_ix));
-
-        // create the record for the edge from the left handle to the right
-        let left_to_right = self.edges.append_record(right, left_edge_list);
-
-        // set the `next` pointer of the new record to the old head of
-        // the left handle
-        self.records_vec
-            .set(left_edge_ix, left_to_right.as_vec_value());
-
-        let right_edge_list =
-            EdgeListIx::from_vec_value(self.records_vec.get(right_edge_ix));
-
-        // create the record for the edge from the right handle to the left
-        let right_to_left = self.edges.append_record(left, right_edge_list);
-
-        // set the `next` pointer of the new record to the old head of
-        // the right handle
-
-        self.records_vec
-            .set(right_edge_ix, right_to_left.as_vec_value());
-    }
-    */
 }

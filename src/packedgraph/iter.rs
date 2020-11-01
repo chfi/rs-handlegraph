@@ -1,23 +1,6 @@
-#![allow(dead_code)]
-#![allow(unused_assignments)]
-#![allow(unused_variables)]
-#![allow(unused_mut)]
-#![allow(unused_imports)]
+use crate::handle::Handle;
 
-use bio::alphabets::dna;
-use bstr::{BString, ByteSlice};
-
-use crate::{
-    handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::*,
-    mutablehandlegraph::MutableHandleGraph,
-};
-
-use super::edges::{
-    EdgeListIter, EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx,
-};
-use super::graph::{PackedGraph, PackedSeqIter, SeqRecordIx, Sequences};
-use super::nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords};
+use super::edges::EdgeListIter;
 
 /// Iterator over a PackedGraph's handles. For every non-zero value in
 /// the PackedDeque holding the PackedGraph's node ID mappings, the

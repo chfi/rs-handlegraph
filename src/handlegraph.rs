@@ -100,15 +100,6 @@ pub trait HandleGraphRef:
     }
 }
 
-/*
-impl<'a, T> HandleGraphRef for &'a T
-where
-    T: HandleGraph,
-    &'a T: AllEdges + AllHandles + HandleNeighbors + HandleSequences + Copy,
-{
-}
-*/
-
 /// Trait denoting that shared references of an implementor has access
 /// to all the HandleGraph methods.
 ///

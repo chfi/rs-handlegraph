@@ -149,16 +149,14 @@ where
     fn has_next_handle(&mut self) -> bool {
         if self.neighbors.is_some() {
             true
+        } else if let Some(handle) = self.handles.next() {
+            let left = self.graph.neighbors(handle, Direction::Left);
+            let right = self.graph.neighbors(handle, Direction::Right);
+            let neighbors = HandleEdgesIter::new(handle, left, right);
+            self.neighbors = Some(neighbors);
+            true
         } else {
-            if let Some(handle) = self.handles.next() {
-                let left = self.graph.neighbors(handle, Direction::Left);
-                let right = self.graph.neighbors(handle, Direction::Right);
-                let neighbors = HandleEdgesIter::new(handle, left, right);
-                self.neighbors = Some(neighbors);
-                true
-            } else {
-                false
-            }
+            false
         }
     }
 }

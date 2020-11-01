@@ -58,6 +58,10 @@ impl Path {
         self.nodes.len()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     pub fn bases_len(&self, graph: &FnvHashMap<NodeId, Node>) -> usize {
         self.nodes
             .iter()
@@ -116,6 +120,6 @@ impl Path {
             }
         }
 
-        return PathStep::End(self.path_id);
+        PathStep::End(self.path_id)
     }
 }

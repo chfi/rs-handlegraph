@@ -1,24 +1,8 @@
-#![allow(dead_code)]
-#![allow(unused_assignments)]
-#![allow(unused_variables)]
-#![allow(unused_mut)]
-#![allow(unused_imports)]
-
-use gfa::{
-    gfa::{Link, Orientation, Segment, GFA},
-    optfields::OptFields,
-};
-
-use crate::{
-    handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::HandleGraph,
-    mutablehandlegraph::MutableHandleGraph,
-    packed::*,
-};
+use crate::{handle::Handle, packed::*};
 
 use std::num::NonZeroUsize;
 
-use super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH};
+use super::graph::WIDE_PAGE_WIDTH;
 
 /// The index for an edge record. Valid indices are natural numbers
 /// starting from 1, each denoting a *record*. An edge list index of
@@ -49,6 +33,7 @@ impl EdgeListIx {
     /// Returns `true` if the provided `EdgeListIx` represents the
     /// empty list.
     #[inline]
+    #[allow(dead_code)]
     pub(super) fn is_empty(&self) -> bool {
         self.0.is_none()
     }
@@ -187,15 +172,6 @@ impl EdgeLists {
         Some((handle, next))
     }
 
-    /// Create a new *empty* record and return its `EdgeListIx`.
-    #[must_use]
-    pub(super) fn append_empty(&mut self) -> EdgeListIx {
-        let vec_ix = EdgeVecIx::new(self.record_vec.len());
-        self.record_vec.append(0);
-        self.record_vec.append(0);
-        vec_ix.as_list_ix()
-    }
-
     /// Create a new record with the provided contents and return its
     /// `EdgeListIx`.
     pub(super) fn append_record(
@@ -206,6 +182,16 @@ impl EdgeLists {
         let vec_ix = EdgeVecIx::new(self.record_vec.len());
         self.record_vec.append(handle.as_integer());
         self.record_vec.append(next.as_vec_value());
+        vec_ix.as_list_ix()
+    }
+
+    /// Create a new *empty* record and return its `EdgeListIx`.
+    #[allow(dead_code)]
+    #[must_use]
+    pub(super) fn append_empty(&mut self) -> EdgeListIx {
+        let vec_ix = EdgeVecIx::new(self.record_vec.len());
+        self.record_vec.append(0);
+        self.record_vec.append(0);
         vec_ix.as_list_ix()
     }
 
@@ -274,6 +260,7 @@ impl EdgeLists {
     /// Since the new start of the index is returned, the output of
     /// this method can be directly used to update the corresponding
     /// GraphRecord.
+    #[allow(dead_code)]
     #[must_use]
     pub(super) fn remove_edge_record<P>(
         &mut self,
@@ -419,8 +406,6 @@ mod tests {
         let edgevec = |es: &EdgeLists, ix: EdgeListIx| {
             es.iter(ix).map(|(_, (h, _))| h).collect::<Vec<_>>()
         };
-
-        let orig_edges = edgevec(&edges, e_1);
 
         // Remove the first edge with an even handle
         let rem_1 = edges

@@ -1,22 +1,6 @@
-#![allow(dead_code)]
-#![allow(unused_assignments)]
-#![allow(unused_variables)]
-#![allow(unused_mut)]
-#![allow(unused_imports)]
+use crate::packed::*;
 
-use gfa::{
-    gfa::{Link, Orientation, Segment, GFA},
-    optfields::OptFields,
-};
-
-use crate::{
-    handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::HandleGraph,
-    mutablehandlegraph::MutableHandleGraph,
-    packed::*,
-};
-
-use super::graph::{GraphRecordIx, GraphVecIx};
+use super::graph::GraphRecordIx;
 
 #[inline]
 const fn encode_dna_base(base: u8) -> u64 {
@@ -72,12 +56,6 @@ impl SeqRecordIx {
     }
 
     #[inline]
-    pub(super) fn as_graph_record_ix(&self) -> GraphRecordIx {
-        let vec_ix = GraphVecIx::new(self.0);
-        vec_ix.as_record_ix()
-    }
-
-    #[inline]
     fn as_vec_ix(&self) -> usize {
         self.0
     }
@@ -108,11 +86,6 @@ impl Sequences {
         self.lengths.append(0);
         self.offsets.append(0);
         true
-    }
-
-    pub(super) fn expected_next_record(&self) -> GraphRecordIx {
-        let seq_ix = SeqRecordIx::new(self.lengths.len());
-        seq_ix.as_graph_record_ix()
     }
 
     fn append_record(&mut self, offset: usize, length: usize) -> SeqRecordIx {
@@ -251,108 +224,6 @@ impl Sequences {
     }
 }
 
-impl Sequences {
-    pub const SIZE: usize = 1;
-
-    /*
-    pub(super) fn add_record(&mut self, ix: usize, seq: &[u8]) {
-        unimplemented!();
-        // let seq_ix = self.sequences.len();
-        // self.indices.set(ix, seq_ix as u64);
-        // self.lengths.set(ix, seq.len() as u64);
-        // seq.iter()
-        //     .for_each(|&b| self.sequences.append(encode_dna_base(b)));
-    }
-
-    pub(super) fn set_record(
-        &mut self,
-        rec_ix: usize,
-        seq_ix: usize,
-        length: usize,
-    ) {
-        unimplemented!();
-        // self.indices.set(rec_ix, seq_ix as u64);
-        // self.lengths.set(rec_ix, length as u64);
-    }
-
-
-    #[inline]
-    pub(super) fn base(&self, seq_ix: usize, base_ix: usize) -> u8 {
-        unimplemented!();
-        // let len = self.lengths.get(seq_ix) as usize;
-        // assert!(base_ix < len);
-        // let offset = self.indices.get(seq_ix) as usize;
-        // let base = self.sequences.get(offset + base_ix);
-        // decode_dna_base(base)
-    }
-    */
-
-    /*
-    pub(super) fn iter(
-        &self,
-        seq_ix: usize,
-        reverse: bool,
-    ) -> PackedSeqIter<'_> {
-        unimplemented!();
-        // let offset = self.indices.get(seq_ix) as usize;
-        // let len = self.lengths.get(seq_ix) as usize;
-
-        // let iter = self.sequences.iter_slice(offset, len);
-
-        // PackedSeqIter {
-        //     iter,
-        //     length: len,
-        //     reverse,
-        // }
-    }
-
-    pub(super) fn divide_sequence(
-        &mut self,
-        seq_ix: usize,
-        lengths: Vec<usize>,
-        // ) -> Vec<(usize, usize)> {
-    ) -> Vec<usize> {
-        unimplemented!();
-        // let mut results = Vec::new();
-
-        // let offset = self.indices.get(seq_ix) as usize;
-        // let len = self.lengths.get(seq_ix) as usize;
-
-        // let mut indices = Vec::new();
-        // let mut start = offset;
-
-        // // for &l in lengths.iter().skip(1) {
-        // for &l in lengths.iter() {
-        //     start += l;
-        //     indices.push(start);
-        // }
-
-        // /*
-        // let indices = lengths
-        //     .iter()
-        //     .copied()
-        //     .map(|l| l + offset)
-        //     .collect::<Vec<_>>();
-        // */
-
-        // // create new records
-        // // for (&i, &l) in indices.iter().skip(1).zip(lengths.iter().skip(1)) {
-        // // for (&i, &l) in indices.iter().skip(1).zip(lengths.iter()) {
-        // for (&i, &l) in indices.iter().zip(lengths.iter()) {
-        //     results.push(self.lengths.len());
-        //     self.lengths.append(l as u64);
-        //     self.indices.append((i - 1) as u64);
-        //     // results.push((i, l));
-        // }
-
-        // // update the original sequence
-        // self.lengths.set(seq_ix, lengths[0] as u64);
-
-        // results
-    }
-    */
-}
-
 pub struct PackedSeqIter<'a> {
     iter: PackedIntVecIter<'a>,
     length: usize,
@@ -387,14 +258,12 @@ mod tests {
 
     #[test]
     fn packedgraph_split_sequence() {
+        use bstr::{BString, B};
         let mut seqs = Sequences::default();
         let g0 = GraphRecordIx::from_vec_value(1);
         seqs.append_empty_record();
 
         let s0 = seqs.add_sequence(g0, b"GTCCACTTTGTGT").unwrap();
-        use bstr::{BString, B};
-
-        let hnd = |x: u64| Handle::pack(x, false);
 
         let seq_bstr = |sq: &Sequences, ix: SeqRecordIx| -> BString {
             sq.iter(ix, false).collect()

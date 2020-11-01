@@ -1,12 +1,3 @@
-#![allow(dead_code)]
-#![allow(unused_assignments)]
-#![allow(unused_variables)]
-#![allow(unused_mut)]
-#![allow(unused_imports)]
-
-use bio::alphabets::dna;
-use bstr::{BString, ByteSlice};
-
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
@@ -19,13 +10,14 @@ pub mod iter;
 pub mod nodes;
 pub mod sequence;
 
-pub use self::edges::{
-    EdgeListIter, EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx,
+pub use self::{
+    edges::{EdgeListIter, EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx},
+    graph::PackedGraph,
+    iter::{EdgeListHandleIter, PackedHandlesIter},
+    nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords},
 };
-pub use self::graph::PackedGraph;
-use self::graph::{PackedSeqIter, SeqRecordIx, Sequences};
-pub use self::iter::{EdgeListHandleIter, PackedHandlesIter};
-pub use self::nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords};
+
+use self::graph::{PackedSeqIter, SeqRecordIx};
 
 impl<'a> AllHandles for &'a PackedGraph {
     type Handles = PackedHandlesIter<crate::packed::PackedDequeIter<'a>>;
@@ -128,7 +120,7 @@ impl<'a> HandleGraphRef for &'a PackedGraph {
 
 impl MutableHandleGraph for PackedGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {
-        let id = NodeId::from(self.max_node_id() + 1);
+        let id = self.max_node_id() + 1;
         self.create_handle(sequence, id)
     }
 
@@ -144,7 +136,7 @@ impl MutableHandleGraph for PackedGraph {
                 && !self.nodes.has_node(id)
         );
 
-        let g_ix = self.nodes.create_node(id, sequence).unwrap();
+        let _g_ix = self.nodes.create_node(id, sequence).unwrap();
 
         Handle::pack(id, false)
     }
@@ -152,18 +144,6 @@ impl MutableHandleGraph for PackedGraph {
     fn create_edge(&mut self, Edge(left, right): Edge) {
         let left_gix = self.nodes.handle_record(left).unwrap();
         let right_gix = self.nodes.handle_record(right).unwrap();
-
-        let left_edge_ix = if left.is_reverse() {
-            left_gix.as_vec_ix().unwrap().left_edges_ix()
-        } else {
-            left_gix.as_vec_ix().unwrap().right_edges_ix()
-        };
-
-        let right_edge_ix = if right.is_reverse() {
-            right_gix.as_vec_ix().unwrap().right_edges_ix()
-        } else {
-            right_gix.as_vec_ix().unwrap().left_edges_ix()
-        };
 
         let left_edge_dir = if left.is_reverse() {
             Direction::Left
@@ -205,13 +185,13 @@ impl MutableHandleGraph for PackedGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,
-        mut offsets: Vec<usize>,
+        offsets: Vec<usize>,
     ) -> Vec<Handle> {
         let mut result = vec![handle];
 
         let node_len = self.node_len(handle);
 
-        let fwd_handle = handle.forward();
+        let _fwd_handle = handle.forward();
 
         let mut lengths = Vec::with_capacity(offsets.len() + 1);
 
@@ -259,7 +239,7 @@ impl MutableHandleGraph for PackedGraph {
 
         // Add new nodes and graph records for the new sequence records
 
-        for &s_ix in new_seq_ixs.iter() {
+        for _s_ix in new_seq_ixs.iter() {
             let n_id = self.nodes.append_empty_node();
             let h = Handle::pack(n_id, false);
             result.push(h);
@@ -275,7 +255,7 @@ impl MutableHandleGraph for PackedGraph {
         let old_right_record_edges =
             self.nodes.get_edge_list(handle_gix, Direction::Right);
 
-        let new_right_edges_head = self.nodes.set_edge_list(
+        self.nodes.set_edge_list(
             last_gix,
             Direction::Right,
             old_right_record_edges,
@@ -312,7 +292,7 @@ impl MutableHandleGraph for PackedGraph {
 
         // create edges between the new segments
         for window in result.windows(2) {
-            if let &[this, next] = window {
+            if let [this, next] = *window {
                 self.create_edge(Edge(this, next));
             }
         }
@@ -357,8 +337,9 @@ impl MutableHandleGraph for PackedGraph {
         }
 
         // Swap the left and right edges on the handle
-        let (left, right) = self.nodes.get_node_edge_lists(g_ix).unwrap();
-        self.nodes.set_node_edge_lists(g_ix, right, left);
+        self.nodes
+            .update_node_edge_lists(g_ix, |l, r| (r, l))
+            .unwrap();
 
         // TODO update paths and occurrences once they're implmented
 
@@ -372,14 +353,14 @@ mod tests {
 
     #[test]
     fn packedgraph_divide_handle() {
-        use bstr::B;
+        use bstr::{BString, B};
 
         let mut graph = PackedGraph::new();
-        let h1 = graph.append_handle(b"GTCA");
-        let h2 = graph.append_handle(b"AAGTGCTAGT");
-        let h3 = graph.append_handle(b"ATA");
-        let h4 = graph.append_handle(b"AA");
-        let h5 = graph.append_handle(b"GG");
+        let _h1 = graph.append_handle(b"GTCA");
+        let _h2 = graph.append_handle(b"AAGTGCTAGT");
+        let _h3 = graph.append_handle(b"ATA");
+        let _h4 = graph.append_handle(b"AA");
+        let _h5 = graph.append_handle(b"GG");
 
         let hnd = |x: u64| Handle::pack(x, false);
         let r_hnd = |x: u64| Handle::pack(x, true);
