@@ -1,5 +1,15 @@
 use crate::handle::Handle;
 
+pub trait EmbeddedPaths {
+    /// A handle to a path in the graph, can also be viewed as a path identifier
+    type PathHandle;
+    /// A handle to a specific step on a specific path in the graph
+    type StepHandle;
+}
+
+// pub trait Paths {
+// }
+
 /// Trait encapsulating the immutable path-related aspects of a handlegraph
 pub trait PathHandleGraph {
     // These associated types may be removed in the future if it turns

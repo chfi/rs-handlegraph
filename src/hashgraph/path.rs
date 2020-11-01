@@ -3,6 +3,8 @@ use fnv::FnvHashMap;
 
 use crate::handle::{Handle, NodeId};
 
+use crate::pathhandlegraph::{PathRef, PathRefMut};
+
 use super::Node;
 
 pub type PathId = i64;
@@ -38,6 +40,80 @@ pub struct Path {
     pub name: BString,
     pub is_circular: bool,
     pub nodes: Vec<Handle>,
+}
+
+pub struct PathStepIter<'a> {
+    handles: std::slice::Iter<'a, Handle>,
+    index: usize,
+}
+
+impl<'a> PathStepIter<'a> {
+    fn new(nodes: &'a [Handle]) -> PathStepIter<'a> {
+        let handles = nodes.iter();
+        Self { handles, index: 0 }
+    }
+}
+
+impl<'a> Iterator for PathStepIter<'a> {
+    type Item = crate::pathhandlegraph::PathStep;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let _handle = self.handles.next()?;
+        let ix = self.index;
+        let item = crate::pathhandlegraph::PathStep::Step(ix);
+        self.index += 1;
+        Some(item)
+    }
+}
+
+use crate::pathhandlegraph::PathStep as PStep;
+
+impl<'a> PathRef for &'a Path {
+    type Steps = PathStepIter<'a>;
+
+    fn steps(self) -> Self::Steps {
+        PathStepIter::new(&self.nodes)
+    }
+
+    fn len(self) -> usize {
+        self.nodes.len()
+    }
+
+    fn circular(self) -> bool {
+        self.is_circular
+    }
+
+    fn handle_at(self, step: PStep) -> Option<Handle> {
+        if let PStep::Step(ix) = step {
+            self.nodes.get(ix).copied()
+        } else {
+            None
+        }
+    }
+
+    fn contains(self, handle: Handle) -> bool {
+        self.nodes.contains(&handle)
+    }
+
+    // fn next_step(self, step: PStep) -> Option<PStep> {
+}
+
+impl<'a> PathRefMut for &'a mut Path {
+    fn append(self, handle: Handle) -> PStep {
+        let new_step = PStep::Step(self.nodes.len());
+        self.nodes.push(handle);
+        new_step
+    }
+
+    fn prepend(self, handle: Handle) -> PStep {
+        let new_step = PStep::Step(0);
+        self.nodes.insert(0, handle);
+        new_step
+    }
+
+    fn set_circularity(self, circular: bool) {
+        self.is_circular = circular;
+    }
 }
 
 impl Path {
