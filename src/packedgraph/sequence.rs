@@ -2,6 +2,8 @@ use crate::packed::*;
 
 use super::graph::{GraphRecordIx, NodeRecordId, RecordIndex};
 
+use super::index::OneBasedIndex;
+
 #[inline]
 const fn encode_dna_base(base: u8) -> u64 {
     match base {
@@ -67,13 +69,13 @@ impl RecordIndex for SeqRecordIx {
     const RECORD_WIDTH: usize = 1;
 
     #[inline]
-    fn from_node_record_id(id: NodeRecordId) -> Option<Self> {
-        id.to_zero_based().map(SeqRecordIx)
+    fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self> {
+        ix.to_record_ix(Self::RECORD_WIDTH).map(SeqRecordIx)
     }
 
     #[inline]
-    fn to_node_record_id(self) -> NodeRecordId {
-        NodeRecordId::from_zero_based(self.0)
+    fn to_one_based_ix<I: OneBasedIndex>(self) -> I {
+        I::from_record_ix(self.0, Self::RECORD_WIDTH)
     }
 
     #[inline]
@@ -124,7 +126,7 @@ impl Sequences {
         rec_id: NodeRecordId,
         seq: &[u8],
     ) -> Option<SeqRecordIx> {
-        let seq_ix = SeqRecordIx::from_node_record_id(rec_id)?;
+        let seq_ix = SeqRecordIx::from_one_based_ix(rec_id)?;
 
         let seq_len = seq.len() as u64;
         let seq_offset = self.sequences.len();
@@ -146,7 +148,7 @@ impl Sequences {
         rec_id: NodeRecordId,
         seq: &[u8],
     ) {
-        let seq_ix = SeqRecordIx::from_node_record_id(rec_id).unwrap();
+        let seq_ix = SeqRecordIx::from_one_based_ix(rec_id).unwrap();
 
         let old_len = self.lengths.get(seq_ix.to_vector_index(0)) as usize;
         let offset = self.offsets.get(seq_ix.to_vector_index(0)) as usize;
@@ -218,7 +220,7 @@ impl Sequences {
 
     #[inline]
     pub(super) fn length(&self, rec_id: NodeRecordId) -> usize {
-        let seq_ix = SeqRecordIx::from_node_record_id(rec_id).unwrap();
+        let seq_ix = SeqRecordIx::from_one_based_ix(rec_id).unwrap();
         self.lengths.get(seq_ix.as_vec_ix()) as usize
     }
 

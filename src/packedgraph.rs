@@ -91,7 +91,7 @@ impl<'a> HandleSequences for &'a PackedGraph {
     #[inline]
     fn sequence_iter(self, handle: Handle) -> Self::Sequence {
         let rec_id = self.nodes.handle_record(handle).unwrap();
-        let seq_ix = SeqRecordIx::from_node_record_id(rec_id);
+        let seq_ix = SeqRecordIx::from_one_based_ix(rec_id);
         self.nodes
             .sequences()
             .iter(seq_ix.unwrap(), handle.is_reverse())
@@ -226,7 +226,7 @@ impl MutableHandleGraph for PackedGraph {
         let seq_ix = self
             .nodes
             .handle_record(handle)
-            .and_then(SeqRecordIx::from_node_record_id)
+            .and_then(SeqRecordIx::from_one_based_ix)
             .unwrap();
 
         // Split the sequence and get the new sequence records

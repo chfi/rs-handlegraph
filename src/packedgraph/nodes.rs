@@ -9,7 +9,7 @@ use super::paths::NodeOccurRecordIx;
 use super::{
     edges::EdgeListIx,
     graph::NARROW_PAGE_WIDTH,
-    index::{NodeRecordId, RecordIndex},
+    index::{NodeRecordId, OneBasedIndex, RecordIndex},
     sequence::Sequences,
 };
 
@@ -90,13 +90,13 @@ impl RecordIndex for GraphVecIx {
     const RECORD_WIDTH: usize = 2;
 
     #[inline]
-    fn from_node_record_id(id: NodeRecordId) -> Option<Self> {
-        id.to_record_ix(Self::RECORD_WIDTH).map(GraphVecIx)
+    fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self> {
+        ix.to_record_ix(Self::RECORD_WIDTH).map(GraphVecIx)
     }
 
     #[inline]
-    fn to_node_record_id(self) -> NodeRecordId {
-        NodeRecordId::from_record_ix(self.0, Self::RECORD_WIDTH)
+    fn to_one_based_ix<I: OneBasedIndex>(self) -> I {
+        I::from_record_ix(self.0, Self::RECORD_WIDTH)
     }
 
     #[inline]
@@ -342,7 +342,7 @@ impl NodeRecords {
         rec_id: NodeRecordId,
         dir: Direction,
     ) -> EdgeListIx {
-        match GraphVecIx::from_node_record_id(rec_id) {
+        match GraphVecIx::from_one_based_ix(rec_id) {
             None => EdgeListIx::empty(),
             Some(vec_ix) => {
                 let ix = match dir {
@@ -362,7 +362,7 @@ impl NodeRecords {
         dir: Direction,
         new_edge: EdgeListIx,
     ) -> Option<()> {
-        let vec_ix = GraphVecIx::from_node_record_id(rec_id)?;
+        let vec_ix = GraphVecIx::from_one_based_ix(rec_id)?;
 
         let ix = match dir {
             Direction::Right => vec_ix.right_edges_ix(),
@@ -378,7 +378,7 @@ impl NodeRecords {
         &self,
         rec_id: NodeRecordId,
     ) -> Option<(EdgeListIx, EdgeListIx)> {
-        let vec_ix = GraphVecIx::from_node_record_id(rec_id)?;
+        let vec_ix = GraphVecIx::from_one_based_ix(rec_id)?;
 
         let left = vec_ix.left_edges_ix();
         let left = EdgeListIx::from_vec_value(self.records_vec.get(left));
@@ -396,7 +396,7 @@ impl NodeRecords {
         left: EdgeListIx,
         right: EdgeListIx,
     ) -> Option<()> {
-        let vec_ix = GraphVecIx::from_node_record_id(rec_id)?;
+        let vec_ix = GraphVecIx::from_one_based_ix(rec_id)?;
 
         let left_ix = vec_ix.left_edges_ix();
         let right_ix = vec_ix.right_edges_ix();
@@ -414,7 +414,7 @@ impl NodeRecords {
     where
         F: Fn(EdgeListIx, EdgeListIx) -> (EdgeListIx, EdgeListIx),
     {
-        let vec_ix = GraphVecIx::from_node_record_id(rec_id)?;
+        let vec_ix = GraphVecIx::from_one_based_ix(rec_id)?;
 
         let (left_rec, right_rec) = self.get_node_edge_lists(rec_id)?;
 
