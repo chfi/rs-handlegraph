@@ -51,6 +51,67 @@ pub trait OneBasedIndex: Copy {
     fn null() -> Self;
 }
 
+/// The identifier and index for all node-related records in the
+/// PackedGraph.
+///
+/// This is used whenever we have some type of record, in one or more
+/// packed collections, such that each node in the graph has exactly
+/// one such record.
+///
+/// This index is 1-based, with 0 denoting missing data, the empty
+/// record, or the empty list, depending on the context.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NodeRecordId(Option<NonZeroUsize>);
+
+/// A 0-based index into a collection that nominally uses 1-based
+/// indexing, with a zero denoting a missing record.
+pub trait RecordIndex: Copy {
+    const RECORD_WIDTH: usize;
+
+    fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self>;
+
+    fn to_one_based_ix<I: OneBasedIndex>(self) -> I;
+
+    fn to_vector_index(self, offset: usize) -> usize;
+}
+
+pub trait PackedList {
+    type ListPtr: Copy;
+    type ListRecord: Copy;
+
+    fn record_pointer(rec: &Self::ListRecord) -> Self::ListPtr;
+
+    fn get_record_for(&self, ptr: Self::ListPtr) -> Option<Self::ListRecord>;
+
+    fn next_record(&self, rec: &Self::ListRecord) -> Option<Self::ListRecord> {
+        self.get_record_for(Self::record_pointer(rec))
+    }
+}
+
+pub struct PackedListIter<'a, T: PackedList> {
+    list: &'a T,
+    current_ptr: T::ListPtr,
+}
+
+impl<'a, T: PackedList> PackedListIter<'a, T> {
+    pub(super) fn new(list: &'a T, current_ptr: T::ListPtr) -> Self {
+        Self { list, current_ptr }
+    }
+}
+
+impl<'a, T: PackedList> Iterator for PackedListIter<'a, T> {
+    type Item = (T::ListPtr, T::ListRecord);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let record = self.list.get_record_for(self.current_ptr)?;
+        let next_record = self.list.next_record(&record);
+        let this_ptr = self.current_ptr;
+        self.current_ptr = T::record_pointer(&record);
+        Some((this_ptr, record))
+    }
+}
+
+#[macro_export]
 macro_rules! impl_one_based_index {
     ($for:ty) => {
         impl OneBasedIndex for $for {
@@ -104,32 +165,4 @@ macro_rules! impl_one_based_index {
     };
 }
 
-/// The identifier and index for all node-related records in the
-/// PackedGraph.
-///
-/// This is used whenever we have some type of record, in one or more
-/// packed collections, such that each node in the graph has exactly
-/// one such record.
-///
-/// This index is 1-based, with 0 denoting missing data, the empty
-/// record, or the empty list, depending on the context.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NodeRecordId(Option<NonZeroUsize>);
-
-/// A 0-based index into a collection that nominally uses 1-based
-/// indexing, with a zero denoting a missing record.
-pub trait RecordIndex: Copy {
-    const RECORD_WIDTH: usize;
-
-    fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self>;
-
-    fn to_one_based_ix<I: OneBasedIndex>(self) -> I;
-
-    fn to_vector_index(self, offset: usize) -> usize;
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct OneBasedIx(Option<NonZeroUsize>);
-
-impl_one_based_index!(OneBasedIx);
 impl_one_based_index!(NodeRecordId);

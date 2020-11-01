@@ -4,6 +4,8 @@ use std::num::NonZeroUsize;
 
 use super::graph::WIDE_PAGE_WIDTH;
 
+use super::{OneBasedIndex, PackedList, PackedListIter, RecordIndex};
+
 /// The index for an edge record. Valid indices are natural numbers
 /// starting from 1, each denoting a *record*. An edge list index of
 /// zero denotes a lack of an edge, or the empty edge list.
@@ -12,6 +14,8 @@ use super::graph::WIDE_PAGE_WIDTH;
 /// `Option<NonZeroUsize>` is a natural fit for representing this.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EdgeListIx(Option<NonZeroUsize>);
+
+crate::impl_one_based_index!(EdgeListIx);
 
 impl EdgeListIx {
     /// Create a new `EdgeListIx` by wrapping a `usize`. Should only
@@ -78,6 +82,25 @@ impl EdgeListIx {
 #[repr(transparent)]
 pub struct EdgeVecIx(usize);
 
+impl RecordIndex for EdgeVecIx {
+    const RECORD_WIDTH: usize = 2;
+
+    #[inline]
+    fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self> {
+        ix.to_record_ix(Self::RECORD_WIDTH).map(EdgeVecIx)
+    }
+
+    #[inline]
+    fn to_one_based_ix<I: OneBasedIndex>(self) -> I {
+        I::from_record_ix(self.0, Self::RECORD_WIDTH)
+    }
+
+    #[inline]
+    fn to_vector_index(self, offset: usize) -> usize {
+        self.0 + offset
+    }
+}
+
 impl EdgeVecIx {
     /// Create a new `EdgeVecIx` by wrapping a `usize`. Should only be
     /// used in the PackedGraph edge list internals.
@@ -122,6 +145,25 @@ pub struct EdgeLists {
     removed_records: Vec<EdgeListIx>,
 }
 
+pub type EdgeRecord = (Handle, EdgeListIx);
+
+impl PackedList for EdgeLists {
+    type ListPtr = EdgeListIx;
+    type ListRecord = EdgeRecord;
+
+    fn record_pointer(rec: &EdgeRecord) -> EdgeListIx {
+        rec.1
+    }
+
+    fn get_record_for(&self, ptr: EdgeListIx) -> Option<EdgeRecord> {
+        self.get_record(ptr)
+    }
+
+    fn next_record(&self, rec: &EdgeRecord) -> Option<EdgeRecord> {
+        self.next(*rec)
+    }
+}
+
 impl Default for EdgeLists {
     fn default() -> Self {
         EdgeLists {
@@ -130,8 +172,6 @@ impl Default for EdgeLists {
         }
     }
 }
-
-pub type EdgeRecord = (Handle, EdgeListIx);
 
 impl EdgeLists {
     const RECORD_SIZE: usize = 2;
