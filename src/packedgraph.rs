@@ -327,10 +327,40 @@ impl MutableHandleGraph for PackedGraph {
             return handle;
         }
 
+        let g_ix = self.nodes.handle_record(handle).unwrap();
+
+        // Overwrite the sequence with its reverse complement
+        let rev_seq = self.sequence(handle);
+        self.nodes
+            .sequences_mut()
+            .overwrite_sequence(g_ix, &rev_seq);
+
+        // Flip the handle on the incoming edges
         let edges = self
             .neighbors(handle, Direction::Left)
             .chain(self.neighbors(handle, Direction::Right))
             .collect::<Vec<_>>();
+
+        for target in edges {
+            let tgt_g_ix = self.nodes.handle_record(target).unwrap();
+            let backward_edge_list = if target.is_reverse() {
+                self.nodes.get_edge_list(tgt_g_ix, Direction::Right)
+            } else {
+                self.nodes.get_edge_list(tgt_g_ix, Direction::Left)
+            };
+
+            self.edges.update_edge_record(
+                backward_edge_list,
+                |_, (h, _)| h == handle,
+                |(h, n)| (h.flip(), n),
+            );
+        }
+
+        // Swap the left and right edges on the handle
+        let (left, right) = self.nodes.get_node_edge_lists(g_ix).unwrap();
+        self.nodes.set_node_edge_lists(g_ix, right, left);
+
+        // TODO update paths and occurrences once they're implmented
 
         handle.flip()
     }

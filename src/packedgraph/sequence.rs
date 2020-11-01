@@ -144,6 +144,27 @@ impl Sequences {
         Some(seq_ix)
     }
 
+    /// Overwrites the sequence for the provided `GraphRecordIx` with
+    /// `seq`. The provided sequence must have exactly the same length
+    /// as the old one.
+    pub(super) fn overwrite_sequence(
+        &mut self,
+        g_ix: GraphRecordIx,
+        seq: &[u8],
+    ) {
+        let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
+
+        let old_len = self.lengths.get(seq_ix.as_vec_ix()) as usize;
+        let offset = self.offsets.get(seq_ix.as_vec_ix()) as usize;
+
+        assert!(old_len == seq.len());
+
+        for (i, b) in seq.iter().copied().enumerate() {
+            let ix = offset + i;
+            self.sequences.set(ix, encode_dna_base(b));
+        }
+    }
+
     /// Splits the sequence at the provided `SeqRecordIx` into
     /// multiple sequences, using the provided slice of `lengths` to
     /// create the new sequence records.
