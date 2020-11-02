@@ -19,36 +19,58 @@ pub trait PackedCollection {
     fn clear(&mut self);
 }
 
-pub trait Viewable<T>: PackedCollection + Sized
-where
-    T: From<u64> + Copy,
-{
-    fn view<'a>(&'a self, index: usize) -> ViewRef<'a, Self, T>;
+/// An element that can be packed into a PackedCollection element as a
+/// u64, and unpacked again
+pub trait PackedElement: Sized + Copy {
+    fn unpack(v: u64) -> Self;
+
+    fn pack(self) -> u64;
 }
 
-impl<T, V> Viewable<T> for V
+impl PackedElement for bool {
+    #[inline]
+    fn unpack(v: u64) -> bool {
+        v == 1
+    }
+
+    #[inline]
+    fn pack(self) -> u64 {
+        self.into()
+    }
+}
+
+pub trait Viewable: PackedCollection + Sized {
+    fn view<'a, T>(&'a self, index: usize) -> ViewRef<'a, Self, T>
+    where
+        T: PackedElement;
+}
+
+impl<V> Viewable for V
 where
-    T: From<u64> + Copy,
     V: PackedCollection + Sized,
 {
-    fn view<'a>(&'a self, index: usize) -> ViewRef<'a, Self, T> {
+    fn view<'a, T>(&'a self, index: usize) -> ViewRef<'a, Self, T>
+    where
+        T: PackedElement,
+    {
         ViewRef::new(self, index)
     }
 }
 
-pub trait MutViewable<T>: PackedCollection + Sized
-where
-    T: From<u64> + Into<u64> + Copy,
-{
-    fn view_mut<'a>(&'a mut self, index: usize) -> ViewMut<'a, Self, T>;
+pub trait MutViewable: PackedCollection + Sized {
+    fn view_mut<'a, T>(&'a mut self, index: usize) -> ViewMut<'a, Self, T>
+    where
+        T: PackedElement;
 }
 
-impl<T, V> MutViewable<T> for V
+impl<V> MutViewable for V
 where
-    T: From<u64> + Into<u64> + Copy,
     V: PackedCollection + Sized,
 {
-    fn view_mut<'a>(&'a mut self, index: usize) -> ViewMut<'a, Self, T> {
+    fn view_mut<'a, T>(&'a mut self, index: usize) -> ViewMut<'a, Self, T>
+    where
+        T: PackedElement,
+    {
         ViewMut::new(self, index)
     }
 }
@@ -56,7 +78,7 @@ where
 pub struct ViewRef<'a, V, T>
 where
     V: PackedCollection + Sized,
-    T: From<u64> + Sized + Copy,
+    T: PackedElement,
 {
     collection: &'a V,
     index: usize,
@@ -66,10 +88,10 @@ where
 impl<'a, V, T> ViewRef<'a, V, T>
 where
     V: PackedCollection + Sized,
-    T: From<u64> + Sized + Copy,
+    T: PackedElement,
 {
     fn new(collection: &'a V, index: usize) -> Self {
-        let value = collection.get(index).into();
+        let value = T::unpack(collection.get(index));
         Self {
             collection,
             index,
@@ -85,7 +107,7 @@ where
 pub struct ViewMut<'a, V, T>
 where
     V: PackedCollection,
-    T: From<u64> + Into<u64> + Copy,
+    T: PackedElement,
 {
     collection: &'a mut V,
     index: usize,
@@ -95,10 +117,10 @@ where
 impl<'a, V, T> ViewMut<'a, V, T>
 where
     V: PackedCollection,
-    T: From<u64> + Into<u64> + Copy,
+    T: PackedElement,
 {
     pub fn new(collection: &'a mut V, index: usize) -> Self {
-        let value = collection.get(index).into();
+        let value = T::unpack(collection.get(index));
         Self {
             collection,
             index,
@@ -112,6 +134,44 @@ where
 
     pub fn set(&mut self, value: T) {
         self.value = value;
-        self.collection.set(self.index, value.into())
+        self.collection.set(self.index, value.pack())
     }
 }
+
+// Can't use a generic implementation for T: From<u64> + Into<u64>
+// because "upstream crates may add a new impl of trait
+// `std::convert::From<u64>` for type `bool` in future versions"
+macro_rules! impl_packed_element_as {
+    ($for:ty) => {
+        impl PackedElement for $for {
+            #[inline]
+            fn unpack(v: u64) -> $for {
+                v as $for
+            }
+
+            #[inline]
+            fn pack(self) -> u64 {
+                self as u64
+            }
+        }
+    };
+}
+
+macro_rules! impl_packed_element_from_into {
+    ($for:ty) => {
+        impl PackedElement for $for {
+            #[inline]
+            fn unpack(v: u64) -> $for {
+                v.into()
+            }
+
+            #[inline]
+            fn pack(self) -> u64 {
+                self.into()
+            }
+        }
+    };
+}
+
+impl_packed_element_as!(usize);
+impl_packed_element_as!(u64);
