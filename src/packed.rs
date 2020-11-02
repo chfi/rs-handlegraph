@@ -48,6 +48,7 @@ impl PackedIntVec {
         self.vector = IntVector::new(self.width);
         self.num_entries = 0;
     }
+mod traits;
 
     #[inline]
     pub fn resize(&mut self, size: usize) {
@@ -99,6 +100,7 @@ impl PackedIntVec {
 
         self.vector.set(index as u64, value);
     }
+pub use self::traits::*;
 
     #[inline]
     pub fn get(&self, index: usize) -> u64 {
