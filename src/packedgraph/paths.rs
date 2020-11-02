@@ -14,6 +14,7 @@ use super::{
 
 use crate::pathhandlegraph::*;
 
+use crate::packed;
 use crate::packed::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -309,7 +310,7 @@ impl PathNames {
     pub(super) fn name_iter(
         &self,
         ix: PathNameIx,
-    ) -> Option<PackedIntVecIter<'_>> {
+    ) -> Option<packed::vector::Iter<'_>> {
         let vec_ix = ix.0;
         if vec_ix >= self.lengths.len() {
             return None;

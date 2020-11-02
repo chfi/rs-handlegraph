@@ -4,6 +4,8 @@ use super::graph::{GraphRecordIx, NodeRecordId, RecordIndex};
 
 use super::index::OneBasedIndex;
 
+use crate::packed;
+
 #[inline]
 const fn encode_dna_base(base: u8) -> u64 {
     match base {
@@ -248,7 +250,7 @@ impl Sequences {
 }
 
 pub struct PackedSeqIter<'a> {
-    iter: PackedIntVecIter<'a>,
+    iter: packed::vector::Iter<'a>,
     length: usize,
     reverse: bool,
 }
