@@ -15,16 +15,10 @@ use super::{
     sequence::Sequences,
 };
 
-/// The index for a graph record. Valid indices are natural numbers
-/// above zero, each denoting a 2-element record. An index of zero
-/// denotes a record that doesn't exist.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct GraphRecordIx(Option<NonZeroUsize>);
-
 /// The index into the underlying packed vector that is used to
 /// represent the graph records that hold pointers to the two edge
 /// lists for each node.
-
+///
 /// Each graph record takes up two elements, so a `GraphVecIx` is
 /// always even.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,12 +30,12 @@ impl RecordIndex for GraphVecIx {
 
     #[inline]
     fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self> {
-        ix.to_record_ix(Self::RECORD_WIDTH).map(GraphVecIx)
+        ix.to_record_start(Self::RECORD_WIDTH).map(GraphVecIx)
     }
 
     #[inline]
     fn to_one_based_ix<I: OneBasedIndex>(self) -> I {
-        I::from_record_ix(self.0, Self::RECORD_WIDTH)
+        I::from_record_start(self.0, Self::RECORD_WIDTH)
     }
 
     #[inline]
@@ -205,7 +199,7 @@ impl NodeRecords {
     /// that's inserted into the graph.
     fn next_graph_ix(&self) -> NodeRecordId {
         let rec_count = self.records_vec.len();
-        let rec_id = NodeRecordId::from_zero_based(rec_count);
+        let rec_id = NodeRecordId::from_record_start(rec_count, 2);
         rec_id
     }
 

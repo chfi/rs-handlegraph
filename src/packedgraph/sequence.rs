@@ -1,6 +1,6 @@
 use crate::packed::*;
 
-use super::graph::{GraphRecordIx, NodeRecordId, RecordIndex};
+use super::graph::{NodeRecordId, RecordIndex};
 
 use super::index::OneBasedIndex;
 
@@ -48,23 +48,6 @@ impl SeqRecordIx {
     pub(super) fn new<I: Into<usize>>(x: I) -> Self {
         Self(x.into())
     }
-
-    /*
-    #[inline]
-    pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Option<Self> {
-        if g_ix.is_null() {
-            return None;
-        }
-        let s_ix = (g_ix.as_vec_value() - 1) as usize;
-
-        Some(Self(s_ix))
-    }
-
-    #[inline]
-    fn as_vec_ix(&self) -> usize {
-        self.0
-    }
-    */
 }
 
 impl RecordIndex for SeqRecordIx {
@@ -72,12 +55,12 @@ impl RecordIndex for SeqRecordIx {
 
     #[inline]
     fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self> {
-        ix.to_record_ix(Self::RECORD_WIDTH).map(SeqRecordIx)
+        ix.to_record_start(Self::RECORD_WIDTH).map(SeqRecordIx)
     }
 
     #[inline]
     fn to_one_based_ix<I: OneBasedIndex>(self) -> I {
-        I::from_record_ix(self.0, Self::RECORD_WIDTH)
+        I::from_record_start(self.0, Self::RECORD_WIDTH)
     }
 
     #[inline]
@@ -285,7 +268,7 @@ mod tests {
     fn packedgraph_split_sequence() {
         use bstr::{BString, B};
         let mut seqs = Sequences::default();
-        let g0 = GraphRecordIx::from_vec_value(1);
+        let g0 = NodeRecordId::unpack(1);
         seqs.append_empty_record();
 
         let s0 = seqs.add_sequence(g0, b"GTCCACTTTGTGT").unwrap();

@@ -3,6 +3,8 @@ use super::vector::PackedIntVec;
 
 use super::traits::*;
 
+use quickcheck::{Arbitrary, Gen};
+
 #[derive(Debug, Clone)]
 pub struct RobustPagedIntVec {
     first_page: PackedIntVec,
@@ -96,6 +98,88 @@ impl PackedCollection for RobustPagedIntVec {
             self.first_page.pop()
         } else {
             self.other_pages.pop()
+        }
+    }
+}
+
+impl Arbitrary for RobustPagedIntVec {
+    fn arbitrary<G: Gen>(g: &mut G) -> RobustPagedIntVec {
+        let only_first = bool::arbitrary(g);
+
+        let page_pow = u32::arbitrary(g) % 4;
+        let page_size = 16 << page_pow;
+
+        assert!(page_size % 2 == 0 && page_size >= 16 && page_size <= 256);
+        let mut paged = RobustPagedIntVec::new(page_size);
+        let mut values: Vec<u64> = Vec::arbitrary(g);
+
+        if !only_first {
+            while values.len() < page_size {
+                let v = u64::arbitrary(g);
+                values.push(v);
+            }
+        }
+
+        values.into_iter().for_each(|v| paged.append(v));
+
+        paged
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use quickcheck::quickcheck;
+
+    use super::*;
+
+    quickcheck! {
+        fn prop_robust_append(paged: RobustPagedIntVec, value: u64) -> bool {
+            let mut paged = paged;
+
+            let entries_before = paged.len();
+
+            paged.append(value);
+
+            let entries_correct = paged.len() == entries_before + 1;
+            let last_val_correct = paged.get(paged.len() - 1) == value;
+
+            entries_correct && last_val_correct
+        }
+    }
+
+    quickcheck! {
+        fn prop_robust_set(paged: RobustPagedIntVec, ix: usize, value: u64) -> bool {
+            let mut paged = paged;
+            if paged.len() == 0 {
+                return true;
+            }
+            let ix = ix % paged.len();
+
+            let len_before = paged.len();
+            let first_len_before = paged.first_page.len();
+            paged.set(ix, value);
+
+            let set_correct = paged.get(ix) == value;
+            let len_correct = paged.len() == len_before;
+
+            set_correct && len_correct
+        }
+    }
+
+    quickcheck! {
+        fn prop_robust_pop(paged: RobustPagedIntVec) -> bool {
+            let mut paged = paged;
+
+            let len_before = paged.len();
+
+            paged.pop();
+
+            if len_before == 0 {
+                paged.len() == 0
+            } else {
+                paged.len() == len_before - 1
+            }
         }
     }
 }

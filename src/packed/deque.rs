@@ -2,6 +2,8 @@ use super::vector::PackedIntVec;
 
 use super::traits::*;
 
+use quickcheck::{Arbitrary, Gen};
+
 #[derive(Debug, Default, Clone)]
 pub struct PackedDeque {
     vector: PackedIntVec,
@@ -195,5 +197,90 @@ impl std::iter::FromIterator<u64> for PackedDeque {
         let mut deque = PackedDeque::new();
         iter.into_iter().for_each(|v| deque.push_back(v));
         deque
+    }
+}
+
+impl Arbitrary for PackedDeque {
+    fn arbitrary<G: Gen>(g: &mut G) -> PackedDeque {
+        let front: Vec<u64> = Vec::arbitrary(g);
+        let back: Vec<u64> = Vec::arbitrary(g);
+        let front_first = bool::arbitrary(g);
+
+        let mut deque = PackedDeque::new();
+
+        if front_first {
+            front.into_iter().for_each(|v| deque.push_front(v));
+            back.into_iter().for_each(|v| deque.push_back(v));
+        } else {
+            back.into_iter().for_each(|v| deque.push_back(v));
+            front.into_iter().for_each(|v| deque.push_front(v));
+        }
+        deque
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use quickcheck::quickcheck;
+
+    use super::*;
+    quickcheck! {
+        fn prop_deque_push_front(deque: PackedDeque, val: u64) -> bool {
+            let mut deque = deque;
+            let len = deque.len();
+
+            deque.push_front(val);
+
+            deque.len() == len + 1 &&
+            deque.get(0) == val
+        }
+    }
+
+    quickcheck! {
+        fn prop_deque_push_back(deque: PackedDeque, val: u64) -> bool {
+            let mut deque = deque;
+            let len = deque.len();
+
+            deque.push_back(val);
+
+            deque.len() == len + 1 &&
+                deque.get(deque.len() - 1) == val
+        }
+    }
+
+    quickcheck! {
+        fn prop_deque_pop_back(deque: PackedDeque) -> bool {
+            let mut deque = deque;
+            let len = deque.len();
+
+            if len <= 1 {
+                deque.pop_back();
+                deque.len() == 0
+            } else {
+                let second_last = deque.get(deque.len() - 2);
+                deque.pop_back();
+                deque.len() == len - 1 &&
+                    deque.get(deque.len() - 1) == second_last
+            }
+        }
+    }
+
+    quickcheck! {
+        fn prop_deque_pop_front(deque: PackedDeque) -> bool {
+            let mut deque = deque;
+            let len = deque.len();
+
+            if len <= 1 {
+                deque.pop_front();
+                deque.len() == 0
+            } else {
+                let second = deque.get(1);
+                deque.pop_front();
+
+                deque.len() == len - 1 &&
+                    deque.get(0) == second
+            }
+        }
     }
 }

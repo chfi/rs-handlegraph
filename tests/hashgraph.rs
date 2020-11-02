@@ -2,7 +2,7 @@ use handlegraph::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
     hashgraph::{HashGraph, PathStep},
-    mutablehandlegraph::MutableHandleGraph,
+    mutablehandlegraph::*,
     pathgraph::PathHandleGraph,
 };
 
@@ -24,8 +24,8 @@ fn can_create_handles() {
     let n2 = graph.get_node_unchecked(&h2.id());
     let n3 = graph.get_node_unchecked(&h3.id());
 
-    assert_eq!(u64::from(h1), 1);
-    assert_eq!(u64::from(h3), 3);
+    assert_eq!(u64::from(h1.id()), 1);
+    assert_eq!(u64::from(h3.id()), 3);
 
     assert_eq!(n1.sequence.as_slice(), b"CAAATAAG");
     assert_eq!(n2.sequence.as_slice(), b"A");

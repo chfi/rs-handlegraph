@@ -17,7 +17,7 @@ pub use self::{
     graph::PackedGraph,
     index::*,
     iter::{EdgeListHandleIter, PackedHandlesIter},
-    nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords},
+    nodes::{GraphVecIx, NodeIdIndexMap, NodeRecords},
     paths::*,
 };
 

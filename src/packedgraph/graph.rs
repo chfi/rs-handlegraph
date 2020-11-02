@@ -4,7 +4,7 @@ pub(crate) static WIDE_PAGE_WIDTH: usize = 1024;
 pub use super::{
     edges::{EdgeListIx, EdgeLists, EdgeVecIx},
     index::{NodeRecordId, RecordIndex},
-    nodes::{GraphRecordIx, GraphVecIx, NodeIdIndexMap, NodeRecords},
+    nodes::{GraphVecIx, NodeIdIndexMap, NodeRecords},
     sequence::{PackedSeqIter, SeqRecordIx, Sequences},
 };
 

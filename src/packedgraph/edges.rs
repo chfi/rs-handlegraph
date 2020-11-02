@@ -32,12 +32,12 @@ impl RecordIndex for EdgeVecIx {
 
     #[inline]
     fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self> {
-        ix.to_record_ix(Self::RECORD_WIDTH).map(EdgeVecIx)
+        ix.to_record_start(Self::RECORD_WIDTH).map(EdgeVecIx)
     }
 
     #[inline]
     fn to_one_based_ix<I: OneBasedIndex>(self) -> I {
-        I::from_record_ix(self.0, Self::RECORD_WIDTH)
+        I::from_record_start(self.0, Self::RECORD_WIDTH)
     }
 
     #[inline]
@@ -107,7 +107,7 @@ impl EdgeLists {
     /// not null.
     #[inline]
     fn get_handle(&self, ix: EdgeListIx) -> Option<Handle> {
-        let h_ix = ix.to_record_ix(0)?;
+        let h_ix = ix.to_record_ix(2, 0)?;
         let handle = Handle::from_integer(self.record_vec.get(h_ix));
         Some(handle)
     }
@@ -118,7 +118,7 @@ impl EdgeLists {
     /// instead be null.
     #[inline]
     fn get_next(&self, ix: EdgeListIx) -> Option<EdgeListIx> {
-        let n_ix = ix.to_record_ix(1)?;
+        let n_ix = ix.to_record_ix(2, 1)?;
         let next = self.record_vec.get_unpack(n_ix);
         Some(next)
     }
@@ -130,7 +130,7 @@ impl EdgeLists {
         handle: Handle,
         next: EdgeListIx,
     ) -> EdgeListIx {
-        let rec_ix = EdgeListIx::from_record_ix(self.record_vec.len(), 2);
+        let rec_ix = EdgeListIx::from_record_start(self.record_vec.len(), 2);
         self.record_vec.append(handle.pack());
         self.record_vec.append(next.pack());
         rec_ix
@@ -139,7 +139,7 @@ impl EdgeLists {
     /// Create a new *empty* record and return its `EdgeListIx`.
     #[must_use]
     pub(super) fn append_empty(&mut self) -> EdgeListIx {
-        let rec_ix = EdgeListIx::from_record_ix(self.record_vec.len(), 2);
+        let rec_ix = EdgeListIx::from_record_start(self.record_vec.len(), 2);
         self.record_vec.append(0);
         self.record_vec.append(0);
         rec_ix
@@ -155,8 +155,8 @@ impl EdgeLists {
         handle: Handle,
         next: EdgeListIx,
     ) -> Option<()> {
-        let h_ix = ix.to_record_ix(0)?;
-        let n_ix = ix.to_record_ix(1)?;
+        let h_ix = ix.to_record_ix(2, 0)?;
+        let n_ix = ix.to_record_ix(2, 1)?;
 
         self.record_vec.set_pack(h_ix, handle);
         self.record_vec.set_pack(n_ix, next);
@@ -238,7 +238,7 @@ impl EdgeLists {
                 self.iter(start).nth(list_step - 1)?;
             let (curr_ix, curr_record) = self.iter(start).nth(list_step)?;
 
-            let prec_next_vec_ix = prec_ix.to_record_ix(1)?;
+            let prec_next_vec_ix = prec_ix.to_record_ix(2, 1)?;
             // Update the previous `next` pointer
             self.record_vec.set_pack(prec_next_vec_ix, curr_record.1);
             // Mark the record in question as removed
@@ -271,7 +271,7 @@ mod tests {
         // A
         //  \- hnd(2)
         edges.set_record(e_1, hnd(1), e_2);
-        edges.set_record(e_2, hnd(2), EdgeListIx::empty());
+        edges.set_record(e_2, hnd(2), EdgeListIx::null());
 
         // edge list two, starting with e_3
         //  /- hnd(4)
@@ -279,7 +279,7 @@ mod tests {
         //  \- hnd(6)
         edges.set_record(e_3, hnd(4), e_4);
         edges.set_record(e_4, hnd(5), e_5);
-        edges.set_record(e_5, hnd(6), EdgeListIx::empty());
+        edges.set_record(e_5, hnd(6), EdgeListIx::null());
 
         let l_1 = edges.iter(e_1).map(|(_, (h, _))| h).collect::<Vec<_>>();
         let l_2 = edges.iter(e_2).map(|(_, (h, _))| h).collect::<Vec<_>>();
@@ -313,7 +313,7 @@ mod tests {
         edges.set_record(e_2, hnd(2), e_3);
         edges.set_record(e_3, hnd(3), e_4);
         edges.set_record(e_4, hnd(4), e_5);
-        edges.set_record(e_5, hnd(5), EdgeListIx::empty());
+        edges.set_record(e_5, hnd(5), EdgeListIx::null());
 
         let edgevec = |es: &EdgeLists, ix: EdgeListIx| {
             es.iter(ix).map(|(_, (h, _))| h).collect::<Vec<_>>()

@@ -2,6 +2,8 @@ use super::vector::PackedIntVec;
 
 use super::traits::*;
 
+use quickcheck::{Arbitrary, Gen};
+
 #[derive(Debug, Clone)]
 pub struct PagedIntVec {
     page_size: usize,
@@ -163,6 +165,79 @@ impl PackedCollection for PagedIntVec {
                 self.pages.shrink_to_fit();
                 self.anchors.pop();
             }
+        }
+    }
+}
+
+impl Arbitrary for PagedIntVec {
+    fn arbitrary<G: Gen>(g: &mut G) -> PagedIntVec {
+        let mut paged = PagedIntVec::new(64);
+        let u64_vec: Vec<u64> = Vec::arbitrary(g);
+
+        for v in u64_vec {
+            paged.append(v);
+        }
+        paged
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use quickcheck::quickcheck;
+
+    use super::*;
+
+    quickcheck! {
+        fn prop_paged_append(paged: PagedIntVec, value: u64) -> bool {
+            let mut paged = paged;
+
+            let entries_before = paged.len();
+
+            paged.append(value);
+
+            let entries_correct = paged.len() == entries_before + 1;
+            let last_val_correct = paged.get(paged.len() - 1) == value;
+
+            entries_correct && last_val_correct
+        }
+    }
+
+    quickcheck! {
+        fn prop_paged_set(paged: PagedIntVec, ix: usize, value: u64) -> bool {
+            let mut paged = paged;
+            if paged.len() == 0 {
+                return true;
+            }
+            let ix = ix % paged.len();
+
+            let len_before = paged.len();
+            let pages_before = paged.pages.len();
+            paged.set(ix, value);
+
+            let set_correct = paged.get(ix) == value;
+            let len_correct = paged.len() == len_before;
+            let pages_correct = paged.pages.len() == pages_before;
+
+            set_correct && len_correct && pages_correct
+        }
+    }
+
+    quickcheck! {
+        fn prop_paged_pop(paged: PagedIntVec) -> bool {
+            let mut paged = paged;
+
+            let len_before = paged.len();
+
+            paged.pop();
+
+            let len_correct = if len_before == 0 {
+                paged.len() == 0
+            } else {
+                paged.len() == len_before - 1
+            };
+
+            len_correct
         }
     }
 }

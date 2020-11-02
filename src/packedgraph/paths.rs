@@ -31,12 +31,12 @@ impl RecordIndex for PathLinkRecordIx {
 
     #[inline]
     fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self> {
-        ix.to_record_ix(Self::RECORD_WIDTH).map(PathLinkRecordIx)
+        ix.to_record_start(Self::RECORD_WIDTH).map(PathLinkRecordIx)
     }
 
     #[inline]
     fn to_one_based_ix<I: OneBasedIndex>(self) -> I {
-        I::from_record_ix(self.0, Self::RECORD_WIDTH)
+        I::from_record_start(self.0, Self::RECORD_WIDTH)
     }
 
     #[inline]
