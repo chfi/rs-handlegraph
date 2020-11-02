@@ -29,6 +29,40 @@ impl PagedIntVec {
         }
     }
 
+    pub(super) fn resize(&mut self, new_size: usize) {
+        #[allow(clippy::comparison_chain)]
+        if new_size < self.num_entries {
+            let num_pages = if new_size == 0 {
+                0
+            } else {
+                (new_size - 1) / self.page_size + 1
+            };
+
+            self.anchors.resize(num_pages);
+            self.pages.resize_with(num_pages, Default::default);
+        } else if new_size > self.num_entries {
+            self.reserve(new_size);
+        }
+
+        self.num_entries = new_size;
+    }
+
+    pub(super) fn reserve(&mut self, new_size: usize) {
+        if new_size > self.pages.len() * self.page_size {
+            let num_pages = (new_size - 1) / self.page_size + 1;
+
+            self.anchors.reserve(num_pages);
+            self.pages.reserve(num_pages - self.pages.len());
+
+            self.anchors.resize(num_pages);
+            while num_pages > self.pages.len() {
+                let mut new_page = PackedIntVec::new();
+                new_page.resize(self.page_size);
+                self.pages.push(new_page);
+            }
+        }
+    }
+
     #[inline]
     pub(super) fn page_width(&self) -> usize {
         self.page_size
@@ -76,42 +110,6 @@ impl PackedCollection for PagedIntVec {
         self.pages.clear();
         self.anchors.clear();
         self.num_entries = 0;
-    }
-
-    #[inline]
-    fn resize(&mut self, new_size: usize) {
-        #[allow(clippy::comparison_chain)]
-        if new_size < self.num_entries {
-            let num_pages = if new_size == 0 {
-                0
-            } else {
-                (new_size - 1) / self.page_size + 1
-            };
-
-            self.anchors.resize(num_pages);
-            self.pages.resize_with(num_pages, Default::default);
-        } else if new_size > self.num_entries {
-            self.reserve(new_size);
-        }
-
-        self.num_entries = new_size;
-    }
-
-    #[inline]
-    fn reserve(&mut self, new_size: usize) {
-        if new_size > self.pages.len() * self.page_size {
-            let num_pages = (new_size - 1) / self.page_size + 1;
-
-            self.anchors.reserve(num_pages);
-            self.pages.reserve(num_pages - self.pages.len());
-
-            self.anchors.resize(num_pages);
-            while num_pages > self.pages.len() {
-                let mut new_page = PackedIntVec::new();
-                new_page.resize(self.page_size);
-                self.pages.push(new_page);
-            }
-        }
     }
 
     #[inline]

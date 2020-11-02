@@ -20,6 +20,27 @@ impl RobustPagedIntVec {
     }
 
     #[inline]
+    pub(super) fn resize(&mut self, new_size: usize) {
+        if new_size > self.page_width() {
+            self.first_page.resize(self.page_width());
+            self.other_pages.resize(new_size - self.page_width());
+        } else {
+            self.first_page.resize(new_size);
+            self.other_pages.clear();
+        }
+    }
+
+    #[inline]
+    pub(super) fn reserve(&mut self, capacity: usize) {
+        if capacity > self.page_width() {
+            self.first_page.reserve(self.page_width());
+            self.other_pages.reserve(capacity - self.page_width());
+        } else {
+            self.first_page.reserve(capacity);
+        }
+    }
+
+    #[inline]
     pub fn page_width(&self) -> usize {
         self.other_pages.page_width()
     }
@@ -40,27 +61,6 @@ impl PackedCollection for RobustPagedIntVec {
     fn clear(&mut self) {
         self.first_page.clear();
         self.other_pages.clear();
-    }
-
-    #[inline]
-    fn resize(&mut self, new_size: usize) {
-        if new_size > self.page_width() {
-            self.first_page.resize(self.page_width());
-            self.other_pages.resize(new_size - self.page_width());
-        } else {
-            self.first_page.resize(new_size);
-            self.other_pages.clear();
-        }
-    }
-
-    #[inline]
-    fn reserve(&mut self, capacity: usize) {
-        if capacity > self.page_width() {
-            self.first_page.reserve(self.page_width());
-            self.other_pages.reserve(capacity - self.page_width());
-        } else {
-            self.first_page.reserve(capacity);
-        }
     }
 
     #[inline]

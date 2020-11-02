@@ -18,7 +18,5 @@ pub trait PackedCollection {
 
     fn clear(&mut self);
 
-    fn resize(&mut self, new_size: usize);
 
-    fn reserve(&mut self, capacity: usize);
 }

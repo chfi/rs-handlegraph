@@ -41,31 +41,7 @@ impl PackedIntVec {
         self.width
     }
 
-    pub fn iter(&self) -> Iter<'_> {
-        let iter = self.vector.iter();
-        Iter::new(iter, self.num_entries)
-    }
-
-    pub fn iter_slice(&self, offset: usize, length: usize) -> Iter<'_> {
-        let iter = self.vector.iter();
-        Iter::offset_new(iter, offset, length)
-    }
-}
-
-impl PackedCollection for PackedIntVec {
-    #[inline]
-    fn len(&self) -> usize {
-        self.num_entries
-    }
-    #[inline]
-    fn clear(&mut self) {
-        self.width = 1;
-        self.vector = IntVector::new(self.width);
-        self.num_entries = 0;
-    }
-
-    #[inline]
-    fn resize(&mut self, size: usize) {
+    pub(super) fn resize(&mut self, size: usize) {
         if size < self.num_entries {
             let capacity = self.vector.len() as f64 / (Self::FACTOR.powi(2));
             let capacity = capacity as usize;
@@ -87,11 +63,33 @@ impl PackedCollection for PackedIntVec {
         self.num_entries = size;
     }
 
-    #[inline]
-    fn reserve(&mut self, size: usize) {
+    pub(super) fn reserve(&mut self, size: usize) {
         if size > self.vector.len() as usize {
             self.vector.resize(size as u64, 0);
         }
+    }
+
+    pub fn iter(&self) -> Iter<'_> {
+        let iter = self.vector.iter();
+        Iter::new(iter, self.num_entries)
+    }
+
+    pub fn iter_slice(&self, offset: usize, length: usize) -> Iter<'_> {
+        let iter = self.vector.iter();
+        Iter::offset_new(iter, offset, length)
+    }
+}
+
+impl PackedCollection for PackedIntVec {
+    #[inline]
+    fn len(&self) -> usize {
+        self.num_entries
+    }
+    #[inline]
+    fn clear(&mut self) {
+        self.width = 1;
+        self.vector = IntVector::new(self.width);
+        self.num_entries = 0;
     }
 
     #[inline]
