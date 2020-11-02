@@ -4,11 +4,13 @@ use crate::{
     mutablehandlegraph::{AdditiveHandleGraph, MutableHandleGraph},
 };
 
+use fnv::FnvHashMap;
+
 use std::num::NonZeroUsize;
 
-use super::graph::{GraphRecordIx, NodeRecordId, RecordIndex};
-
-use super::index::OneBasedIndex;
+use super::{
+    NodeRecordId, OneBasedIndex, PackedList, PackedListIter, RecordIndex,
+};
 
 use crate::pathhandlegraph::*;
 
@@ -134,6 +136,10 @@ impl PackedPath {
     }
 }
 
+// impl<'a> PathRef for &'a PackedPath {
+
+// }
+
 pub struct PackedPathSteps<'a> {
     path: &'a PackedPath,
     current_step: usize,
@@ -149,7 +155,6 @@ impl<'a> PackedPathSteps<'a> {
         }
     }
 
-    /*
     fn next(&mut self) -> Option<(usize, Handle)> {
         if self.finished {
             return None;
@@ -160,15 +165,33 @@ impl<'a> PackedPathSteps<'a> {
 
         let link = self.current_step += 1;
     }
-    */
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathPropertyRecord {
     head_ptr: usize,
     tail_ptr: usize,
     deleted: bool,
     circular: bool,
     deleted_steps: usize,
+}
+
+impl PathPropertyRecord {
+    fn new(
+        head_ptr: usize,
+        tail_ptr: usize,
+        deleted: bool,
+        circular: bool,
+        deleted_steps: usize,
+    ) -> Self {
+        Self {
+            head_ptr,
+            tail_ptr,
+            deleted,
+            circular,
+            deleted_steps,
+        }
+    }
 }
 
 pub struct PathProperties {
@@ -199,40 +222,62 @@ impl PathProperties {
         self.circular.append(0);
         self.deleted_steps.append(0);
     }
+
+    fn len(&self) -> usize {
+        self.heads.len()
+    }
+
+    fn set_record(&mut self, id: PathId, record: &PathPropertyRecord) -> bool {
+        if id.0 >= self.len() as u64 {
+            return false;
+        }
+
+        let ix = id.0 as usize;
+        self.heads.set(ix, record.head_ptr as u64);
+        self.tails.set(ix, record.tail_ptr as u64);
+        self.deleted.set(ix, record.deleted as u64);
+        self.circular.set(ix, record.circular as u64);
+        self.deleted_steps.set(ix, record.deleted_steps as u64);
+        true
+    }
+
+    fn get_record(&self, id: PathId) -> Option<PathPropertyRecord> {
+        if id.0 >= self.len() as u64 {
+            return None;
+        }
+        let ix = id.0 as usize;
+        let head_ptr = self.heads.get(ix) as usize;
+        let tail_ptr = self.tails.get(ix) as usize;
+        let deleted = self.deleted.get(ix) == 1;
+        let circular = self.circular.get(ix) == 1;
+        let deleted_steps = self.deleted_steps.get(ix) as usize;
+
+        Some(PathPropertyRecord {
+            head_ptr,
+            tail_ptr,
+            deleted,
+            circular,
+            deleted_steps,
+        })
+    }
 }
 
-// An index into both the offset record and the length record for some
-// path name.
+/// A zero-based index into both the corresponding path in the vector
+/// of PackedPaths, as well as all the other property records for the
+/// path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PathNameIx(usize);
 
 impl PathNameIx {
     #[inline]
-    pub(super) fn new<I: Into<usize>>(x: I) -> Self {
+    fn new<I: Into<usize>>(x: I) -> Self {
         Self(x.into())
     }
 }
 
-impl RecordIndex for PathNameIx {
-    const RECORD_WIDTH: usize = 1;
-
-    #[inline]
-    fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self> {
-        ix.to_record_ix(Self::RECORD_WIDTH).map(PathNameIx)
-    }
-
-    #[inline]
-    fn to_one_based_ix<I: OneBasedIndex>(self) -> I {
-        I::from_record_ix(self.0, Self::RECORD_WIDTH)
-    }
-
-    #[inline]
-    fn to_vector_index(self, _: usize) -> usize {
-        self.0
-    }
-}
-
 pub struct PathNames {
+    // TODO compress the names; don't store entire Vec<u8>s
+    name_id_map: FnvHashMap<Vec<u8>, PathNameIx>,
     names: PackedIntVec,
     lengths: PackedIntVec,
     offsets: PagedIntVec,
@@ -241,6 +286,7 @@ pub struct PathNames {
 impl Default for PathNames {
     fn default() -> Self {
         PathNames {
+            name_id_map: Default::default(),
             names: Default::default(),
             lengths: Default::default(),
             offsets: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
@@ -251,6 +297,8 @@ impl Default for PathNames {
 impl PathNames {
     pub(super) fn add_name(&mut self, name: &[u8]) -> PathNameIx {
         let name_ix = PathNameIx::new(self.lengths.len());
+
+        self.name_id_map.insert(name.into(), name_ix);
 
         let name_len = name.len() as u64;
         let name_offset = self.lengths.len() as u64;
@@ -266,7 +314,7 @@ impl PathNames {
         &self,
         ix: PathNameIx,
     ) -> Option<PackedIntVecIter<'_>> {
-        let vec_ix = ix.to_vector_index(0);
+        let vec_ix = ix.0;
         if vec_ix >= self.lengths.len() {
             return None;
         }
@@ -297,7 +345,7 @@ impl Default for PackedGraphPaths {
 
 impl PackedGraphPaths {
     pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
-        let path_id = self.path_names.lengths.len() as u64;
+        let path_id = self.paths.len() as u64;
         let packed_path = PackedPath::new(PathId(path_id));
         self.paths.push(packed_path);
 
@@ -306,89 +354,31 @@ impl PackedGraphPaths {
 
         PathId(path_id)
     }
+
+    pub fn len(&self) -> usize {
+        self.paths.len()
+    }
+
+    pub(super) fn path_properties(
+        &self,
+        id: PathId,
+    ) -> Option<PathPropertyRecord> {
+        self.path_props.get_record(id)
+    }
+
+    pub(super) fn get_path(&self, id: PathId) -> Option<&PackedPath> {
+        self.paths.get(id.0 as usize)
+    }
+
+    pub(super) fn get_path_mut(
+        &mut self,
+        id: PathId,
+    ) -> Option<&mut PackedPath> {
+        self.paths.get_mut(id.0 as usize)
+    }
 }
 
-/*
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NodeOccurIx(Option<NonZeroUsize>);
-
-impl NodeOccurIx {
-    #[inline]
-    fn new<I: Into<usize>>(x: I) -> Self {
-        Self(NonZeroUsize::new(x.into()))
-    }
-*/
-
-/*
-#[inline]
-fn from_zero_based<I: Into<usize>>(x: I) -> Self {
-    let x = x.into() + 1;
-    Self::new(x)
-}
-
-#[inline]
-#[allow(dead_code)]
-pub(super) fn empty() -> Self {
-    Self(None)
-}
-
-#[inline]
-pub(super) fn is_null(&self) -> bool {
-    self.0.is_none()
-}
-
-#[inline]
-pub(super) fn as_vec_value(&self) -> u64 {
-    match self.0 {
-        None => 0,
-        Some(v) => v.get() as u64,
-    }
-}
-
-#[inline]
-pub(super) fn from_vec_value(x: u64) -> Self {
-    Self(NonZeroUsize::new(x as usize))
-}
-
-#[inline]
-pub(super) fn from_graph_record_ix(g_ix: GraphRecordIx) -> Self {
-    if g_ix.is_null() {
-        Self::empty()
-    } else {
-        let x = g_ix.as_vec_value() as usize;
-        Self::new(x)
-    }
-}
-
-#[inline]
-pub(super) fn as_vec_ix(&self) -> Option<usize> {
-    let x = self.0?.get();
-    Some(x - 1)
-}
-*/
-// }
-
-/*
-impl RecordIndex for NodeOccurIx {
-    const RECORD_WIDTH: usize = 1;
-
-    #[inline]
-    fn from_node_record_id(id: NodeRecordId) -> Option<Self> {
-        id.to_zero_based().map(NodeOccurIx)
-    }
-
-    #[inline]
-    fn to_node_record_id(self) -> NodeRecordId {
-        NodeRecordId::from_zero_based(self.0)
-    }
-
-    #[inline]
-    fn to_vector_index(self, _: usize) -> usize {
-        self.0
-    }
-}
-*/
-
 pub struct OccurRecord {
     path_id: PathId,
     offset: usize,
@@ -399,6 +389,40 @@ pub struct NodeOccurrences {
     path_ids: PagedIntVec,
     node_occur_offsets: PagedIntVec,
     node_occur_next: PagedIntVec,
+}
+
+impl PackedList for NodeOccurrences {
+    type ListPtr = NodeOccurRecordIx;
+    type ListRecord = OccurRecord;
+
+    #[inline]
+    fn record_pointer(rec: &OccurRecord) -> NodeOccurRecordIx {
+        rec.next
+    }
+
+    #[inline]
+    fn get_record(&self, ix: NodeOccurRecordIx) -> Option<OccurRecord> {
+        let ix = ix.to_zero_based()?;
+        if ix >= self.path_ids.len() {
+            return None;
+        }
+
+        let path_id = PathId(self.path_ids.get(ix));
+        let offset = self.node_occur_offsets.get(ix) as usize;
+        let next =
+            NodeOccurRecordIx::from_vector_value(self.node_occur_next.get(ix));
+
+        Some(OccurRecord {
+            path_id,
+            offset,
+            next,
+        })
+    }
+
+    #[inline]
+    fn next_record(&self, rec: &OccurRecord) -> Option<OccurRecord> {
+        self.get_record(rec.next)
+    }
 }
 
 impl Default for NodeOccurrences {
@@ -413,14 +437,21 @@ impl Default for NodeOccurrences {
     }
 }
 
-pub type NodeOccurRecordIx = usize;
+/// The index for a node path occurrence record. Valid indices are
+/// natural numbers starting from 1, each denoting a *record*. A zero
+/// denotes the end of the list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NodeOccurRecordIx(Option<NonZeroUsize>);
+
+crate::impl_one_based_index!(NodeOccurRecordIx);
 
 impl NodeOccurrences {
     pub(super) fn append_record(
         &mut self,
         rec_id: NodeRecordId,
     ) -> Option<NodeOccurRecordIx> {
-        let node_rec_ix = self.path_ids.len();
+        let node_rec_ix =
+            NodeOccurRecordIx::from_zero_based(self.path_ids.len());
 
         self.path_ids.append(0);
         self.node_occur_offsets.append(0);
@@ -436,43 +467,29 @@ impl NodeOccurrences {
         offset: usize,
         next: NodeOccurRecordIx,
     ) -> bool {
-        if ix >= self.path_ids.len() {
-            return false;
+        if let Some(ix) = ix.to_zero_based() {
+            if ix >= self.path_ids.len() {
+                return false;
+            }
+
+            self.path_ids.set(ix, path_id.0);
+            self.node_occur_offsets.set(ix, offset as u64);
+            self.node_occur_next.set(ix, next.to_vector_value());
+
+            true
+        } else {
+            false
         }
-
-        self.path_ids.set(ix, path_id.0);
-        self.node_occur_offsets.set(ix, offset as u64);
-        self.node_occur_next.set(ix, next as u64);
-
-        true
-    }
-
-    pub(super) fn get_record(
-        &self,
-        ix: NodeOccurRecordIx,
-    ) -> Option<OccurRecord> {
-        if ix >= self.path_ids.len() {
-            return None;
-        }
-
-        let path_id = PathId(self.path_ids.get(ix));
-        let offset = self.node_occur_offsets.get(ix) as usize;
-        let next = self.node_occur_next.get(ix) as usize;
-
-        Some(OccurRecord {
-            path_id,
-            offset,
-            next,
-        })
     }
 
     pub(super) fn iter(
         &self,
         ix: NodeOccurRecordIx,
-    ) -> NodeOccurrencesIter<'_> {
-        NodeOccurrencesIter::new(self, ix)
+    ) -> PackedListIter<'_, Self> {
+        PackedListIter::new(self, ix)
     }
 
+    /*
     pub(super) fn set_last_next(
         &mut self,
         ix: NodeOccurRecordIx,
@@ -487,38 +504,5 @@ impl NodeOccurrences {
 
         self.node_occur_next.set(cur_ix, next as u64);
     }
-}
-
-pub struct NodeOccurrencesIter<'a> {
-    occurrences: &'a NodeOccurrences,
-    current_rec_ix: NodeOccurRecordIx,
-}
-
-impl<'a> NodeOccurrencesIter<'a> {
-    fn new(
-        occurrences: &'a NodeOccurrences,
-        current_rec_ix: NodeOccurRecordIx,
-    ) -> Self {
-        Self {
-            occurrences,
-            current_rec_ix,
-        }
-    }
-}
-
-impl<'a> Iterator for NodeOccurrencesIter<'a> {
-    type Item = OccurRecord;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.current_rec_ix == 0 {
-            None
-        } else {
-            // TODO I shouldn't use unwrap() here; there are better
-            // ways of making sure this is consistent
-            let item =
-                self.occurrences.get_record(self.current_rec_ix).unwrap();
-            self.current_rec_ix = item.next;
-            Some(item)
-        }
-    }
+    */
 }
