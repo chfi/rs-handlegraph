@@ -41,7 +41,7 @@ impl RecordIndex for EdgeVecIx {
     }
 
     #[inline]
-    fn to_vector_index(self, offset: usize) -> usize {
+    fn record_ix(self, offset: usize) -> usize {
         self.0 + offset
     }
 }
@@ -119,7 +119,7 @@ impl EdgeLists {
     #[inline]
     fn get_next(&self, ix: EdgeListIx) -> Option<EdgeListIx> {
         let n_ix = ix.to_record_ix(1)?;
-        let next = EdgeListIx::from_vector_value(self.record_vec.get(n_ix));
+        let next = self.record_vec.get_unpack(n_ix);
         Some(next)
     }
 
@@ -131,8 +131,8 @@ impl EdgeLists {
         next: EdgeListIx,
     ) -> EdgeListIx {
         let rec_ix = EdgeListIx::from_record_ix(self.record_vec.len(), 2);
-        self.record_vec.append(handle.as_integer());
-        self.record_vec.append(next.to_vector_value());
+        self.record_vec.append(handle.pack());
+        self.record_vec.append(next.pack());
         rec_ix
     }
 
@@ -158,8 +158,8 @@ impl EdgeLists {
         let h_ix = ix.to_record_ix(0)?;
         let n_ix = ix.to_record_ix(1)?;
 
-        self.record_vec.set(h_ix, handle.as_integer());
-        self.record_vec.set(n_ix, next.to_vector_value());
+        self.record_vec.set_pack(h_ix, handle);
+        self.record_vec.set_pack(n_ix, next);
 
         Some(())
     }
@@ -240,8 +240,7 @@ impl EdgeLists {
 
             let prec_next_vec_ix = prec_ix.to_record_ix(1)?;
             // Update the previous `next` pointer
-            self.record_vec
-                .set(prec_next_vec_ix, curr_record.1.to_vector_value());
+            self.record_vec.set_pack(prec_next_vec_ix, curr_record.1);
             // Mark the record in question as removed
             self.removed_records.push(curr_ix);
             // The start of the edge list hasn't changed

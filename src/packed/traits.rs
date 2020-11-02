@@ -1,5 +1,6 @@
 use succinct::{IntVec, IntVecMut, IntVector};
 
+/// A collection built from one or more packed vectors
 pub trait PackedCollection {
     fn len(&self) -> usize;
 
@@ -20,7 +21,7 @@ pub trait PackedCollection {
 }
 
 /// An element that can be packed into a PackedCollection element as a
-/// u64, and unpacked again
+/// u64, and unpacked to its original form.
 pub trait PackedElement: Sized + Copy {
     fn unpack(v: u64) -> Self;
 
@@ -39,16 +40,33 @@ impl PackedElement for bool {
     }
 }
 
+/// A `Viewable` is a `PackedCollection` that we can get a "view" into
+/// a single element of. This lets us get a "reference" to a specific
+/// element in a packed collection.
+///
+/// The view converts element values from their packed
+/// representation automatically, using the `PackedCollection` trait.
 pub trait Viewable: PackedCollection + Sized {
+    /// Get a `ViewRef` for at the provided index on this collection.
     fn view<'a, T>(&'a self, index: usize) -> ViewRef<'a, Self, T>
     where
         T: PackedElement;
+
+    /// Get the element at `index` and unpack it.
+    #[inline]
+    fn get_unpack<T>(&self, index: usize) -> T
+    where
+        T: PackedElement,
+    {
+        T::unpack(self.get(index))
+    }
 }
 
 impl<V> Viewable for V
 where
     V: PackedCollection + Sized,
 {
+    #[inline]
     fn view<'a, T>(&'a self, index: usize) -> ViewRef<'a, Self, T>
     where
         T: PackedElement,
@@ -57,16 +75,34 @@ where
     }
 }
 
+/// A `MutViewable` lets us get a "mutable view" into a single
+/// element. This gives us what is essentially a mutable reference to
+/// a single element in a packed collection, despite packed
+/// collections not being indexable in that way.
+///
+/// The mutable view converts element values to/from their packed
+/// representations automatically, using the `PackedCollection` trait.
 pub trait MutViewable: PackedCollection + Sized {
+    /// Get a `ViewMut` for at the provided index on this collection.
     fn view_mut<'a, T>(&'a mut self, index: usize) -> ViewMut<'a, Self, T>
     where
         T: PackedElement;
+
+    /// Set the element at `index` to the packed representation of `value`.
+    #[inline]
+    fn set_pack<T>(&mut self, index: usize, value: T)
+    where
+        T: PackedElement,
+    {
+        self.set(index, value.pack())
+    }
 }
 
 impl<V> MutViewable for V
 where
     V: PackedCollection + Sized,
 {
+    #[inline]
     fn view_mut<'a, T>(&'a mut self, index: usize) -> ViewMut<'a, Self, T>
     where
         T: PackedElement,
@@ -75,6 +111,8 @@ where
     }
 }
 
+/// A "view" into an element at single index of any `PackedCollection`,
+/// unpacked from `u64` into `T`
 pub struct ViewRef<'a, V, T>
 where
     V: PackedCollection + Sized,
@@ -90,6 +128,7 @@ where
     V: PackedCollection + Sized,
     T: PackedElement,
 {
+    /// Build a new view into the provided collection, at the given index.
     fn new(collection: &'a V, index: usize) -> Self {
         let value = T::unpack(collection.get(index));
         Self {
@@ -99,11 +138,16 @@ where
         }
     }
 
+    /// Get the value at the index. Since `ViewRef` has a shared
+    /// reference to the packed collection, the value cannot change,
+    /// so we just use the cached value.
     pub fn get(&self) -> T {
         self.value
     }
 }
 
+/// A mutable "view" into an element at single index of any
+/// `PackedCollection`, unpacked from `u64` into `T`
 pub struct ViewMut<'a, V, T>
 where
     V: PackedCollection,
@@ -119,7 +163,9 @@ where
     V: PackedCollection,
     T: PackedElement,
 {
-    pub fn new(collection: &'a mut V, index: usize) -> Self {
+    /// Build a new mutable view into the provided collection, at the
+    /// given index.
+    fn new(collection: &'a mut V, index: usize) -> Self {
         let value = T::unpack(collection.get(index));
         Self {
             collection,
@@ -128,10 +174,16 @@ where
         }
     }
 
+    /// Get the value at the index. Since `ViewMut` has a mutable
+    /// reference to the packed collection, the value can only be
+    /// changed by calling `set()` on this `ViewMut`, so we just use
+    /// the cached value.
     pub fn get(&self) -> T {
         self.value
     }
 
+    /// Update the value at the index. Also updates the cache in this
+    /// `ViewMut`.
     pub fn set(&mut self, value: T) {
         self.value = value;
         self.collection.set(self.index, value.pack())

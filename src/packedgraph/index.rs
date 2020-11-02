@@ -1,12 +1,14 @@
 use std::num::NonZeroUsize;
 
+use crate::packed::traits::PackedElement;
+
 /// An index that is 1-based, and uses 0 to denote missing data/the
 /// empty record/the empty list.
 ///
 /// Can be constructed from zero-based indices (e.g. when using the
 /// length of a collection to produce the new index, and the
 /// collection is empty), or unwrapped 1-based indices.
-pub trait OneBasedIndex: Copy {
+pub trait OneBasedIndex: Copy + Sized {
     /// Construct a 1-based index from a 0-based index, shifting
     /// it into the 1-based index. The resulting index will
     /// never be the null identifier.
@@ -51,6 +53,19 @@ pub trait OneBasedIndex: Copy {
     fn null() -> Self;
 }
 
+/// Any `OneBasedIndex` can be stored in any kind of packed collection.
+impl<T: OneBasedIndex> PackedElement for T {
+    #[inline]
+    fn unpack(v: u64) -> Self {
+        Self::from_vector_value(v)
+    }
+
+    #[inline]
+    fn pack(self) -> u64 {
+        self.to_vector_value()
+    }
+}
+
 /// The identifier and index for all node-related records in the
 /// PackedGraph.
 ///
@@ -72,7 +87,14 @@ pub trait RecordIndex: Copy {
 
     fn to_one_based_ix<I: OneBasedIndex>(self) -> I;
 
-    fn to_vector_index(self, offset: usize) -> usize;
+    fn record_ix(self, offset: usize) -> usize;
+
+    /// Convenience method for getting the index of the first field at
+    /// this record index
+    #[inline]
+    fn at_0(self) -> usize {
+        self.record_ix(0)
+    }
 }
 
 /// A collection of linked lists implemented using one or more

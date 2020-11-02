@@ -239,14 +239,3 @@ impl std::iter::FromIterator<u64> for PackedIntVec {
         intvec
     }
 }
-
-// impl From<Vec<u64>> for PackedIntVec {
-//     fn from(vector: Vec<u64>) -> Self {
-//         let mut intvec = PackedIntVec::new();
-//         intvec.resize(vector.len());
-//         for (ix, v) in vector.into_iter().enumerate() {
-//             intvec.set(ix, v);
-//         }
-//         intvec
-//     }
-// }

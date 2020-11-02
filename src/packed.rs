@@ -1,6 +1,6 @@
 use succinct::{IntVec, IntVecMut, IntVector};
 
-mod traits;
+pub mod traits;
 
 pub mod deque;
 pub mod paged;

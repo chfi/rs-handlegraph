@@ -63,24 +63,33 @@ impl Add<u64> for NodeId {
 #[repr(transparent)]
 pub struct Handle(pub u64);
 
-impl From<Handle> for u64 {
+/// Returns the forward-oriented `Handle` for a `NodeId`
+impl From<NodeId> for Handle {
     #[inline]
-    fn from(h: Handle) -> Self {
-        h.0 >> 1
+    fn from(id: NodeId) -> Handle {
+        Handle(id.0 << 1)
     }
 }
 
-impl From<u32> for Handle {
+/// Unpacks the `NodeId` from a `Handle`
+impl From<Handle> for NodeId {
     #[inline]
-    fn from(i: u32) -> Self {
-        Handle::from_integer((i << 1) as u64)
+    fn from(h: Handle) -> NodeId {
+        h.id()
     }
 }
 
-impl From<i32> for Handle {
+/// A `Handle` can be packed for use in a packed collection -- it is
+/// already a packed `u64`.
+impl crate::packed::PackedElement for Handle {
     #[inline]
-    fn from(i: i32) -> Self {
-        Handle::from_integer((i << 1) as u64)
+    fn unpack(v: u64) -> Self {
+        Handle(v)
+    }
+
+    #[inline]
+    fn pack(self) -> u64 {
+        self.0
     }
 }
 

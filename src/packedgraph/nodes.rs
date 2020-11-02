@@ -1,9 +1,11 @@
+use std::num::NonZeroUsize;
+
 use crate::{
     handle::{Direction, Handle, NodeId},
     packed::*,
 };
 
-use std::num::NonZeroUsize;
+use crate::packed;
 
 use super::paths::NodeOccurRecordIx;
 use super::{
@@ -12,8 +14,6 @@ use super::{
     index::{NodeRecordId, OneBasedIndex, RecordIndex},
     sequence::Sequences,
 };
-
-use crate::packed;
 
 /// The index for a graph record. Valid indices are natural numbers
 /// above zero, each denoting a 2-element record. An index of zero
@@ -45,7 +45,7 @@ impl RecordIndex for GraphVecIx {
     }
 
     #[inline]
-    fn to_vector_index(self, offset: usize) -> usize {
+    fn record_ix(self, offset: usize) -> usize {
         self.0 + offset
     }
 }
@@ -124,7 +124,7 @@ impl NodeIdIndexMap {
         let index = id - self.min_id;
         let value = next_ix;
 
-        self.deque.set(index as usize, value.to_vector_value());
+        self.deque.set(index as usize, value.pack());
 
         true
     }
@@ -142,7 +142,8 @@ impl NodeIdIndexMap {
         }
         let index = id - self.min_id;
         let value = self.deque.get(index as usize);
-        let rec_id = NodeRecordId::from_vector_value(value);
+        let rec_id = self.deque.get_unpack(index as usize);
+
         Some(rec_id)
     }
 }
@@ -295,7 +296,7 @@ impl NodeRecords {
                     Direction::Left => vec_ix.left_edges_ix(),
                 };
 
-                EdgeListIx::from_vector_value(self.records_vec.get(ix))
+                self.records_vec.get_unpack(ix)
             }
         }
     }
@@ -314,7 +315,7 @@ impl NodeRecords {
             Direction::Left => vec_ix.left_edges_ix(),
         };
 
-        self.records_vec.set(ix, new_edge.to_vector_value());
+        self.records_vec.set_pack(ix, new_edge);
         Some(())
     }
 
@@ -326,10 +327,10 @@ impl NodeRecords {
         let vec_ix = GraphVecIx::from_one_based_ix(rec_id)?;
 
         let left = vec_ix.left_edges_ix();
-        let left = EdgeListIx::from_vector_value(self.records_vec.get(left));
+        let left = self.records_vec.get_unpack(left);
 
         let right = vec_ix.right_edges_ix();
-        let right = EdgeListIx::from_vector_value(self.records_vec.get(right));
+        let right = self.records_vec.get_unpack(right);
 
         Some((left, right))
     }
@@ -345,8 +346,9 @@ impl NodeRecords {
 
         let left_ix = vec_ix.left_edges_ix();
         let right_ix = vec_ix.right_edges_ix();
-        self.records_vec.set(left_ix, left.to_vector_value());
-        self.records_vec.set(right_ix, right.to_vector_value());
+        self.records_vec.set_pack(left_ix, left);
+        self.records_vec.set_pack(right_ix, right);
+
         Some(())
     }
 
@@ -365,10 +367,11 @@ impl NodeRecords {
 
         let (new_left, new_right) = f(left_rec, right_rec);
 
-        let left = vec_ix.left_edges_ix();
-        let right = vec_ix.right_edges_ix();
-        self.records_vec.set(left, new_left.to_vector_value());
-        self.records_vec.set(right, new_right.to_vector_value());
+        let left_ix = vec_ix.left_edges_ix();
+        let right_ix = vec_ix.right_edges_ix();
+        self.records_vec.set_pack(left_ix, new_left);
+        self.records_vec.set_pack(right_ix, new_right);
+
         Some(())
     }
 

@@ -40,7 +40,7 @@ impl RecordIndex for PathLinkRecordIx {
     }
 
     #[inline]
-    fn to_vector_index(self, offset: usize) -> usize {
+    fn record_ix(self, offset: usize) -> usize {
         self.0 + offset
     }
 }
@@ -72,12 +72,11 @@ impl PackedPath {
 
         self.steps.append(handle.as_integer());
 
-        self.links.append(ix.to_vector_value());
-        let ix_next = self.links.get(link_ix.to_vector_index(1));
-        self.links.append(ix_next);
+        self.links.append(ix.pack());
+        let ix_next = self.links.get(link_ix.record_ix(1));
+        self.links.append(ix_next.pack());
 
-        self.links
-            .set(link_ix.to_vector_index(1), new_ix.to_vector_value());
+        self.links.set(link_ix.record_ix(1), new_ix.pack());
 
         Some(new_ix)
     }
@@ -90,14 +89,13 @@ impl PackedPath {
         let new_ix = PathStepIx::from_zero_based(self.len());
         let link_ix = PathLinkRecordIx::from_one_based_ix(ix)?;
 
-        self.steps.append(handle.as_integer());
+        self.steps.append(handle.pack());
 
-        let ix_prev = self.links.get(link_ix.to_vector_index(0));
+        let ix_prev = self.links.get(link_ix.record_ix(0));
         self.links.append(ix_prev);
-        self.links.append(ix.to_vector_value());
+        self.links.append(ix.pack());
 
-        self.links
-            .set(link_ix.to_vector_index(0), new_ix.to_vector_value());
+        self.links.set_pack(link_ix.record_ix(0), new_ix);
 
         Some(new_ix)
     }
@@ -230,11 +228,11 @@ impl PathProperties {
         }
 
         let ix = id.0 as usize;
-        self.heads.set(ix, record.head_ptr.to_vector_value());
-        self.tails.set(ix, record.tail_ptr.to_vector_value());
-        self.deleted.set(ix, record.deleted as u64);
-        self.circular.set(ix, record.circular as u64);
-        self.deleted_steps.set(ix, record.deleted_steps as u64);
+        self.heads.set(ix, record.head_ptr.pack());
+        self.tails.set(ix, record.tail_ptr.pack());
+        self.deleted.set(ix, record.deleted.pack());
+        self.circular.set(ix, record.circular.pack());
+        self.deleted_steps.set(ix, record.deleted_steps.pack());
         true
     }
 
@@ -243,11 +241,12 @@ impl PathProperties {
             return None;
         }
         let ix = id.0 as usize;
-        let head_ptr = PathStepIx::from_vector_value(self.heads.get(ix));
-        let tail_ptr = PathStepIx::from_vector_value(self.tails.get(ix));
-        let deleted = self.deleted.get(ix) == 1;
-        let circular = self.circular.get(ix) == 1;
-        let deleted_steps = self.deleted_steps.get(ix) as usize;
+
+        let head_ptr = self.heads.get_unpack(ix);
+        let tail_ptr = self.tails.get_unpack(ix);
+        let deleted = self.deleted.get_unpack(ix);
+        let circular = self.circular.get_unpack(ix);
+        let deleted_steps = self.deleted_steps.get_unpack(ix);
 
         Some(PathPropertyRecord {
             head_ptr,
@@ -316,8 +315,8 @@ impl PathNames {
             return None;
         }
 
-        let offset = self.offsets.get(vec_ix) as usize;
-        let len = self.lengths.get(vec_ix) as usize;
+        let offset = self.offsets.get_unpack(vec_ix);
+        let len = self.lengths.get_unpack(vec_ix);
         let iter = self.names.iter_slice(offset, len);
 
         Some(iter)
@@ -440,9 +439,8 @@ impl PackedList for NodeOccurrences {
         }
 
         let path_id = PathId(self.path_ids.get(ix));
-        let offset = self.node_occur_offsets.get(ix) as usize;
-        let next =
-            NodeOccurRecordIx::from_vector_value(self.node_occur_next.get(ix));
+        let offset = self.node_occur_offsets.get_unpack(ix);
+        let next = self.node_occur_next.get_unpack(ix);
 
         Some(OccurRecord {
             path_id,
@@ -504,9 +502,9 @@ impl NodeOccurrences {
                 return false;
             }
 
-            self.path_ids.set(ix, path_id.0);
-            self.node_occur_offsets.set(ix, offset as u64);
-            self.node_occur_next.set(ix, next.to_vector_value());
+            self.path_ids.set_pack(ix, path_id.0);
+            self.node_occur_offsets.set_pack(ix, offset);
+            self.node_occur_next.set_pack(ix, next);
 
             true
         } else {
