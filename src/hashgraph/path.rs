@@ -3,13 +3,13 @@ use fnv::FnvHashMap;
 
 use crate::handle::{Handle, NodeId};
 
-use crate::pathhandlegraph::{PathRef, PathRefMut};
+use crate::pathhandlegraph::{PathBase, PathRef, PathRefMut};
 
 use super::Node;
 
 pub type PathId = i64;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PathStep {
     Front(i64),
     End(i64),
@@ -67,6 +67,10 @@ impl<'a> Iterator for PathStepIter<'a> {
 }
 
 use crate::pathhandlegraph::PathStep as PStep;
+
+impl PathBase for Path {
+    type Step = PStep;
+}
 
 impl<'a> PathRef for &'a Path {
     type Steps = PathStepIter<'a>;
