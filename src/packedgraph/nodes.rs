@@ -19,63 +19,6 @@ use super::{
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct GraphRecordIx(Option<NonZeroUsize>);
 
-/*
-impl GraphRecordIx {
-    /// Create a new `GraphRecordIx` by wrapping a `usize`. Should only
-    /// be used in the PackedGraph graph record internals.
-    ///
-    /// If `x` is zero, the result will be `GraphRecordIx(None)`.
-    #[inline]
-    fn new<I: Into<usize>>(x: I) -> Self {
-        Self(NonZeroUsize::new(x.into()))
-    }
-
-    /// Returns the "null", or empty `GraphRecordIx`, i.e. the one that
-    /// is used for yet-to-be-filled elements in the graph NodeId map.
-    #[inline]
-    #[allow(dead_code)]
-    pub(super) fn empty() -> Self {
-        Self(None)
-    }
-
-    /// Returns `true` if the provided `GraphRecordIx` represents the
-    /// null record.
-    #[inline]
-    pub(super) fn is_null(&self) -> bool {
-        self.0.is_none()
-    }
-
-    /// Unwrap the `GraphRecordIx` into a `u64` for use as a value in
-    /// a packed vector.
-    #[inline]
-    pub(super) fn as_vec_value(&self) -> u64 {
-        match self.0 {
-            None => 0,
-            Some(v) => v.get() as u64,
-        }
-    }
-
-    /// Wrap a `u64`, e.g. an element from a packed vector, as a
-    /// `GraphRecordIx`.
-    #[inline]
-    pub(super) fn from_vec_value(x: u64) -> Self {
-        Self(NonZeroUsize::new(x as usize))
-    }
-
-    /// Transforms the `GraphRecordIx` into an index that can be used
-    /// to get the first element of a record from the graph record
-    /// vector. Returns None if the `GraphRecordIx` points to the
-    /// empty record.
-    ///
-    /// `x -> (x - 1) * 2`
-    #[inline]
-    pub(super) fn as_vec_ix(&self) -> Option<GraphVecIx> {
-        let x = self.0?.get();
-        Some(GraphVecIx((x - 1) * 2))
-    }
-}
-*/
-
 /// The index into the underlying packed vector that is used to
 /// represent the graph records that hold pointers to the two edge
 /// lists for each node.

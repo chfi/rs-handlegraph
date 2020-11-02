@@ -16,70 +16,44 @@ use crate::pathhandlegraph::*;
 
 use crate::packed::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PackedPathStep(Option<NonZeroUsize>);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub struct PathStepIx(Option<NonZeroUsize>);
 
-impl PackedPathStep {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[repr(transparent)]
+pub struct PathLinkRecordIx(usize);
+
+crate::impl_one_based_index!(PathStepIx);
+
+impl RecordIndex for PathLinkRecordIx {
+    const RECORD_WIDTH: usize = 2;
+
     #[inline]
-    fn new<I: Into<usize>>(x: I) -> Self {
-        Self(NonZeroUsize::new(x.into()))
+    fn from_one_based_ix<I: OneBasedIndex>(ix: I) -> Option<Self> {
+        ix.to_record_ix(Self::RECORD_WIDTH).map(PathLinkRecordIx)
     }
 
     #[inline]
-    fn from_zero_based(x: usize) -> Self {
-        let x = x + 1;
-        Self::new(x)
+    fn to_one_based_ix<I: OneBasedIndex>(self) -> I {
+        I::from_record_ix(self.0, Self::RECORD_WIDTH)
     }
 
     #[inline]
-    fn to_zero_based(self) -> Option<usize> {
-        if let Some(ix) = self.0 {
-            Some(ix.get() - 1)
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    #[allow(dead_code)]
-    pub(super) fn empty() -> Self {
-        Self(None)
-    }
-    #[inline]
-    pub(super) fn is_null(&self) -> bool {
-        self.0.is_none()
-    }
-
-    #[inline]
-    pub(super) fn as_vec_value(&self) -> u64 {
-        match self.0 {
-            None => 0,
-            Some(v) => v.get() as u64,
-        }
-    }
-
-    #[inline]
-    pub(super) fn from_vec_value(x: u64) -> Self {
-        Self(NonZeroUsize::new(x as usize))
+    fn to_vector_index(self, offset: usize) -> usize {
+        self.0 + offset
     }
 }
 
 pub struct PackedPath {
     steps: RobustPagedIntVec,
     links: RobustPagedIntVec,
-    path_id: PathId,
-    head: PackedPathStep,
-    tail: PackedPathStep,
 }
 
 impl PackedPath {
-    pub(super) fn new(path_id: PathId) -> Self {
+    pub(super) fn new() -> Self {
         Self {
-            path_id,
             steps: RobustPagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
             links: RobustPagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
-            head: PackedPathStep::empty(),
-            tail: PackedPathStep::empty(),
         }
     }
 
@@ -87,58 +61,78 @@ impl PackedPath {
         self.steps.len()
     }
 
-    pub(super) fn append_step(&mut self, handle: Handle) -> PackedPathStep {
-        let ix = PackedPathStep::from_zero_based(self.len());
+    pub(super) fn insert_step(
+        &mut self,
+        ix: PathStepIx,
+        handle: Handle,
+    ) -> Option<PathStepIx> {
+        let new_ix = PathStepIx::from_zero_based(self.len());
+        let link_ix = PathLinkRecordIx::from_one_based_ix(ix)?;
+
         self.steps.append(handle.as_integer());
 
-        if self.head.is_null() {
-            self.head = PackedPathStep::from_zero_based(0);
-            self.tail = self.head;
-        }
+        self.links.append(ix.to_vector_value());
+        let ix_next = self.links.get(link_ix.to_vector_index(1));
+        self.links.append(ix_next);
 
-        self.links.append(ix.as_vec_value());
-        self.links.append(0);
+        self.links
+            .set(link_ix.to_vector_index(1), new_ix.to_vector_value());
 
-        if !self.tail.is_null() {
-            // this is definitely super wrong
-            self.links.set(
-                (ix.as_vec_value() - 1) as usize,
-                self.tail.to_zero_based().unwrap() as u64,
-            );
-        }
-
-        ix
+        Some(new_ix)
     }
 
-    pub(super) fn prepend_step(&mut self, handle: Handle) -> PackedPathStep {
-        let ix = PackedPathStep::from_zero_based(self.len());
+    pub(super) fn insert_step_before(
+        &mut self,
+        ix: PathStepIx,
+        handle: Handle,
+    ) -> Option<PathStepIx> {
+        let new_ix = PathStepIx::from_zero_based(self.len());
+        let link_ix = PathLinkRecordIx::from_one_based_ix(ix)?;
+
         self.steps.append(handle.as_integer());
 
-        if self.head.is_null() {
-            self.head = PackedPathStep::from_zero_based(0);
-            self.tail = self.head;
-        }
+        let ix_prev = self.links.get(link_ix.to_vector_index(0));
+        self.links.append(ix_prev);
+        self.links.append(ix.to_vector_value());
 
-        self.links.append(0);
-        self.links.append(self.head.to_zero_based().unwrap() as u64);
+        self.links
+            .set(link_ix.to_vector_index(0), new_ix.to_vector_value());
 
-        // self.links.set(self.hea
-
-        // if !self.tail.is_null() {
-        // this is definitely super wrong
-        self.links.set(
-            (ix.as_vec_value() - 1) as usize,
-            self.tail.to_zero_based().unwrap() as u64,
-        );
-        // }
-
-        ix
+        Some(new_ix)
     }
 }
 
-// impl<'a> PathRef for &'a PackedPath {
+pub struct PackedPathRef<'a> {
+    path: &'a PackedPath,
+    properties: PathPropertyRecord,
+}
 
-// }
+pub struct PackedPathRefMut<'a> {
+    path: &'a mut PackedPath,
+    properties: PathPropertyRecord,
+}
+
+impl<'a> std::ops::Deref for PackedPathRef<'a> {
+    type Target = PackedPath;
+
+    fn deref(&self) -> &PackedPath {
+        &self.path
+    }
+}
+
+impl<'a> std::ops::Deref for PackedPathRefMut<'a> {
+    type Target = PackedPath;
+
+    fn deref(&self) -> &PackedPath {
+        &self.path
+    }
+}
+
+impl<'a> std::ops::DerefMut for PackedPathRefMut<'a> {
+    fn deref_mut(&mut self) -> &mut PackedPath {
+        &mut self.path
+    }
+}
 
 pub struct PackedPathSteps<'a> {
     path: &'a PackedPath,
@@ -155,6 +149,7 @@ impl<'a> PackedPathSteps<'a> {
         }
     }
 
+    /*
     fn next(&mut self) -> Option<(usize, Handle)> {
         if self.finished {
             return None;
@@ -165,12 +160,13 @@ impl<'a> PackedPathSteps<'a> {
 
         let link = self.current_step += 1;
     }
+    */
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathPropertyRecord {
-    head_ptr: usize,
-    tail_ptr: usize,
+    head_ptr: PathStepIx,
+    tail_ptr: PathStepIx,
     deleted: bool,
     circular: bool,
     deleted_steps: usize,
@@ -178,8 +174,8 @@ pub struct PathPropertyRecord {
 
 impl PathPropertyRecord {
     fn new(
-        head_ptr: usize,
-        tail_ptr: usize,
+        head_ptr: PathStepIx,
+        tail_ptr: PathStepIx,
         deleted: bool,
         circular: bool,
         deleted_steps: usize,
@@ -233,8 +229,8 @@ impl PathProperties {
         }
 
         let ix = id.0 as usize;
-        self.heads.set(ix, record.head_ptr as u64);
-        self.tails.set(ix, record.tail_ptr as u64);
+        self.heads.set(ix, record.head_ptr.to_vector_value());
+        self.tails.set(ix, record.tail_ptr.to_vector_value());
         self.deleted.set(ix, record.deleted as u64);
         self.circular.set(ix, record.circular as u64);
         self.deleted_steps.set(ix, record.deleted_steps as u64);
@@ -246,8 +242,8 @@ impl PathProperties {
             return None;
         }
         let ix = id.0 as usize;
-        let head_ptr = self.heads.get(ix) as usize;
-        let tail_ptr = self.tails.get(ix) as usize;
+        let head_ptr = PathStepIx::from_vector_value(self.heads.get(ix));
+        let tail_ptr = PathStepIx::from_vector_value(self.tails.get(ix));
         let deleted = self.deleted.get(ix) == 1;
         let circular = self.circular.get(ix) == 1;
         let deleted_steps = self.deleted_steps.get(ix) as usize;
@@ -346,7 +342,7 @@ impl Default for PackedGraphPaths {
 impl PackedGraphPaths {
     pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
         let path_id = self.paths.len() as u64;
-        let packed_path = PackedPath::new(PathId(path_id));
+        let packed_path = PackedPath::new();
         self.paths.push(packed_path);
 
         self.path_props.append_record();
@@ -366,15 +362,50 @@ impl PackedGraphPaths {
         self.path_props.get_record(id)
     }
 
-    pub(super) fn get_path(&self, id: PathId) -> Option<&PackedPath> {
-        self.paths.get(id.0 as usize)
+    pub(super) fn get_path(&self, id: PathId) -> Option<PackedPathRef<'_>> {
+        let path = self.paths.get(id.0 as usize)?;
+        let properties = self.path_props.get_record(id)?;
+        Some(PackedPathRef { path, properties })
     }
 
     pub(super) fn get_path_mut(
         &mut self,
         id: PathId,
-    ) -> Option<&mut PackedPath> {
-        self.paths.get_mut(id.0 as usize)
+    ) -> Option<PackedPathRefMut<'_>> {
+        let path = self.paths.get_mut(id.0 as usize)?;
+        let properties = self.path_props.get_record(id)?;
+        Some(PackedPathRefMut { path, properties })
+    }
+
+    pub(super) fn get_paths_mut<'a, 'b>(
+        &'a mut self,
+        ids: &'b [PathId],
+    ) -> Vec<PackedPathRefMut<'a>> {
+        let props = ids
+            .iter()
+            .copied()
+            .filter_map(|i| self.path_props.get_record(i))
+            .collect::<Vec<_>>();
+
+        let paths = self
+            .paths
+            .iter_mut()
+            .enumerate()
+            .filter_map(|(ix, path)| {
+                let ix = PathId(ix as u64);
+                if ids.contains(&ix) {
+                    Some(path)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+
+        props
+            .into_iter()
+            .zip(paths.into_iter())
+            .map(|(properties, path)| PackedPathRefMut { path, properties })
+            .collect()
     }
 }
 
