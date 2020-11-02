@@ -13,6 +13,8 @@ use super::{
     sequence::Sequences,
 };
 
+use crate::packed;
+
 /// The index for a graph record. Valid indices are natural numbers
 /// above zero, each denoting a 2-element record. An index of zero
 /// denotes a record that doesn't exist.
@@ -78,7 +80,7 @@ impl Default for NodeIdIndexMap {
 }
 
 impl NodeIdIndexMap {
-    pub(super) fn iter(&self) -> PackedDequeIter<'_> {
+    pub(super) fn iter(&self) -> packed::deque::Iter<'_> {
         self.deque.iter()
     }
 
@@ -179,7 +181,7 @@ impl NodeRecords {
         self.id_index_map.max_id
     }
 
-    pub fn nodes_iter(&self) -> PackedDequeIter<'_> {
+    pub fn nodes_iter(&self) -> packed::deque::Iter<'_> {
         self.id_index_map.iter()
     }
 

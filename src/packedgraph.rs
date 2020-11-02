@@ -23,8 +23,10 @@ pub use self::{
 
 use self::graph::{PackedSeqIter, SeqRecordIx};
 
+use crate::packed;
+
 impl<'a> AllHandles for &'a PackedGraph {
-    type Handles = PackedHandlesIter<crate::packed::PackedDequeIter<'a>>;
+    type Handles = PackedHandlesIter<packed::deque::Iter<'a>>;
 
     #[inline]
     fn all_handles(self) -> Self::Handles {
