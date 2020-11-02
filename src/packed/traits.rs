@@ -1,8 +1,6 @@
 use succinct::{IntVec, IntVecMut, IntVector};
 
 pub trait PackedCollection {
-    fn width(&self) -> usize;
-
     fn len(&self) -> usize;
 
     #[inline]

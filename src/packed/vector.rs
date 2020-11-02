@@ -36,6 +36,11 @@ impl PackedIntVec {
         Default::default()
     }
 
+    #[inline]
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
     pub fn iter(&self) -> Iter<'_> {
         let iter = self.vector.iter();
         Iter::new(iter, self.num_entries)
@@ -48,11 +53,6 @@ impl PackedIntVec {
 }
 
 impl PackedCollection for PackedIntVec {
-    #[inline]
-    fn width(&self) -> usize {
-        self.width
-    }
-
     #[inline]
     fn len(&self) -> usize {
         self.num_entries
