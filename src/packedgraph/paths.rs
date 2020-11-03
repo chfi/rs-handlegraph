@@ -134,8 +134,15 @@ impl PackedGraphPaths {
     ) -> Option<PackedPathRefMut<'a>> {
         let path_id = id;
         let path = self.paths.get_mut(id.0 as usize)?;
-        let properties = self.path_props.record_mut(id);
+        let properties = self.path_props.record_ref(id);
         Some(PackedPathRefMut::new(path_id, path, properties))
+    }
+
+    pub(super) fn path_properties_mut<'a>(
+        &'a mut self,
+        id: PathId,
+    ) -> PathPropertyMut<'a> {
+        self.path_props.record_mut(id)
     }
 
     /*

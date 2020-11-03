@@ -36,7 +36,6 @@ pub(super) struct NodeOccurrences {
     path_ids: PagedIntVec,
     node_occur_offsets: PagedIntVec,
     node_occur_next: PagedIntVec,
-    // node_id_occur_ix_map: PagedIntVec,
 }
 
 impl Default for NodeOccurrences {
@@ -45,7 +44,6 @@ impl Default for NodeOccurrences {
             path_ids: PagedIntVec::new(WIDE_PAGE_WIDTH),
             node_occur_offsets: PagedIntVec::new(NARROW_PAGE_WIDTH),
             node_occur_next: PagedIntVec::new(NARROW_PAGE_WIDTH),
-            // node_id_occur_ix_map: PagedIntVec::new(NARROW_PAGE_WIDTH),
         }
     }
 }
@@ -61,6 +59,30 @@ impl NodeOccurrences {
 
         node_rec_ix
     }
+
+    /*
+    pub(super) fn append_entries(
+        &mut self,
+        path: PathId,
+        offsets: &[PathStepIx],
+    ) -> NodeOccurRecordIx {
+        let node_rec_ix =
+            NodeOccurRecordIx::from_zero_based(self.path_ids.len());
+
+        let mut count = self.path_ids.len();
+        let mut next = node_rec_ix.pack();
+
+        for &offset in offsets.iter() {
+            self.path_ids.append(path.0 as u64);
+            self.node_occur_offsets.append(offset.pack());
+            self.node_occur_next.append(next);
+            count += 1;
+            next = self.path_ids.len();
+        }
+
+        NodeOccurRecordIx::unpack(next)
+    }
+    */
 
     pub(super) fn append_entry(
         &mut self,
