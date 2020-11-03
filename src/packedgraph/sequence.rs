@@ -45,7 +45,7 @@ pub struct SeqRecordIx(usize);
 
 impl SeqRecordIx {
     #[inline]
-    pub(super) fn new<I: Into<usize>>(x: I) -> Self {
+    fn new<I: Into<usize>>(x: I) -> Self {
         Self(x.into())
     }
 }
@@ -90,10 +90,30 @@ impl Default for Sequences {
 
 impl Sequences {
     /// Add a new, empty sequence record.
-    pub(super) fn append_empty_record(&mut self) -> bool {
+
+    pub(super) fn append_empty_record(&mut self) {
         self.lengths.append(0);
         self.offsets.append(0);
-        true
+    }
+
+    fn set_record(
+        &mut self,
+        seq_ix: SeqRecordIx,
+        offset: usize,
+        length: usize,
+    ) {
+        let ix = seq_ix.at_0();
+        self.lengths.set_pack(ix, length);
+        self.offsets.set_pack(ix, offset);
+    }
+
+    fn get_record(&self, seq_ix: SeqRecordIx) -> (usize, usize) {
+        let ix = seq_ix.at_0();
+
+        let offset: usize = self.offsets.get_unpack(ix);
+        let length: usize = self.lengths.get_unpack(ix);
+
+        (offset, length)
     }
 
     fn append_record(&mut self, offset: usize, length: usize) -> SeqRecordIx {
@@ -104,8 +124,8 @@ impl Sequences {
         seq_ix
     }
 
-    /// Adds a sequence and updates the sequence records for the provided `GraphRecordIx` to the correct length and offset.
-    #[must_use]
+    /// Adds a sequence and updates the sequence records for the
+    /// provided `NodeRecordId` to the correct length and offset.
     pub(super) fn add_sequence(
         &mut self,
         rec_id: NodeRecordId,
@@ -116,8 +136,7 @@ impl Sequences {
         let len = seq.len();
         let offset = self.sequences.len();
 
-        self.lengths.set_pack(seq_ix.at_0(), len);
-        self.offsets.set_pack(seq_ix.at_0(), offset);
+        self.set_record(seq_ix, offset, len);
 
         seq.iter()
             .for_each(|&b| self.sequences.append(encode_dna_base(b)));
@@ -135,8 +154,7 @@ impl Sequences {
     ) {
         let seq_ix = SeqRecordIx::from_one_based_ix(rec_id).unwrap();
 
-        let old_len: usize = self.lengths.get_unpack(seq_ix.at_0());
-        let offset: usize = self.offsets.get_unpack(seq_ix.at_0());
+        let (old_len, offset) = self.get_record(seq_ix);
 
         assert!(old_len == seq.len());
 
@@ -167,8 +185,7 @@ impl Sequences {
         seq_ix: SeqRecordIx,
         lengths: &[usize],
     ) -> Option<Vec<SeqRecordIx>> {
-        let seq_offset: usize = self.offsets.get_unpack(seq_ix.at_0());
-        let seq_len = self.lengths.get_unpack(seq_ix.at_0());
+        let (seq_offset, seq_len) = self.get_record(seq_ix);
 
         let lengths_sum: usize = lengths.iter().sum();
         if lengths_sum > seq_len {
@@ -219,8 +236,7 @@ impl Sequences {
         seq_ix: SeqRecordIx,
         reverse: bool,
     ) -> PackedSeqIter<'_> {
-        let offset = self.offsets.get_unpack(seq_ix.at_0());
-        let len = self.lengths.get_unpack(seq_ix.at_0());
+        let (offset, len) = self.get_record(seq_ix);
 
         let iter = self.sequences.iter_slice(offset, len);
 

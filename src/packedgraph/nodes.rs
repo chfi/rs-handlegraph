@@ -257,7 +257,7 @@ impl NodeRecords {
     }
     */
 
-    pub(super) fn insert_node(&mut self, n_id: NodeId) -> Option<NodeRecordId> {
+    fn insert_node(&mut self, n_id: NodeId) -> Option<NodeRecordId> {
         if n_id == NodeId::from(0) {
             return None;
         }
@@ -379,7 +379,7 @@ impl NodeRecords {
         let g_ix = self.insert_node(n_id)?;
 
         // insert the sequence
-        let _s_ix = self.sequences.add_sequence(g_ix, seq)?;
+        self.sequences.add_sequence(g_ix, seq);
 
         Some(g_ix)
     }

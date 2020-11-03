@@ -138,7 +138,7 @@ impl EdgeLists {
 
     /// Create a new *empty* record and return its `EdgeListIx`.
     #[must_use]
-    pub(super) fn append_empty(&mut self) -> EdgeListIx {
+    fn append_empty(&mut self) -> EdgeListIx {
         let rec_ix = EdgeListIx::from_record_start(self.record_vec.len(), 2);
         self.record_vec.append(0);
         self.record_vec.append(0);
