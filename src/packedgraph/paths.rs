@@ -117,8 +117,16 @@ impl PackedPath {
 
         self.steps.append(handle.as_integer());
 
+        let ix_prev: PathStepIx = self.links.get_unpack(link_ix.record_ix(0));
+        let ix_next: PathStepIx = self.links.get_unpack(link_ix.record_ix(1));
+
+        if let Some(next_link_ix) = PathLinkRecordIx::from_one_based_ix(ix_next)
+        {
+            self.links
+                .set_pack(next_link_ix.record_ix(0), new_ix.pack());
+        }
+
         self.links.append(ix.pack());
-        let ix_next = self.links.get(link_ix.record_ix(1));
         self.links.append(ix_next.pack());
 
         self.links.set(link_ix.record_ix(1), new_ix.pack());
@@ -136,8 +144,17 @@ impl PackedPath {
 
         self.steps.append(handle.pack());
 
-        let ix_prev = self.links.get(link_ix.record_ix(0));
-        self.links.append(ix_prev);
+        let ix_prev: PathStepIx = self.links.get_unpack(link_ix.record_ix(0));
+        let ix_next: PathStepIx = self.links.get_unpack(link_ix.record_ix(1));
+
+        if let Some(prev_link_ix) = PathLinkRecordIx::from_one_based_ix(ix_prev)
+        {
+            self.links
+                .set_pack(prev_link_ix.record_ix(1), new_ix.pack());
+        }
+
+        // let ix_prev = self.links.get(link_ix.record_ix(0));
+        self.links.append(ix_prev.pack());
         self.links.append(ix.pack());
 
         self.links.set_pack(link_ix.record_ix(0), new_ix);
@@ -538,5 +555,33 @@ mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(steps_bwd, vec![(4, 2), (3, 3), (2, 4), (1, 1)]);
+
+        let s5 = p_path.insert_before(s3, hnd(5)).unwrap();
+        let s6 = p_path.insert_before(s1, hnd(6)).unwrap();
+
+        let steps_fwd = p_path
+            .iter(s6, PathStepIx::null())
+            .map(|(ix, step)| {
+                (ix.to_vector_value(), u64::from(step.handle.id()))
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            steps_fwd,
+            vec![(6, 6), (1, 1), (2, 4), (5, 5), (3, 3), (4, 2)]
+        );
+
+        let steps_bwd = p_path
+            .iter(PathStepIx::null(), s4)
+            .rev()
+            .map(|(ix, step)| {
+                (ix.to_vector_value(), u64::from(step.handle.id()))
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            steps_bwd,
+            vec![(4, 2), (3, 3), (5, 5), (2, 4), (1, 1), (6, 6)]
+        );
     }
 }

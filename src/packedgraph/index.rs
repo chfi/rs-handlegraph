@@ -185,6 +185,7 @@ impl<'a, T: PackedList> Iterator for PackedListIter<'a, T> {
 impl<'a, T: PackedDoubleList> DoubleEndedIterator for PackedListIter<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
+        // if self.head_ptr.is_null() && self.tail_ptr.is_null() {
         if self.head_ptr == self.tail_ptr {
             None
         } else {
