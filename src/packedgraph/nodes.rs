@@ -83,7 +83,11 @@ impl NodeIdIndexMap {
     /// with the given target `GraphRecordIx`.
     ///
     /// Returns `true` if the NodeId was successfully appended.
-    fn append_node_id(&mut self, id: NodeId, next_ix: NodeRecordId) -> bool {
+    pub fn append_node_id(
+        &mut self,
+        id: NodeId,
+        next_ix: NodeRecordId,
+    ) -> bool {
         let id = u64::from(id);
         if id == 0 {
             return false;
@@ -126,7 +130,7 @@ impl NodeIdIndexMap {
     }
 
     #[inline]
-    fn get_index<I: Into<NodeId>>(&self, id: I) -> Option<NodeRecordId> {
+    pub fn get_index<I: Into<NodeId>>(&self, id: I) -> Option<NodeRecordId> {
         let id = u64::from(id.into());
         if id < self.min_id || id > self.max_id {
             return None;

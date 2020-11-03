@@ -10,9 +10,13 @@ use super::{
     OneBasedIndex, PackedDoubleList, PackedList, PackedListIter, RecordIndex,
 };
 
+use super::super::NodeIdIndexMap;
+
 use crate::pathhandlegraph::PathId;
 
 use super::properties::*;
+
+use super::occurrences::{NodeOccurRecordIx, NodeOccurrences};
 
 use crate::packed::*;
 
@@ -214,4 +218,84 @@ pub struct PackedPathRefMut<'a> {
     pub path_id: PathId,
     pub path: &'a mut PackedPath,
     pub properties: PathPropertyMut<'a>,
+}
+
+impl<'a> PackedPathRefMut<'a> {
+    pub(super) fn new(
+        path_id: PathId,
+        path: &'a mut PackedPath,
+        properties: PathPropertyMut<'a>,
+    ) -> Self {
+        PackedPathRefMut {
+            path_id,
+            path,
+            properties,
+        }
+    }
+
+    #[must_use]
+    pub(super) fn append_handle(
+        &mut self,
+        handle: Handle,
+    ) -> (Handle, PathStepIx) {
+        let tail = self.properties.get_tail();
+        let step = self.path.append_handle(handle);
+
+        // add back link from new step to old tail
+
+        let new_prev_ix = step.to_record_ix(2, 0).unwrap();
+        self.path.links.set_pack(new_prev_ix, tail);
+
+        // just in case the path was empty, set the head as well
+        if self.properties.get_head().is_null() {
+            self.properties.set_head(step);
+        }
+
+        if let Some(tail_next_ix) = tail.to_record_ix(2, 1) {
+            // add forward link from old tail to new step
+            self.path.links.set_pack(tail_next_ix, step);
+        }
+        // set the new tail
+        self.properties.set_tail(step);
+
+        (handle, step)
+    }
+
+    #[must_use]
+    pub(super) fn prepend_handle(
+        &mut self,
+        handle: Handle,
+    ) -> (Handle, PathStepIx) {
+        let head = self.properties.get_head();
+        let step = self.path.append_handle(handle);
+
+        // add forward link from new step to old head
+        let new_next_ix = step.to_record_ix(2, 1).unwrap();
+        self.path.links.set_pack(new_next_ix, head);
+
+        // just in case the path was empty, set the tail as well
+        if self.properties.get_tail().is_null() {
+            self.properties.set_tail(step);
+        }
+
+        if let Some(head_prev_ix) = head.to_record_ix(2, 01) {
+            // add back link from old head to new step
+            self.path.links.set_pack(head_prev_ix, step);
+        }
+        // set the new head
+        self.properties.set_head(step);
+
+        (handle, step)
+
+        // self.occurrences
+        //     .prepend_occurrence(node_occur_ix, self.path_id, step);
+        // let node_occur_ix = self.occurrences.append_record();
+
+        // self.occurrences.set_record(
+        //     node_occur_ix,
+        //     self.path_id,
+        //     step,
+        //     NodeOccurRecordIx::null(),
+        // );
+    }
 }

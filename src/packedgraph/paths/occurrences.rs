@@ -9,7 +9,8 @@ use std::num::NonZeroUsize;
 
 #[allow(unused_imports)]
 use super::{
-    NodeRecordId, OneBasedIndex, PackedList, PackedListIter, RecordIndex,
+    NodeRecordId, OneBasedIndex, PackedList, PackedListIter, PathStepIx,
+    RecordIndex,
 };
 
 use crate::pathhandlegraph::*;
@@ -27,7 +28,7 @@ crate::impl_one_based_index!(NodeOccurRecordIx);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct OccurRecord {
     path_id: PathId,
-    offset: usize,
+    offset: PathStepIx,
     next: NodeOccurRecordIx,
 }
 
@@ -35,6 +36,7 @@ pub(super) struct NodeOccurrences {
     path_ids: PagedIntVec,
     node_occur_offsets: PagedIntVec,
     node_occur_next: PagedIntVec,
+    // node_id_occur_ix_map: PagedIntVec,
 }
 
 impl Default for NodeOccurrences {
@@ -43,12 +45,13 @@ impl Default for NodeOccurrences {
             path_ids: PagedIntVec::new(WIDE_PAGE_WIDTH),
             node_occur_offsets: PagedIntVec::new(NARROW_PAGE_WIDTH),
             node_occur_next: PagedIntVec::new(NARROW_PAGE_WIDTH),
+            // node_id_occur_ix_map: PagedIntVec::new(NARROW_PAGE_WIDTH),
         }
     }
 }
 
 impl NodeOccurrences {
-    pub(super) fn append_record(&mut self) -> Option<NodeOccurRecordIx> {
+    pub(super) fn append_record(&mut self) -> NodeOccurRecordIx {
         let node_rec_ix =
             NodeOccurRecordIx::from_zero_based(self.path_ids.len());
 
@@ -56,14 +59,78 @@ impl NodeOccurrences {
         self.node_occur_offsets.append(0);
         self.node_occur_next.append(0);
 
-        Some(node_rec_ix)
+        node_rec_ix
+    }
+
+    pub(super) fn append_entry(
+        &mut self,
+        path: PathId,
+        offset: PathStepIx,
+    ) -> NodeOccurRecordIx {
+        let node_rec_ix =
+            NodeOccurRecordIx::from_zero_based(self.path_ids.len());
+
+        self.path_ids.append(path.0 as u64);
+        self.node_occur_offsets.append(offset.pack());
+        self.node_occur_next.append(0);
+
+        node_rec_ix
+    }
+
+    pub(super) fn add_link(
+        &mut self,
+        from: NodeOccurRecordIx,
+        to: NodeOccurRecordIx,
+    ) {
+        let from_ix = from.to_zero_based().unwrap();
+        self.node_occur_next.set_pack(from_ix, to);
+    }
+
+    // pub(super) fn append_node(&mut self) {
+    //     self.node_id_occur_ix_map.append(0);
+    // }
+
+    // pub(super) fn set_node_head(
+    //     &mut self,
+    //     node: NodeRecordId,
+    //     head: NodeOccurRecordIx,
+    // ) {
+    //     let ix = node.to_zero_based().unwrap();
+    //     self.node_id_occur_ix_map.set_pack(ix, head);
+    // }
+
+    // pub(super) fn get_node_head(
+    //     &self,
+    //     node: NodeRecordId,
+    // ) -> NodeOccurRecordIx {
+    //     let ix = node.to_zero_based().unwrap();
+    //     self.node_id_occur_ix_map.get_unpack(ix)
+    // }
+
+    pub(super) fn prepend_occurrence(
+        &mut self,
+        ix: NodeOccurRecordIx,
+        path_id: PathId,
+        offset: PathStepIx,
+    ) {
+        let ix = ix.to_zero_based().unwrap();
+
+        let rec_ix = self.append_record();
+
+        let next: NodeOccurRecordIx = self.node_occur_next.get_unpack(ix);
+
+        let rec_ix = rec_ix.to_zero_based().unwrap();
+
+        self.path_ids.set_pack(rec_ix, path_id.0);
+        self.node_occur_offsets.set_pack(rec_ix, offset);
+        self.node_occur_next.set_pack(rec_ix, next);
     }
 
     pub(super) fn set_record(
         &mut self,
         ix: NodeOccurRecordIx,
         path_id: PathId,
-        offset: usize,
+        offset: PathStepIx,
         next: NodeOccurRecordIx,
     ) -> bool {
         if let Some(ix) = ix.to_zero_based() {

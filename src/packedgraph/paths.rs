@@ -13,6 +13,8 @@ use super::{
     RecordIndex,
 };
 
+use super::NodeIdIndexMap;
+
 use crate::pathhandlegraph::*;
 
 use crate::packed;
@@ -24,6 +26,8 @@ mod properties;
 
 pub use self::packedpath::*;
 pub use self::properties::*;
+
+use self::occurrences::*;
 
 /// A zero-based index into both the corresponding path in the vector
 /// of PackedPaths, as well as all the other property records for the
@@ -94,6 +98,7 @@ pub struct PackedGraphPaths {
     paths: Vec<PackedPath>,
     path_props: PathProperties,
     path_names: PathNames,
+    occurrences: NodeOccurrences,
 }
 
 impl Default for PackedGraphPaths {
@@ -102,6 +107,7 @@ impl Default for PackedGraphPaths {
             paths: Vec::new(),
             path_props: Default::default(),
             path_names: Default::default(),
+            occurrences: Default::default(),
         }
     }
 }
@@ -120,6 +126,16 @@ impl PackedGraphPaths {
 
     pub fn len(&self) -> usize {
         self.paths.len()
+    }
+
+    pub(super) fn path_ref_mut<'a>(
+        &'a mut self,
+        id: PathId,
+    ) -> Option<PackedPathRefMut<'a>> {
+        let path_id = id;
+        let path = self.paths.get_mut(id.0 as usize)?;
+        let properties = self.path_props.record_mut(id);
+        Some(PackedPathRefMut::new(path_id, path, properties))
     }
 
     /*
@@ -241,5 +257,56 @@ mod tests {
             steps_bwd,
             vec![(4, 2), (3, 3), (5, 5), (2, 4), (1, 1), (6, 6)]
         );
+    }
+
+    #[test]
+    fn packedgraph_paths_add() {
+        let mut paths = PackedGraphPaths::default();
+
+        let path_id = paths.create_path(b"path1");
+
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let (s1, s2, s3, s11) = {
+            let mut path_mut = paths.path_ref_mut(path_id).unwrap();
+
+            let (_, s1) = path_mut.append_handle(hnd(1));
+            let (_, s2) = path_mut.append_handle(hnd(2));
+            let (_, s3) = path_mut.append_handle(hnd(3));
+            let (_, s11) = path_mut.append_handle(hnd(1));
+
+            let head = path_mut.properties.get_head();
+            let tail = path_mut.properties.get_tail();
+            {
+                let mut iter = path_mut.path.iter(head, PathStepIx::null());
+
+                println!("{:?}", iter.next());
+                println!("{:?}", iter.next());
+                println!("{:?}", iter.next());
+                println!("{:?}", iter.next());
+            }
+            (s1, s2, s3, s11)
+        };
+
+        let occur = &mut paths.occurrences;
+
+        let o1 = occur.append_entry(path_id, s1);
+        let o2 = occur.append_entry(path_id, s2);
+        let o3 = occur.append_entry(path_id, s3);
+        let o11 = occur.append_entry(path_id, s11);
+
+        occur.add_link(o1, o11);
+
+        let mut occur_iter = paths.occurrences.iter(o1);
+
+        println!("{:?}", occur_iter.next());
+        println!("{:?}", occur_iter.next());
+        println!("{:?}", occur_iter.next());
+        println!("{:?}", occur_iter.next());
+
+        /*
+        let node_rec = ix_map.get_index(NodeId::from(1)).unwrap();
+        let head = path_mut.occurrences.get_node_head(node_rec);
+        */
     }
 }
