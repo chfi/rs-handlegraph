@@ -9,7 +9,8 @@ use fnv::FnvHashMap;
 use std::num::NonZeroUsize;
 
 use super::{
-    NodeRecordId, OneBasedIndex, PackedList, PackedListIter, RecordIndex,
+    NodeRecordId, OneBasedIndex, PackedDoubleList, PackedList, PackedListIter,
+    RecordIndex,
 };
 
 use crate::pathhandlegraph::*;
@@ -49,6 +50,13 @@ impl RecordIndex for PathLinkRecordIx {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PackedStep {
+    handle: Handle,
+    prev: PathStepIx,
+    next: PathStepIx,
+}
+
 pub struct PackedPath {
     steps: RobustPagedIntVec,
     links: RobustPagedIntVec,
@@ -66,7 +74,40 @@ impl PackedPath {
         self.steps.len()
     }
 
-    pub(super) fn insert_step(
+    fn append_handle(&mut self, handle: Handle) -> PathStepIx {
+        let new_ix = PathStepIx::from_zero_based(self.len());
+        self.steps.append(handle.pack());
+        self.links.append(0);
+        self.links.append(0);
+        new_ix
+    }
+
+    fn link_record(&self, ix: PathStepIx) -> Option<(PathStepIx, PathStepIx)> {
+        let link_ix = PathLinkRecordIx::from_one_based_ix(ix)?;
+        let prev = self.links.get_unpack(link_ix.record_ix(0));
+        let next = self.links.get_unpack(link_ix.record_ix(1));
+        Some((prev, next))
+    }
+
+    fn step_record(&self, ix: PathStepIx) -> Option<Handle> {
+        let step_ix = ix.to_record_start(1)?;
+        let step = self.steps.get_unpack(step_ix);
+        Some(step)
+    }
+
+    pub(super) fn prev_step(&self, ix: PathStepIx) -> Option<PathStepIx> {
+        let link_ix = ix.to_record_ix(2, 0)?;
+        let link = self.links.get_unpack(link_ix);
+        Some(link)
+    }
+
+    pub(super) fn next_step(&self, ix: PathStepIx) -> Option<PathStepIx> {
+        let link_ix = ix.to_record_ix(2, 1)?;
+        let link = self.links.get_unpack(link_ix);
+        Some(link)
+    }
+
+    pub(super) fn insert_after(
         &mut self,
         ix: PathStepIx,
         handle: Handle,
@@ -85,7 +126,7 @@ impl PackedPath {
         Some(new_ix)
     }
 
-    pub(super) fn insert_step_before(
+    pub(super) fn insert_before(
         &mut self,
         ix: PathStepIx,
         handle: Handle,
@@ -103,8 +144,51 @@ impl PackedPath {
 
         Some(new_ix)
     }
+
+    pub fn iter(
+        &self,
+        head: PathStepIx,
+        tail: PathStepIx,
+    ) -> PackedListIter<'_, PackedPath> {
+        PackedListIter::new_double(self, head, tail)
+    }
 }
 
+impl PackedList for PackedPath {
+    type ListPtr = PathStepIx;
+    type ListRecord = PackedStep;
+
+    #[inline]
+    fn next_pointer(rec: &PackedStep) -> PathStepIx {
+        rec.next
+    }
+
+    #[inline]
+    fn get_record(&self, ptr: PathStepIx) -> Option<PackedStep> {
+        let link_ix = PathLinkRecordIx::from_one_based_ix(ptr)?;
+        let prev = self.links.get_unpack(link_ix.record_ix(0));
+        let next = self.links.get_unpack(link_ix.record_ix(1));
+
+        let step_ix = ptr.to_record_start(1)?;
+        let handle = self.steps.get_unpack(step_ix);
+
+        Some(PackedStep { prev, next, handle })
+    }
+}
+
+impl PackedDoubleList for PackedPath {
+    #[inline]
+    fn prev_pointer(rec: &PackedStep) -> PathStepIx {
+        rec.prev
+    }
+}
+
+pub struct PackedPathRef<'a> {
+    path: &'a PackedPath,
+    properties: PathPropertyRef<'a>,
+}
+
+/*
 pub struct PackedPathRef<'a> {
     path: &'a PackedPath,
     properties: PathPropertyRecord,
@@ -136,131 +220,7 @@ impl<'a> std::ops::DerefMut for PackedPathRefMut<'a> {
         &mut self.path
     }
 }
-
-pub struct PackedPathSteps<'a> {
-    path: &'a PackedPath,
-    current_step: usize,
-    finished: bool,
-}
-
-impl<'a> PackedPathSteps<'a> {
-    fn new(path: &'a PackedPath) -> Self {
-        Self {
-            path,
-            current_step: 0,
-            finished: false,
-        }
-    }
-
-    /*
-    fn next(&mut self) -> Option<(usize, Handle)> {
-        if self.finished {
-            return None;
-        }
-
-        let handle = Handle::from_integer(self.steps.get(self.current_step));
-        let index = self.current_step;
-
-        let link = self.current_step += 1;
-    }
-    */
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PathPropertyRecord {
-    head_ptr: PathStepIx,
-    tail_ptr: PathStepIx,
-    deleted: bool,
-    circular: bool,
-    deleted_steps: usize,
-}
-
-impl PathPropertyRecord {
-    fn new(
-        head_ptr: PathStepIx,
-        tail_ptr: PathStepIx,
-        deleted: bool,
-        circular: bool,
-        deleted_steps: usize,
-    ) -> Self {
-        Self {
-            head_ptr,
-            tail_ptr,
-            deleted,
-            circular,
-            deleted_steps,
-        }
-    }
-}
-
-pub struct PathProperties {
-    heads: PagedIntVec,
-    tails: PagedIntVec,
-    deleted: PackedIntVec,
-    circular: PackedIntVec,
-    deleted_steps: PackedIntVec,
-}
-
-impl Default for PathProperties {
-    fn default() -> PathProperties {
-        Self {
-            heads: PagedIntVec::new(super::graph::WIDE_PAGE_WIDTH),
-            tails: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
-            deleted: Default::default(),
-            circular: Default::default(),
-            deleted_steps: Default::default(),
-        }
-    }
-}
-
-impl PathProperties {
-    fn append_record(&mut self) {
-        self.heads.append(0);
-        self.tails.append(0);
-        self.deleted.append(0);
-        self.circular.append(0);
-        self.deleted_steps.append(0);
-    }
-
-    fn len(&self) -> usize {
-        self.heads.len()
-    }
-
-    fn set_record(&mut self, id: PathId, record: &PathPropertyRecord) -> bool {
-        if id.0 >= self.len() as u64 {
-            return false;
-        }
-
-        let ix = id.0 as usize;
-        self.heads.set(ix, record.head_ptr.pack());
-        self.tails.set(ix, record.tail_ptr.pack());
-        self.deleted.set(ix, record.deleted.pack());
-        self.circular.set(ix, record.circular.pack());
-        self.deleted_steps.set(ix, record.deleted_steps.pack());
-        true
-    }
-
-    fn get_record(&self, id: PathId) -> Option<PathPropertyRecord> {
-        if id.0 >= self.len() as u64 {
-            return None;
-        }
-        let ix = id.0 as usize;
-
-        let head_ptr = self.heads.get_unpack(ix);
-        let tail_ptr = self.tails.get_unpack(ix);
-        let deleted = self.deleted.get_unpack(ix);
-        let circular = self.circular.get_unpack(ix);
-        let deleted_steps = self.deleted_steps.get_unpack(ix);
-
-        Some(PathPropertyRecord {
-            head_ptr,
-            tail_ptr,
-            deleted,
-            circular,
-            deleted_steps,
-        })
-    }
-}
+*/
 
 /// A zero-based index into both the corresponding path in the vector
 /// of PackedPaths, as well as all the other property records for the
@@ -543,4 +503,40 @@ impl NodeOccurrences {
         self.node_occur_next.set(cur_ix, next as u64);
     }
     */
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packedpath_new_path() {
+        let mut p_path = PackedPath::new();
+
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let s1 = p_path.append_handle(hnd(1));
+        let s2 = p_path.insert_after(s1, hnd(4)).unwrap();
+        let s3 = p_path.insert_after(s2, hnd(3)).unwrap();
+        let s4 = p_path.insert_after(s3, hnd(2)).unwrap();
+
+        let steps_fwd = p_path
+            .iter(s1, PathStepIx::null())
+            .map(|(ix, step)| {
+                (ix.to_vector_value(), u64::from(step.handle.id()))
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(steps_fwd, vec![(1, 1), (2, 4), (3, 3), (4, 2)]);
+
+        let steps_bwd = p_path
+            .iter(PathStepIx::null(), s4)
+            .rev()
+            .map(|(ix, step)| {
+                (ix.to_vector_value(), u64::from(step.handle.id()))
+            })
+            .collect::<Vec<_>>();
+
+        assert_eq!(steps_bwd, vec![(4, 2), (3, 3), (2, 4), (1, 1)]);
+    }
 }
