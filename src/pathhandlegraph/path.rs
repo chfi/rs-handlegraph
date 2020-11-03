@@ -5,41 +5,15 @@ use crate::handle::{Direction, Edge, Handle, NodeId};
 #[repr(transparent)]
 pub struct PathId(pub u64);
 
-/// A step along a path; the path context is implicit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub enum PathStep {
-    Before,
-    After,
-    Step(usize),
+/*
+pub trait SomeStep: Copy + Sized {
+    fn before() -> Self;
+
+    fn after() -> Self;
+
+    fn step(self) -> usize;
 }
-
-impl PathStep {
-    #[inline]
-    pub fn before(&self) -> bool {
-        *self == PathStep::Before
-    }
-
-    #[inline]
-    pub fn after(&self) -> bool {
-        *self == PathStep::After
-    }
-
-    #[inline]
-    pub fn index(&self) -> Option<usize> {
-        if let PathStep::Step(ix) = *self {
-            Some(ix)
-        } else {
-            None
-        }
-    }
-}
-
-/// A step along a specific path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-pub struct StepHandle {
-    path: PathId,
-    step: PathStep,
-}
+*/
 
 pub trait PathBase: Sized {
     type Step: Copy + Eq;
@@ -62,26 +36,28 @@ where
 /// Abstraction of an immutable embedded path.
 pub trait PathRef: Copy + PathBase {
     /// The iterator that will step through the length of the path.
-    type Steps: Iterator<Item = Self::Step>;
+    // type Steps: Iterator<Item = Self::Step>;
 
     /// Return a step iterator, starting from the first step on the path.
-    fn steps(self) -> Self::Steps;
+    // fn steps(self) -> Self::Steps;
 
     fn len(self) -> usize;
 
     fn circular(self) -> bool;
 
-    // fn first_step(self) -> StepHandle;
+    fn first_step(self) -> Self::Step;
 
-    // fn last_step(self) -> StepHandle;
+    fn last_step(self) -> Self::Step;
 
-    fn handle_at(self, step: Self::Step) -> Option<Handle>;
+    /*
+    fn next_step(self, step: Self::Step) -> Option<Self::Step>;
+
+    fn prev_step(self, step: Self::Step) -> Option<Self::Step>;
 
     fn contains(self, handle: Handle) -> bool;
 
-    // fn next_step(self, step: PathStep) -> Option<PathStep>;
-
-    // fn prev_step(self, step: PathStep) -> Option<PathStep>;
+    fn handle_at(self, step: Self::Step) -> Option<Handle>;
+    */
 
     /*
     fn before_step(self) -> StepHandle;

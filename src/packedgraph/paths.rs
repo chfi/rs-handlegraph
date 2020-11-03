@@ -17,6 +17,10 @@ use crate::pathhandlegraph::*;
 use crate::packed;
 use crate::packed::*;
 
+mod properties;
+
+pub use self::properties::*;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathStepIx(Option<NonZeroUsize>);
 

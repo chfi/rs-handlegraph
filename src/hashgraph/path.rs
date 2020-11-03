@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 
 use crate::handle::{Handle, NodeId};
 
-use crate::pathhandlegraph::{PathBase, PathRef, PathRefMut};
+// use crate::pathhandlegraph::{PathBase, PathRef, PathRefMut};
 
 use super::Node;
 
@@ -66,6 +66,7 @@ impl<'a> Iterator for PathStepIter<'a> {
     }
 }
 
+/*
 use crate::pathhandlegraph::PathStep as PStep;
 
 impl PathBase for Path {
@@ -119,6 +120,7 @@ impl<'a> PathRefMut for &'a mut Path {
         self.is_circular = circular;
     }
 }
+*/
 
 impl Path {
     pub fn new<T: Into<BString>>(
