@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use bstr::BString;
 use fnv::FnvHashMap;
 

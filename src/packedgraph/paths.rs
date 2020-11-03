@@ -1,12 +1,12 @@
+#![allow(dead_code)]
+#![allow(unused_imports)]
+
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
-    mutablehandlegraph::{AdditiveHandleGraph, MutableHandleGraph},
 };
 
 use fnv::FnvHashMap;
-
-use std::num::NonZeroUsize;
 
 use super::{
     NodeRecordId, OneBasedIndex, PackedDoubleList, PackedList, PackedListIter,

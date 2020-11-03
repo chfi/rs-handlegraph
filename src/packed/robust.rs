@@ -21,7 +21,7 @@ impl RobustPagedIntVec {
         }
     }
 
-    #[inline]
+    #[allow(dead_code)]
     pub(super) fn resize(&mut self, new_size: usize) {
         if new_size > self.page_width() {
             self.first_page.resize(self.page_width());
@@ -32,7 +32,7 @@ impl RobustPagedIntVec {
         }
     }
 
-    #[inline]
+    #[allow(dead_code)]
     pub(super) fn reserve(&mut self, capacity: usize) {
         if capacity > self.page_width() {
             self.first_page.reserve(self.page_width());

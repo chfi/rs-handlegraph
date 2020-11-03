@@ -1,10 +1,7 @@
-use succinct::{IntVec, IntVecMut, IntVector};
-
-pub mod traits;
-
 pub mod deque;
 pub mod paged;
 pub mod robust;
+pub mod traits;
 pub mod vector;
 
 pub use self::{

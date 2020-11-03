@@ -1,5 +1,3 @@
-use std::num::NonZeroUsize;
-
 use crate::{
     handle::{Direction, Handle, NodeId},
     packed::*,
@@ -7,7 +5,6 @@ use crate::{
 
 use crate::packed;
 
-use super::paths::NodeOccurRecordIx;
 use super::{
     edges::EdgeListIx,
     graph::NARROW_PAGE_WIDTH,
@@ -135,7 +132,6 @@ impl NodeIdIndexMap {
             return None;
         }
         let index = id - self.min_id;
-        let value = self.deque.get(index as usize);
         let rec_id = self.deque.get_unpack(index as usize);
 
         Some(rec_id)

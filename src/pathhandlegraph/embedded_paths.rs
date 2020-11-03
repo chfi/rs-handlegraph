@@ -1,6 +1,6 @@
-use crate::handle::{Direction, Edge, Handle, NodeId};
+use crate::handle::Handle;
 
-use super::{PathId, PathRef, PathRefMut, PathStep, StepHandle};
+use super::{PathId, PathRef, PathRefMut, StepHandle};
 
 /// A collection of embedded paths in a graph.
 pub trait EmbeddedPaths: Sized {

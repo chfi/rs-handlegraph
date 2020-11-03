@@ -1,4 +1,4 @@
-use crate::handle::{Direction, Edge, Handle, NodeId};
+use crate::handle::Handle;
 
 /// A unique identifier for a single path.
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

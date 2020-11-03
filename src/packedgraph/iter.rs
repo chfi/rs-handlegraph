@@ -1,7 +1,5 @@
 use crate::handle::Handle;
 
-use crate::packed::traits::*;
-
 use super::{EdgeLists, PackedListIter};
 
 /// Iterator over a PackedGraph's handles. For every non-zero value in

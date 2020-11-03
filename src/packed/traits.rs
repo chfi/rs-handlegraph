@@ -1,5 +1,3 @@
-use succinct::{IntVec, IntVecMut, IntVector};
-
 /// A collection built from one or more packed vectors
 pub trait PackedCollection {
     fn len(&self) -> usize;
@@ -118,8 +116,8 @@ where
     V: PackedCollection + Sized,
     T: PackedElement,
 {
-    collection: &'a V,
-    index: usize,
+    _collection: &'a V,
+    _index: usize,
     value: T,
 }
 
@@ -132,8 +130,8 @@ where
     fn new(collection: &'a V, index: usize) -> Self {
         let value = T::unpack(collection.get(index));
         Self {
-            collection,
-            index,
+            _collection: collection,
+            _index: index,
             value,
         }
     }
@@ -209,6 +207,7 @@ macro_rules! impl_packed_element_as {
     };
 }
 
+#[allow(unused_macros)]
 macro_rules! impl_packed_element_from_into {
     ($for:ty) => {
         impl PackedElement for $for {

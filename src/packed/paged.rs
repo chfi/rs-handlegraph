@@ -31,6 +31,7 @@ impl PagedIntVec {
         }
     }
 
+    #[allow(dead_code)]
     pub(super) fn resize(&mut self, new_size: usize) {
         #[allow(clippy::comparison_chain)]
         if new_size < self.num_entries {
@@ -49,6 +50,7 @@ impl PagedIntVec {
         self.num_entries = new_size;
     }
 
+    #[allow(dead_code)]
     pub(super) fn reserve(&mut self, new_size: usize) {
         if new_size > self.pages.len() * self.page_size {
             let num_pages = (new_size - 1) / self.page_size + 1;
