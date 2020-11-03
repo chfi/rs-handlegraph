@@ -108,11 +108,11 @@ pub trait RecordIndex: Copy {
 /// A collection of linked lists implemented using one or more
 /// vector-like collections.
 pub trait PackedList {
-    type ListPtr: Copy;
+    type ListPtr: PartialEq + OneBasedIndex;
     type ListRecord: Copy;
 
     /// Extract the pointer for a record
-    fn record_pointer(rec: &Self::ListRecord) -> Self::ListPtr;
+    fn next_pointer(rec: &Self::ListRecord) -> Self::ListPtr;
 
     /// Retrieve the record for the given pointer, if the pointer is
     /// not the empty list
@@ -122,19 +122,47 @@ pub trait PackedList {
     /// we're not already at the end of the list
     #[inline]
     fn next_record(&self, rec: &Self::ListRecord) -> Option<Self::ListRecord> {
-        self.get_record(Self::record_pointer(rec))
+        self.get_record(Self::next_pointer(rec))
+    }
+}
+
+/// A collection of doubly linked lists implemented using packed vectors.
+pub trait PackedDoubleList: PackedList {
+    fn prev_pointer(rec: &Self::ListRecord) -> Self::ListPtr;
+
+    #[inline]
+    fn prev_record(&self, rec: &Self::ListRecord) -> Option<Self::ListRecord> {
+        self.get_record(Self::prev_pointer(rec))
     }
 }
 
 /// An iterator through linked lists represented using PackedList
 pub struct PackedListIter<'a, T: PackedList> {
     list: &'a T,
-    current_ptr: T::ListPtr,
+    head_ptr: T::ListPtr,
+    tail_ptr: T::ListPtr,
 }
 
 impl<'a, T: PackedList> PackedListIter<'a, T> {
-    pub(super) fn new(list: &'a T, current_ptr: T::ListPtr) -> Self {
-        Self { list, current_ptr }
+    pub(super) fn new(list: &'a T, head_ptr: T::ListPtr) -> Self {
+        let tail_ptr = T::ListPtr::null();
+        Self {
+            list,
+            head_ptr,
+            tail_ptr,
+        }
+    }
+
+    pub(super) fn new_double(
+        list: &'a T,
+        head_ptr: T::ListPtr,
+        tail_ptr: T::ListPtr,
+    ) -> Self {
+        Self {
+            list,
+            head_ptr,
+            tail_ptr,
+        }
     }
 }
 
@@ -143,10 +171,28 @@ impl<'a, T: PackedList> Iterator for PackedListIter<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        let record = self.list.get_record(self.current_ptr)?;
-        let this_ptr = self.current_ptr;
-        self.current_ptr = T::record_pointer(&record);
-        Some((this_ptr, record))
+        if self.head_ptr == self.tail_ptr {
+            None
+        } else {
+            let record = self.list.get_record(self.head_ptr)?;
+            let this_ptr = self.head_ptr;
+            self.head_ptr = T::next_pointer(&record);
+            Some((this_ptr, record))
+        }
+    }
+}
+
+impl<'a, T: PackedDoubleList> DoubleEndedIterator for PackedListIter<'a, T> {
+    #[inline]
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.head_ptr == self.tail_ptr {
+            None
+        } else {
+            let record = self.list.get_record(self.tail_ptr)?;
+            let this_ptr = self.tail_ptr;
+            self.tail_ptr = T::prev_pointer(&record);
+            Some((this_ptr, record))
+        }
     }
 }
 

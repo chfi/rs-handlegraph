@@ -359,13 +359,16 @@ impl PackedGraphPaths {
         self.paths.len()
     }
 
+    /*
     pub(super) fn path_properties(
         &self,
         id: PathId,
     ) -> Option<PathPropertyRecord> {
         self.path_props.get_record(id)
     }
+    */
 
+    /*
     pub(super) fn get_path(&self, id: PathId) -> Option<PackedPathRef<'_>> {
         let path = self.paths.get(id.0 as usize)?;
         let properties = self.path_props.get_record(id)?;
@@ -411,6 +414,7 @@ impl PackedGraphPaths {
             .map(|(properties, path)| PackedPathRefMut { path, properties })
             .collect()
     }
+    */
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -431,7 +435,7 @@ impl PackedList for NodeOccurrences {
     type ListRecord = OccurRecord;
 
     #[inline]
-    fn record_pointer(rec: &OccurRecord) -> NodeOccurRecordIx {
+    fn next_pointer(rec: &OccurRecord) -> NodeOccurRecordIx {
         rec.next
     }
 

@@ -68,7 +68,7 @@ impl PackedList for EdgeLists {
     type ListRecord = EdgeRecord;
 
     #[inline]
-    fn record_pointer(rec: &EdgeRecord) -> EdgeListIx {
+    fn next_pointer(rec: &EdgeRecord) -> EdgeListIx {
         rec.1
     }
 
