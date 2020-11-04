@@ -5,18 +5,12 @@ use crate::handle::Handle;
 #[repr(transparent)]
 pub struct PathId(pub u64);
 
-/*
-pub trait SomeStep: Copy + Sized {
-    fn before() -> Self;
-
-    fn after() -> Self;
-
-    fn step(self) -> usize;
+pub trait PathStep: Sized + Copy + Eq {
+    fn handle(&self) -> Handle;
 }
-*/
 
 pub trait PathBase: Sized {
-    type Step: Copy + Eq;
+    type Step: PathStep;
 }
 
 impl<'a, T> PathBase for &'a T
@@ -36,12 +30,17 @@ where
 /// Abstraction of an immutable embedded path.
 pub trait PathRef: Copy + PathBase {
     /// The iterator that will step through the length of the path.
-    // type Steps: Iterator<Item = Self::Step>;
+    type Steps: DoubleEndedIterator<Item = Self::Step>;
 
-    /// Return a step iterator, starting from the first step on the path.
-    // fn steps(self) -> Self::Steps;
+    // Return a step iterator, starting from the first step on the path.
+    fn steps(self) -> Self::Steps;
 
     fn len(self) -> usize;
+
+    #[inline]
+    fn is_empty(self) -> bool {
+        self.len() == 0
+    }
 
     fn circular(self) -> bool;
 
@@ -49,13 +48,15 @@ pub trait PathRef: Copy + PathBase {
 
     fn last_step(self) -> Self::Step;
 
-    /*
     fn next_step(self, step: Self::Step) -> Option<Self::Step>;
 
     fn prev_step(self, step: Self::Step) -> Option<Self::Step>;
 
-    fn contains(self, handle: Handle) -> bool;
+    fn contains(self, handle: Handle) -> bool {
+        self.steps().any(|s| s.handle() == handle)
+    }
 
+    /*
     fn handle_at(self, step: Self::Step) -> Option<Handle>;
     */
 

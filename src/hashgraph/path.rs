@@ -44,6 +44,7 @@ pub struct Path {
     pub nodes: Vec<Handle>,
 }
 
+/*
 pub struct PathStepIter<'a> {
     handles: std::slice::Iter<'a, Handle>,
     index: usize,
@@ -67,6 +68,7 @@ impl<'a> Iterator for PathStepIter<'a> {
         Some(item)
     }
 }
+*/
 
 /*
 use crate::pathhandlegraph::PathStep as PStep;

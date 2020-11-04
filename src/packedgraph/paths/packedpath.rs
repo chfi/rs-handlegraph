@@ -12,7 +12,7 @@ use super::{
 
 use super::super::NodeIdIndexMap;
 
-use crate::pathhandlegraph::PathId;
+use crate::pathhandlegraph::{PathBase, PathId, PathRef, PathStep};
 
 use super::properties::*;
 
@@ -93,6 +93,12 @@ impl PackedPath {
         let step_ix = ix.to_record_start(1)?;
         let step = self.steps.get_unpack(step_ix);
         Some(step)
+    }
+
+    fn get_step(&self, ix: PathStepIx) -> PackedStep {
+        let handle = self.step_record(ix).unwrap();
+        let (prev, next) = self.link_record(ix).unwrap();
+        PackedStep { handle, prev, next }
     }
 
     fn set_link(&mut self, from: PathStepIx, to: PathStepIx) -> Option<()> {
@@ -246,6 +252,58 @@ pub struct PackedPathRefMut<'a> {
     pub path: &'a mut PackedPath,
     pub properties: PathPropertyRef<'a>,
     updates: PathUpdate,
+}
+
+impl PathStep for (PathStepIx, PackedStep) {
+    fn handle(&self) -> Handle {
+        self.1.handle
+    }
+}
+
+impl<'a> PathBase for PackedPathRef<'a> {
+    type Step = (PathStepIx, PackedStep);
+}
+
+impl<'a> PathRef for &'a PackedPathRef<'a> {
+    type Steps = PackedListIter<'a, PackedPath>;
+
+    fn steps(self) -> Self::Steps {
+        let head = self.properties.get_head();
+        let tail = self.properties.get_tail();
+        self.path.iter(head, tail)
+    }
+
+    fn len(self) -> usize {
+        self.path.steps.len()
+    }
+
+    fn circular(self) -> bool {
+        self.properties.get_circular()
+    }
+
+    fn first_step(self) -> Self::Step {
+        let head = self.properties.get_head();
+        let step = self.path.get_step(head);
+        (head, step)
+    }
+
+    fn last_step(self) -> Self::Step {
+        let tail = self.properties.get_tail();
+        let step = self.path.get_step(tail);
+        (tail, step)
+    }
+
+    fn next_step(self, step: Self::Step) -> Option<Self::Step> {
+        let next = self.path.next_step(step.0)?;
+        let next_step = self.path.get_step(next);
+        Some((next, next_step))
+    }
+
+    fn prev_step(self, step: Self::Step) -> Option<Self::Step> {
+        let prev = self.path.prev_step(step.0)?;
+        let prev_step = self.path.get_step(prev);
+        Some((prev, prev_step))
+    }
 }
 
 /// A representation of a step that's added to a path, that must be

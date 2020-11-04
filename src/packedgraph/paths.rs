@@ -99,7 +99,6 @@ pub struct PackedGraphPaths {
     paths: Vec<PackedPath>,
     path_props: PathProperties,
     path_names: PathNames,
-    // occurrences: NodeOccurrences,
 }
 
 impl Default for PackedGraphPaths {
@@ -108,7 +107,6 @@ impl Default for PackedGraphPaths {
             paths: Vec::new(),
             path_props: Default::default(),
             path_names: Default::default(),
-            // occurrences: Default::default(),
         }
     }
 }
@@ -145,63 +143,6 @@ impl PackedGraphPaths {
     ) -> PathPropertyMut<'a> {
         self.path_props.record_mut(id)
     }
-
-    /*
-    pub(super) fn path_properties(
-        &self,
-        id: PathId,
-    ) -> Option<PathPropertyRecord> {
-        self.path_props.get_record(id)
-    }
-    */
-
-    /*
-    pub(super) fn get_path(&self, id: PathId) -> Option<PackedPathRef<'_>> {
-        let path = self.paths.get(id.0 as usize)?;
-        let properties = self.path_props.get_record(id)?;
-        Some(PackedPathRef { path, properties })
-    }
-
-    pub(super) fn get_path_mut(
-        &mut self,
-        id: PathId,
-    ) -> Option<PackedPathRefMut<'_>> {
-        let path = self.paths.get_mut(id.0 as usize)?;
-        let properties = self.path_props.get_record(id)?;
-        Some(PackedPathRefMut { path, properties })
-    }
-
-    pub(super) fn get_paths_mut<'a, 'b>(
-        &'a mut self,
-        ids: &'b [PathId],
-    ) -> Vec<PackedPathRefMut<'a>> {
-        let props = ids
-            .iter()
-            .copied()
-            .filter_map(|i| self.path_props.get_record(i))
-            .collect::<Vec<_>>();
-
-        let paths = self
-            .paths
-            .iter_mut()
-            .enumerate()
-            .filter_map(|(ix, path)| {
-                let ix = PathId(ix as u64);
-                if ids.contains(&ix) {
-                    Some(path)
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-
-        props
-            .into_iter()
-            .zip(paths.into_iter())
-            .map(|(properties, path)| PackedPathRefMut { path, properties })
-            .collect()
-    }
-    */
 }
 
 #[cfg(test)]
