@@ -18,6 +18,7 @@ pub type StepViewMut<'a> = ViewMut<'a, PagedIntVec, PathStepIx>;
 pub type BoolViewMut<'a> = ViewMut<'a, PackedIntVec, bool>;
 pub type UsizeViewMut<'a> = ViewMut<'a, PackedIntVec, usize>;
 
+#[derive(Debug, Clone)]
 pub struct PathPropertyRef<'a> {
     head: StepView<'a>,
     tail: StepView<'a>,
@@ -44,6 +45,7 @@ impl<'a> PathPropertyRef<'a> {
     }
 }
 
+#[derive(Debug)]
 pub struct PathPropertyMut<'a> {
     head: StepViewMut<'a>,
     tail: StepViewMut<'a>,
@@ -86,6 +88,7 @@ impl<'a> PathPropertyMut<'a> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PathPropertyRecord {
     pub(super) head: PathStepIx,
     pub(super) tail: PathStepIx,
@@ -94,6 +97,7 @@ pub struct PathPropertyRecord {
     pub(super) deleted_steps: usize,
 }
 
+#[derive(Debug, Clone)]
 pub struct PathProperties {
     heads: PagedIntVec,
     tails: PagedIntVec,

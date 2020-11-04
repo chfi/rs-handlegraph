@@ -9,6 +9,7 @@ pub mod graph;
 pub mod index;
 pub mod iter;
 pub mod nodes;
+pub mod occurrences;
 pub mod paths;
 pub mod sequence;
 
@@ -19,9 +20,10 @@ pub use self::{
     iter::{EdgeListHandleIter, PackedHandlesIter},
     nodes::{GraphVecIx, NodeIdIndexMap, NodeRecords},
     paths::*,
+    sequence::{PackedSeqIter, Sequences},
 };
 
-use self::graph::{PackedSeqIter, SeqRecordIx};
+use self::graph::SeqRecordIx;
 
 use crate::packed;
 

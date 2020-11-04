@@ -3,7 +3,7 @@
 #[allow(unused_imports)]
 use crate::handle::{Handle, NodeId};
 
-use super::super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH};
+use super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH};
 
 use std::num::NonZeroUsize;
 
@@ -21,18 +21,19 @@ use crate::packed::*;
 /// natural numbers starting from 1, each denoting a *record*. A zero
 /// denotes the end of the list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) struct NodeOccurRecordIx(Option<NonZeroUsize>);
+pub struct NodeOccurRecordIx(Option<NonZeroUsize>);
 
 crate::impl_one_based_index!(NodeOccurRecordIx);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct OccurRecord {
+pub struct OccurRecord {
     path_id: PathId,
     offset: PathStepIx,
     next: NodeOccurRecordIx,
 }
 
-pub(super) struct NodeOccurrences {
+#[derive(Debug, Clone)]
+pub struct NodeOccurrences {
     path_ids: PagedIntVec,
     node_occur_offsets: PagedIntVec,
     node_occur_next: PagedIntVec,

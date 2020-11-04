@@ -20,14 +20,13 @@ use crate::pathhandlegraph::*;
 use crate::packed;
 use crate::packed::*;
 
-mod occurrences;
+// mod occurrences;
 mod packedpath;
 mod properties;
 
+// pub use self::occurrences::*;
 pub use self::packedpath::*;
 pub use self::properties::*;
-
-use self::occurrences::*;
 
 /// A zero-based index into both the corresponding path in the vector
 /// of PackedPaths, as well as all the other property records for the
@@ -42,6 +41,7 @@ impl PathNameIx {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PathNames {
     // TODO compress the names; don't store entire Vec<u8>s
     name_id_map: FnvHashMap<Vec<u8>, PathNameIx>,
@@ -94,11 +94,12 @@ impl PathNames {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PackedGraphPaths {
     paths: Vec<PackedPath>,
     path_props: PathProperties,
     path_names: PathNames,
-    occurrences: NodeOccurrences,
+    // occurrences: NodeOccurrences,
 }
 
 impl Default for PackedGraphPaths {
@@ -107,7 +108,7 @@ impl Default for PackedGraphPaths {
             paths: Vec::new(),
             path_props: Default::default(),
             path_names: Default::default(),
-            occurrences: Default::default(),
+            // occurrences: Default::default(),
         }
     }
 }

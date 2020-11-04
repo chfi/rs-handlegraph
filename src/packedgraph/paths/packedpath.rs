@@ -16,8 +16,6 @@ use crate::pathhandlegraph::PathId;
 
 use super::properties::*;
 
-use super::occurrences::{NodeOccurRecordIx, NodeOccurrences};
-
 use crate::packed::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -58,6 +56,7 @@ pub struct PackedStep {
     pub(super) next: PathStepIx,
 }
 
+#[derive(Debug, Clone)]
 pub struct PackedPath {
     steps: RobustPagedIntVec,
     links: RobustPagedIntVec,
@@ -236,12 +235,6 @@ impl PathUpdate {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct StepUpdate {
-    pub(super) handle: Handle,
-    pub(super) step: PathStepIx,
-}
-
 pub struct PackedPathRef<'a> {
     pub path_id: PathId,
     pub path: &'a PackedPath,
@@ -253,6 +246,19 @@ pub struct PackedPathRefMut<'a> {
     pub path: &'a mut PackedPath,
     pub properties: PathPropertyRef<'a>,
     updates: PathUpdate,
+}
+
+/// A representation of a step that's added to a path, that must be
+/// inserted into the occurrences list and linked to the correct list
+/// for the handle.
+///
+/// The path ID must be provided separately, and the `Handle` must be
+/// transformed into a `NodeRecordId` so that the list for the node in
+/// question can be identified.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct StepUpdate {
+    pub(super) handle: Handle,
+    pub(super) step: PathStepIx,
 }
 
 impl<'a> PackedPathRefMut<'a> {
@@ -319,7 +325,6 @@ impl<'a> PackedPathRefMut<'a> {
     #[must_use]
     pub(super) fn append_handle(&mut self, handle: Handle) -> StepUpdate {
         let tail = self.updates.tail;
-        // let tail = self.properties.get_tail();
         let step = self.path.append_handle(handle);
 
         // add back link from new step to old tail
@@ -343,7 +348,6 @@ impl<'a> PackedPathRefMut<'a> {
 
     #[must_use]
     pub(super) fn prepend_handle(&mut self, handle: Handle) -> StepUpdate {
-        // let head = self.properties.get_head();
         let head = self.updates.head;
         let step = self.path.append_handle(handle);
 
