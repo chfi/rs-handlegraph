@@ -12,7 +12,9 @@ use super::{
 
 use super::super::NodeIdIndexMap;
 
-use crate::pathhandlegraph::{PathBase, PathId, PathRef, PathStep};
+use crate::pathhandlegraph::{
+    PathBase, PathId, PathRef, PathRefMutSteps, PathStep,
+};
 
 use super::properties::*;
 
@@ -251,7 +253,7 @@ pub struct PackedPathRefMut<'a> {
     pub path_id: PathId,
     pub path: &'a mut PackedPath,
     pub properties: PathPropertyRef<'a>,
-    updates: PathUpdate,
+    pub(super) updates: PathUpdate,
 }
 
 impl PathStep for (PathStepIx, PackedStep) {
@@ -262,6 +264,14 @@ impl PathStep for (PathStepIx, PackedStep) {
 
 impl<'a> PathBase for PackedPathRef<'a> {
     type Step = (PathStepIx, PackedStep);
+
+    type StepIx = PathStepIx;
+}
+
+impl<'a> PathBase for PackedPathRefMut<'a> {
+    type Step = (PathStepIx, PackedStep);
+
+    type StepIx = PathStepIx;
 }
 
 impl<'a> PathRef for &'a PackedPathRef<'a> {
@@ -428,3 +438,18 @@ impl<'a> PackedPathRefMut<'a> {
         StepUpdate { handle, step }
     }
 }
+
+/*
+impl<'a> PathRefMutSteps for PackedPathRefMut<'a> {
+    fn append_step(&mut self, handle: Handle) -> (Handle, PathStepIx) {
+        let update = self.append_handle(handle);
+        (handle, update.step)
+    }
+
+    fn prepend_step(&mut self, handle: Handle) -> (Handle, PathStepIx) {
+        let update = self.prepend_handle(handle);
+        (handle, update.step)
+    }
+}
+
+    */

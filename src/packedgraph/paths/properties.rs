@@ -99,11 +99,11 @@ pub struct PathPropertyRecord {
 
 #[derive(Debug, Clone)]
 pub struct PathProperties {
-    heads: PagedIntVec,
-    tails: PagedIntVec,
-    deleted: PackedIntVec,
-    circular: PackedIntVec,
-    deleted_steps: PackedIntVec,
+    pub(super) heads: PagedIntVec,
+    pub(super) tails: PagedIntVec,
+    pub(super) deleted: PackedIntVec,
+    pub(super) circular: PackedIntVec,
+    pub(super) deleted_steps: PackedIntVec,
 }
 
 impl Default for PathProperties {

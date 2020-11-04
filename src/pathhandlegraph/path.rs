@@ -11,6 +11,8 @@ pub trait PathStep: Sized + Copy + Eq {
 
 pub trait PathBase: Sized {
     type Step: PathStep;
+
+    type StepIx: Sized + Copy + Eq;
 }
 
 impl<'a, T> PathBase for &'a T
@@ -18,6 +20,8 @@ where
     T: PathBase,
 {
     type Step = T::Step;
+
+    type StepIx = T::StepIx;
 }
 
 impl<'a, T> PathBase for &'a mut T
@@ -25,6 +29,8 @@ where
     T: PathBase,
 {
     type Step = T::Step;
+
+    type StepIx = T::StepIx;
 }
 
 /// Abstraction of an immutable embedded path.
@@ -71,6 +77,26 @@ pub trait PathRef: Copy + PathBase {
 
     fn step_at_base(self, pos: usize) -> Option<StepHandle>;
     */
+}
+
+pub trait PathRefMutSteps: PathBase {
+    // type StepUpdate: Sized + Copy;
+
+    fn append_step(&mut self, handle: Handle) -> (Handle, Self::StepIx);
+
+    fn prepend_step(&mut self, handle: Handle) -> (Handle, Self::StepIx);
+
+    /*
+    fn append_iter<I>(self, iter: I) -> Vec<StepUpdate>
+    where
+        I: IntoIterator<Item = Handle>;
+
+    fn prepend_iter<I>(self, iter: I) -> Vec<StepUpdate>
+    where
+        I: IntoIterator<Item = Handle>;
+    */
+
+    // fn rewrite_segment<I>(self, iter: I, from: Self::Step, to: Self::Step) -> Vec<StepUpdate>;
 }
 
 /// An embedded path that can also be mutated by appending or

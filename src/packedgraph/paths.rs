@@ -137,6 +137,16 @@ impl PackedGraphPaths {
         Some(PackedPathRefMut::new(path_id, path, properties))
     }
 
+    pub(super) fn apply_path_update<'a>(
+        &'a mut self,
+        path_mut: PackedPathRefMut<'a>,
+    ) {
+        let PathUpdate { head, tail } = path_mut.updates;
+        let ix = path_mut.path_id.0 as usize;
+        self.path_props.heads.set_pack(ix, head);
+        self.path_props.tails.set_pack(ix, tail);
+    }
+
     pub(super) fn path_properties_mut<'a>(
         &'a mut self,
         id: PathId,
