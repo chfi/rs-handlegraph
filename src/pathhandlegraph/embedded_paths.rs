@@ -20,6 +20,18 @@ pub trait PathNamesMut: Sized {
     fn insert_name(self, name: &[u8]) -> Option<PathId>;
 }
 
+pub trait PathRefs: Sized {
+    type Path: PathRef;
+
+    fn path_ref(self, id: PathId) -> Option<Self::Path>;
+}
+
+pub trait PathRefsMut: Sized {
+    type PathMut: PathRefMut;
+
+    fn path_ref_mut(self, id: PathId) -> Option<Self::PathMut>;
+}
+
 /// A collection of embedded paths in a graph.
 pub trait EmbeddedPaths: Sized {
     /// Iterator through all path IDs in the graph

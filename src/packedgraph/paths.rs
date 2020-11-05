@@ -100,7 +100,7 @@ impl Default for PackedGraphPaths {
     }
 }
 
-pub(super) struct PathMutContext<'a> {
+pub struct PathMutContext<'a> {
     path_ref_mut: PackedPathRefMut<'a>,
     path_properties: &'a mut PathProperties,
 }
@@ -126,6 +126,26 @@ impl<'a> Drop for PathMutContext<'a> {
         self.path_properties
             .deleted_steps
             .set_pack(ix, new_props.deleted_steps);
+    }
+}
+
+impl<'a> PathBase for PathMutContext<'a> {
+    type Step = (PathStepIx, PackedStep);
+
+    type StepIx = PathStepIx;
+}
+
+impl<'a> PathRefMut for PathMutContext<'a> {
+    fn append_step(&mut self, handle: Handle) -> StepUpdate {
+        self.path_ref_mut.append_handle(handle)
+    }
+
+    fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
+        self.path_ref_mut.prepend_handle(handle)
+    }
+
+    fn set_circularity(&mut self, circular: bool) {
+        self.path_ref_mut.properties.circular = circular;
     }
 }
 
@@ -188,7 +208,7 @@ impl PackedGraphPaths {
     ) -> Option<PackedPathRef<'a>> {
         let path_id = id;
         let path = self.paths.get(id.0 as usize)?;
-        let properties = self.path_props.record_ref(id);
+        let properties = self.path_props.get_record(id);
         Some(PackedPathRef::new(path_id, path, properties))
     }
 
@@ -283,6 +303,18 @@ impl<'a> AllPathIds for &'a PackedGraphPaths {
     }
 }
 
+impl<'a> PathNames for &'a PackedPathNames {
+    type PathName = packed::vector::IterView<'a, u8>;
+
+    fn get_path_name(self, id: PathId) -> Option<Self::PathName> {
+        self.name_iter(id)
+    }
+
+    fn get_path_id(self, name: &[u8]) -> Option<PathId> {
+        self.name_id_map.get(name).copied()
+    }
+}
+
 impl<'a> PathNames for &'a PackedGraphPaths {
     type PathName = packed::vector::IterView<'a, u8>;
 
@@ -302,6 +334,22 @@ impl<'a> PathNamesMut for &'a mut PackedGraphPaths {
         } else {
             Some(self.path_names.add_name(name))
         }
+    }
+}
+
+impl<'a> PathRefs for &'a PackedGraphPaths {
+    type Path = PackedPathRef<'a>;
+
+    fn path_ref(self, id: PathId) -> Option<PackedPathRef<'a>> {
+        self.path_ref(id)
+    }
+}
+
+impl<'a> PathRefsMut for &'a mut PackedGraphPaths {
+    type PathMut = PathMutContext<'a>;
+
+    fn path_ref_mut(self, id: PathId) -> Option<PathMutContext<'a>> {
+        self.get_path_mut_ctx(id)
     }
 }
 

@@ -213,24 +213,29 @@ impl PackedDoubleList for PackedPath {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct PackedPathRef<'a> {
     pub(super) path_id: PathId,
     pub(super) path: &'a PackedPath,
-    pub(super) properties: PathPropertyRef<'a>,
+    // pub(super) properties: PathPropertyRef<'a>,
+    properties: PathPropertyRecord,
 }
 
 impl<'a> PackedPathRef<'a> {
     pub(super) fn new(
         path_id: PathId,
         path: &'a PackedPath,
-        properties: PathPropertyRef<'a>,
+        properties: PathPropertyRecord,
     ) -> Self {
         PackedPathRef {
             path_id,
             path,
             properties,
         }
+    }
+
+    pub(super) fn properties<'b>(&'b self) -> &'b PathPropertyRecord {
+        &self.properties
     }
 }
 
@@ -267,12 +272,12 @@ impl<'a> PathBase for PackedPathRefMut<'a> {
     type StepIx = PathStepIx;
 }
 
-impl<'a> PathRef for &'a PackedPathRef<'a> {
+impl<'a> PathRef for PackedPathRef<'a> {
     type Steps = PackedListIter<'a, PackedPath>;
 
     fn steps(self) -> Self::Steps {
-        let head = self.properties.get_head();
-        let tail = self.properties.get_tail();
+        let head = self.properties.head;
+        let tail = self.properties.tail;
         self.path.iter(head, tail)
     }
 
@@ -281,17 +286,17 @@ impl<'a> PathRef for &'a PackedPathRef<'a> {
     }
 
     fn circular(self) -> bool {
-        self.properties.get_circular()
+        self.properties.circular
     }
 
     fn first_step(self) -> Self::Step {
-        let head = self.properties.get_head();
+        let head = self.properties.head;
         let step = self.path.get_step(head);
         (head, step)
     }
 
     fn last_step(self) -> Self::Step {
-        let tail = self.properties.get_tail();
+        let tail = self.properties.tail;
         let step = self.path.get_step(tail);
         (tail, step)
     }
