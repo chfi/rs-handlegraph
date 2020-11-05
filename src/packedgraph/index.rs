@@ -141,6 +141,7 @@ pub struct PackedListIter<'a, T: PackedList> {
     list: &'a T,
     head_ptr: T::ListPtr,
     tail_ptr: T::ListPtr,
+    finished: bool,
 }
 
 impl<'a, T: PackedList> PackedListIter<'a, T> {
@@ -150,6 +151,7 @@ impl<'a, T: PackedList> PackedListIter<'a, T> {
             list,
             head_ptr,
             tail_ptr,
+            finished: false,
         }
     }
 
@@ -162,6 +164,7 @@ impl<'a, T: PackedList> PackedListIter<'a, T> {
             list,
             head_ptr,
             tail_ptr,
+            finished: false,
         }
     }
 }
@@ -171,29 +174,33 @@ impl<'a, T: PackedList> Iterator for PackedListIter<'a, T> {
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        if self.head_ptr == self.tail_ptr {
-            None
-        } else {
-            let record = self.list.get_record(self.head_ptr)?;
-            let this_ptr = self.head_ptr;
-            self.head_ptr = T::next_pointer(&record);
-            Some((this_ptr, record))
+        if self.finished {
+            return None;
         }
+        if self.head_ptr == self.tail_ptr {
+            self.finished = true;
+        }
+        let record = self.list.get_record(self.head_ptr)?;
+        let this_ptr = self.head_ptr;
+        self.head_ptr = T::next_pointer(&record);
+        Some((this_ptr, record))
     }
 }
 
 impl<'a, T: PackedDoubleList> DoubleEndedIterator for PackedListIter<'a, T> {
     #[inline]
     fn next_back(&mut self) -> Option<Self::Item> {
-        // if self.head_ptr.is_null() && self.tail_ptr.is_null() {
-        if self.head_ptr == self.tail_ptr {
-            None
-        } else {
-            let record = self.list.get_record(self.tail_ptr)?;
-            let this_ptr = self.tail_ptr;
-            self.tail_ptr = T::prev_pointer(&record);
-            Some((this_ptr, record))
+        if self.finished {
+            return None;
         }
+        if self.head_ptr == self.tail_ptr {
+            self.finished = true;
+        }
+
+        let record = self.list.get_record(self.tail_ptr)?;
+        let this_ptr = self.tail_ptr;
+        self.tail_ptr = T::prev_pointer(&record);
+        Some((this_ptr, record))
     }
 }
 
