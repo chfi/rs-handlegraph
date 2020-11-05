@@ -131,6 +131,17 @@ impl PathProperties {
         self.heads.len()
     }
 
+    pub(super) fn get_record(&self, id: PathId) -> PathPropertyRecord {
+        let ix = id.0 as usize;
+        PathPropertyRecord {
+            head: self.heads.get_unpack(ix),
+            tail: self.tails.get_unpack(ix),
+            deleted: self.deleted.get_unpack(ix),
+            circular: self.circular.get_unpack(ix),
+            deleted_steps: self.deleted_steps.get_unpack(ix),
+        }
+    }
+
     pub(super) fn record_ref(&self, id: PathId) -> PathPropertyRef<'_> {
         let ix = id.0 as usize;
         PathPropertyRef {

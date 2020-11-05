@@ -237,10 +237,12 @@ impl PathUpdate {
         self.tail = tail;
     }
 
-    fn apply(self, mut prop: PathPropertyMut<'_>) {
+    pub(super) fn apply(self, mut prop: PathPropertyMut<'_>) {
         prop.set_head(self.head);
         prop.set_tail(self.tail);
     }
+
+    // pub(super) fn into_record(
 }
 
 pub struct PackedPathRef<'a> {
@@ -252,8 +254,9 @@ pub struct PackedPathRef<'a> {
 pub struct PackedPathRefMut<'a> {
     pub path_id: PathId,
     pub path: &'a mut PackedPath,
-    pub properties: PathPropertyRef<'a>,
-    pub(super) updates: PathUpdate,
+    // pub properties: PathPropertyRef<'a>,
+    pub properties: PathPropertyRecord,
+    // pub(super) updates: PathUpdate,
 }
 
 impl PathStep for (PathStepIx, PackedStep) {
@@ -333,23 +336,25 @@ impl<'a> PackedPathRefMut<'a> {
     pub(super) fn new(
         path_id: PathId,
         path: &'a mut PackedPath,
-        properties: PathPropertyRef<'a>,
+        // properties: PathPropertyRef<'a>,
+        properties: PathPropertyRecord,
     ) -> Self {
-        let updates = PathUpdate::new(&properties);
+        // let updates = PathUpdate::new(&properties);
         PackedPathRefMut {
             path_id,
             path,
             properties,
-            updates,
+            // updates,
         }
     }
 
+    /*
     #[must_use]
     pub(super) fn append_handles<I>(&mut self, iter: I) -> Vec<StepUpdate>
     where
         I: IntoIterator<Item = Handle>,
     {
-        let mut tail = self.updates.tail;
+        let mut tail = self.properties.tail;
 
         let mut iter = iter.into_iter();
 
@@ -389,10 +394,11 @@ impl<'a> PackedPathRefMut<'a> {
 
         new_steps
     }
+    */
 
     #[must_use]
     pub(super) fn append_handle(&mut self, handle: Handle) -> StepUpdate {
-        let tail = self.updates.tail;
+        let tail = self.properties.tail;
         let step = self.path.append_handle(handle);
 
         // add back link from new step to old tail
@@ -400,8 +406,8 @@ impl<'a> PackedPathRefMut<'a> {
         self.path.links.set_pack(new_prev_ix, tail);
 
         // just in case the path was empty, set the head as well
-        if self.updates.head.is_null() {
-            self.updates.head = step;
+        if self.properties.head.is_null() {
+            self.properties.head = step;
         }
 
         if let Some(tail_next_ix) = tail.to_record_ix(2, 1) {
@@ -409,14 +415,14 @@ impl<'a> PackedPathRefMut<'a> {
             self.path.links.set_pack(tail_next_ix, step);
         }
         // set the new tail
-        self.updates.tail = step;
+        self.properties.tail = step;
 
         StepUpdate { handle, step }
     }
 
     #[must_use]
     pub(super) fn prepend_handle(&mut self, handle: Handle) -> StepUpdate {
-        let head = self.updates.head;
+        let head = self.properties.head;
         let step = self.path.append_handle(handle);
 
         // add forward link from new step to old head
@@ -424,8 +430,8 @@ impl<'a> PackedPathRefMut<'a> {
         self.path.links.set_pack(new_next_ix, head);
 
         // just in case the path was empty, set the tail as well
-        if self.updates.tail.is_null() {
-            self.updates.tail = step;
+        if self.properties.tail.is_null() {
+            self.properties.tail = step;
         }
 
         if let Some(head_prev_ix) = head.to_record_ix(2, 01) {
@@ -433,7 +439,7 @@ impl<'a> PackedPathRefMut<'a> {
             self.path.links.set_pack(head_prev_ix, step);
         }
         // set the new head
-        self.updates.head = step;
+        self.properties.head = step;
 
         StepUpdate { handle, step }
     }

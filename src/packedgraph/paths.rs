@@ -111,6 +111,21 @@ impl Default for PackedGraphPaths {
     }
 }
 
+pub(super) struct PathMutContext<'a> {
+    path_ref_mut: PackedPathRefMut<'a>,
+    path_properties: &'a mut PathProperties,
+}
+
+impl<'a> Drop for PathMutContext<'a> {
+    fn drop(&mut self) {
+        let path_id = self.path_ref_mut.path_id;
+        let ix = path_id.0 as usize;
+        let new_props = &self.path_ref_mut.properties;
+        self.path_properties.heads.set_pack(ix, new_props.head);
+        self.path_properties.heads.set_pack(ix, new_props.tail);
+    }
+}
+
 impl PackedGraphPaths {
     pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
         let path_id = self.paths.len() as u64;
@@ -133,18 +148,8 @@ impl PackedGraphPaths {
     ) -> Option<PackedPathRefMut<'a>> {
         let path_id = id;
         let path = self.paths.get_mut(id.0 as usize)?;
-        let properties = self.path_props.record_ref(id);
+        let properties = self.path_props.get_record(id);
         Some(PackedPathRefMut::new(path_id, path, properties))
-    }
-
-    pub(super) fn apply_path_update<'a>(
-        &'a mut self,
-        path_mut: PackedPathRefMut<'a>,
-    ) {
-        let PathUpdate { head, tail } = path_mut.updates;
-        let ix = path_mut.path_id.0 as usize;
-        self.path_props.heads.set_pack(ix, head);
-        self.path_props.tails.set_pack(ix, tail);
     }
 
     pub(super) fn path_properties_mut<'a>(
@@ -152,6 +157,21 @@ impl PackedGraphPaths {
         id: PathId,
     ) -> PathPropertyMut<'a> {
         self.path_props.record_mut(id)
+    }
+
+    pub(super) fn get_path_mut_ctx<'a>(
+        &'a mut self,
+        id: PathId,
+    ) -> Option<PathMutContext<'a>> {
+        let path_id = id;
+        let path = self.paths.get_mut(id.0 as usize)?;
+        let properties = self.path_props.get_record(id);
+        let path_properties = &mut self.path_props;
+        let path_ref_mut = PackedPathRefMut::new(path_id, path, properties);
+        Some(PathMutContext {
+            path_ref_mut,
+            path_properties,
+        })
     }
 }
 
