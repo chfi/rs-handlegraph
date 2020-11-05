@@ -1,6 +1,8 @@
 #![allow(dead_code)]
 #![allow(unused_imports)]
 
+use rayon::prelude::*;
+
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
@@ -20,11 +22,9 @@ use crate::pathhandlegraph::*;
 use crate::packed;
 use crate::packed::*;
 
-// mod occurrences;
 mod packedpath;
 mod properties;
 
-// pub use self::occurrences::*;
 pub use self::packedpath::*;
 pub use self::properties::*;
 
@@ -145,6 +145,12 @@ impl<'a> MultiPathMutContext<'a> {
     ) -> std::slice::IterMut<'b, PackedPathRefMut<'a>> {
         self.paths.iter_mut()
     }
+
+    pub(super) fn ref_muts_par<'b>(
+        &'b mut self,
+    ) -> rayon::slice::IterMut<'b, PackedPathRefMut<'a>> {
+        self.paths.par_iter_mut()
+    }
 }
 
 impl<'a> Drop for MultiPathMutContext<'a> {
@@ -184,18 +190,6 @@ impl PackedGraphPaths {
         let properties = self.path_props.record_ref(id);
         Some(PackedPathRef::new(path_id, path, properties))
     }
-
-    /*
-    pub(super) fn path_ref_mut<'a>(
-        &'a mut self,
-        id: PathId,
-    ) -> Option<PackedPathRefMut<'a>> {
-        let path_id = id;
-        let path = self.paths.get_mut(id.0 as usize)?;
-        let properties = self.path_props.get_record(id);
-        Some(PackedPathRefMut::new(path_id, path, properties))
-    }
-    */
 
     pub(super) fn path_properties_mut<'a>(
         &'a mut self,
@@ -248,7 +242,7 @@ impl PackedGraphPaths {
         mut f: F,
     ) -> Option<Vec<StepUpdate>>
     where
-        F: FnMut(&mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
+        F: Fn(&mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
     {
         let mut mut_ctx = self.get_path_mut_ctx(id)?;
         let mut ref_mut = mut_ctx.get_ref_mut();
