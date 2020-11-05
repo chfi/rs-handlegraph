@@ -14,6 +14,8 @@ use crate::pathhandlegraph::PathId;
 
 use crate::packed::traits::*;
 
+use super::paths;
+
 pub(crate) static NARROW_PAGE_WIDTH: usize = 256;
 pub(crate) static WIDE_PAGE_WIDTH: usize = 1024;
 
@@ -47,21 +49,26 @@ impl PackedGraph {
 
     pub(super) fn add_node_occurrence(
         &mut self,
-        handle: Handle,
         path_id: PathId,
-        step: PathStepIx,
+        step_update: paths::StepUpdate,
     ) {
-        let rec_id = self.nodes.handle_record(handle).unwrap();
-        let vec_ix = rec_id.to_zero_based().unwrap();
+        use paths::StepUpdate;
+        match step_update {
+            StepUpdate::Insert { handle, step } => {
+                let rec_id = self.nodes.handle_record(handle).unwrap();
+                let vec_ix = rec_id.to_zero_based().unwrap();
 
-        let occur_ix = self.nodes.node_occurrence_map.get_unpack(vec_ix);
+                let occur_ix =
+                    self.nodes.node_occurrence_map.get_unpack(vec_ix);
 
-        let new_occur_ix =
-            self.occurrences.append_entry(path_id, step, occur_ix);
+                let new_occur_ix =
+                    self.occurrences.append_entry(path_id, step, occur_ix);
 
-        self.nodes
-            .node_occurrence_map
-            .set_pack(vec_ix, new_occur_ix);
+                self.nodes
+                    .node_occurrence_map
+                    .set_pack(vec_ix, new_occur_ix);
+            }
+        }
     }
 
     pub(super) fn add_node_occurrences_iter<I>(
@@ -69,9 +76,20 @@ impl PackedGraph {
         path_id: PathId,
         iter: I,
     ) where
-        I: IntoIterator<Item = (Handle, PathStepIx)>,
+        I: IntoIterator<Item = paths::StepUpdate>,
     {
         iter.into_iter()
-            .for_each(|(h, s)| self.add_node_occurrence(h, path_id, s))
+            .for_each(|s| self.add_node_occurrence(path_id, s))
+    }
+
+    pub(super) fn with_path_mut_ctx<'a, F>(&'a mut self, path_id: PathId, f: F)
+    where
+        for<'b> F:
+            Fn(&mut paths::PackedPathRefMut<'b>) -> Vec<paths::StepUpdate>,
+    {
+        let steps = self.paths.with_path_mut_ctx(path_id, f);
+        if let Some(steps) = steps {
+            self.add_node_occurrences_iter(path_id, steps);
+        }
     }
 }

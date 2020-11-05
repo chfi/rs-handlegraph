@@ -236,6 +236,23 @@ impl<'a> PackedPathRef<'a> {
     }
 }
 
+/// A representation of a step that's added to a path, that must be
+/// inserted into the occurrences list and linked to the correct list
+/// for the handle.
+///
+/// The path ID must be provided separately, and the `Handle` must be
+/// transformed into a `NodeRecordId` so that the list for the node in
+/// question can be identified.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StepUpdate {
+    Insert { handle: Handle, step: PathStepIx },
+    // Remove { handle: Handle, step: PathStepIx },
+    // InsertSegment {
+    //     start: PathStepIx,
+    //     steps: Vec<(Handle, PathStepIx)>,
+    // },
+}
+
 pub struct PackedPathRefMut<'a> {
     pub path_id: PathId,
     pub path: &'a mut PackedPath,
@@ -302,24 +319,10 @@ impl<'a> PathRef for &'a PackedPathRef<'a> {
     }
 }
 
-/// A representation of a step that's added to a path, that must be
-/// inserted into the occurrences list and linked to the correct list
-/// for the handle.
-///
-/// The path ID must be provided separately, and the `Handle` must be
-/// transformed into a `NodeRecordId` so that the list for the node in
-/// question can be identified.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct StepUpdate {
-    pub(super) handle: Handle,
-    pub(super) step: PathStepIx,
-}
-
 impl<'a> PackedPathRefMut<'a> {
     pub(super) fn new(
         path_id: PathId,
         path: &'a mut PackedPath,
-        // properties: PathPropertyRef<'a>,
         properties: PathPropertyRecord,
     ) -> Self {
         // let updates = PathUpdate::new(&properties);
@@ -400,7 +403,9 @@ impl<'a> PackedPathRefMut<'a> {
         // set the new tail
         self.properties.tail = step;
 
-        StepUpdate { handle, step }
+        let update = StepUpdate::Insert { handle, step };
+
+        update
     }
 
     #[must_use]
@@ -424,7 +429,9 @@ impl<'a> PackedPathRefMut<'a> {
         // set the new head
         self.properties.head = step;
 
-        StepUpdate { handle, step }
+        let update = StepUpdate::Insert { handle, step };
+
+        update
     }
 }
 

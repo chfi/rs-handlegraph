@@ -277,7 +277,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn packedpath_new_path() {
+    fn packedpathpaths_new_path() {
         let mut p_path = PackedPath::new();
 
         let hnd = |x: u64| Handle::pack(x, false);
@@ -336,7 +336,7 @@ mod tests {
     }
 
     #[test]
-    fn packedgraph_paths_add() {
+    fn packedgraphpaths_paths_add() {
         let hnd = |x: u64| Handle::pack(x, false);
 
         let mut paths = PackedGraphPaths::default();
@@ -395,7 +395,7 @@ mod tests {
     }
 
     #[test]
-    fn packedgraph_path_with_mut_ctx() {
+    fn packedgraphpaths_path_with_mut_ctx() {
         let hnd = |x: u64| Handle::pack(x, false);
 
         let mut paths = PackedGraphPaths::default();
@@ -426,7 +426,7 @@ mod tests {
     }
 
     #[test]
-    fn packedgraph_multipaths() {
+    fn packedgraphpaths_multipaths() {
         let hnd = |x: u64| Handle::pack(x, false);
 
         let mut paths = PackedGraphPaths::default();
