@@ -73,11 +73,11 @@ pub trait MutableHandleGraph: HandleGraph {
     fn apply_orientation(&mut self, handle: Handle) -> Handle;
 }
 
-pub trait MutHandleGraphRef: HandleGraphRef {}
+// pub trait MutHandleGraphRef: HandleGraphRef {}
 
-impl<'a, T> MutHandleGraphRef for &'a T
-where
-    T: HandleGraph,
-    &'a T: HandleGraphRef,
-{
-}
+// impl<'a, T> MutHandleGraphRef for &'a T
+// where
+//     T: HandleGraph,
+//     &'a T: HandleGraphRef,
+// {
+// }

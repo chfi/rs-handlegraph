@@ -1,5 +1,7 @@
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
+use rayon::prelude::*;
+
 pub mod iter;
 
 pub use self::iter::*;
@@ -20,6 +22,12 @@ pub trait AllHandles: Sized {
         let n_id = n_id.into();
         self.all_handles().any(|h| h.id() == n_id)
     }
+}
+
+pub trait AllHandlesPar {
+    type HandlesPar: ParallelIterator<Item = Handle>;
+
+    fn all_handles_par(self) -> Self::HandlesPar;
 }
 
 /// Access all the edges in the graph as an iterator, and related

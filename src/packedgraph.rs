@@ -224,9 +224,6 @@ impl MutableHandleGraph for PackedGraph {
             lengths.reverse();
         }
 
-        // let g_ix = self.nodes.handle_record(handle).unwrap();
-        // let seq_ix = SeqRecordIx::from_graph_record_ix(g_ix).unwrap();
-
         let seq_ix = self
             .nodes
             .handle_record(handle)

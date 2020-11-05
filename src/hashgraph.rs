@@ -1,6 +1,8 @@
 use bio::alphabets::dna;
 use bstr::BString;
 
+use rayon::prelude::*;
+
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
@@ -36,6 +38,19 @@ impl<'a> AllHandles for &'a HashGraph {
     #[inline]
     fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
         self.graph.contains_key(&n_id.into())
+    }
+}
+
+impl<'a> AllHandlesPar for &'a HashGraph {
+    type HandlesPar = rayon::iter::IterBridge<
+        NodeIdRefHandles<
+            'a,
+            std::collections::hash_map::Keys<'a, NodeId, Node>,
+        >,
+    >;
+
+    fn all_handles_par(self) -> Self::HandlesPar {
+        self.all_handles().par_bridge()
     }
 }
 
