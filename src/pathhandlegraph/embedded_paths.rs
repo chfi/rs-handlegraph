@@ -8,6 +8,18 @@ pub trait AllPathIds: Sized {
     fn all_path_ids(self) -> Self::PathIds;
 }
 
+pub trait PathNames: Sized {
+    type PathName: Iterator<Item = u8>;
+
+    fn get_path_name(self, id: PathId) -> Option<Self::PathName>;
+
+    fn get_path_id(self, name: &[u8]) -> Option<PathId>;
+}
+
+pub trait PathNamesMut: Sized {
+    fn insert_name(self, name: &[u8]) -> Option<PathId>;
+}
+
 /// A collection of embedded paths in a graph.
 pub trait EmbeddedPaths: Sized {
     /// Iterator through all path IDs in the graph

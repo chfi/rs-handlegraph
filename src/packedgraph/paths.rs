@@ -31,7 +31,7 @@ pub use self::properties::*;
 pub use self::packedpath::StepUpdate;
 
 #[derive(Debug, Clone)]
-pub struct PathNames {
+pub struct PackedPathNames {
     // TODO compress the names; don't store entire Vec<u8>s
     name_id_map: FnvHashMap<Vec<u8>, PathId>,
     names: PackedIntVec,
@@ -39,9 +39,9 @@ pub struct PathNames {
     offsets: PagedIntVec,
 }
 
-impl Default for PathNames {
+impl Default for PackedPathNames {
     fn default() -> Self {
-        PathNames {
+        PackedPathNames {
             name_id_map: Default::default(),
             names: Default::default(),
             lengths: Default::default(),
@@ -50,7 +50,7 @@ impl Default for PathNames {
     }
 }
 
-impl PathNames {
+impl PackedPathNames {
     pub(super) fn add_name(&mut self, name: &[u8]) -> PathId {
         let path_id = PathId(self.lengths.len() as u64);
 
@@ -87,7 +87,7 @@ impl PathNames {
 pub struct PackedGraphPaths {
     paths: Vec<PackedPath>,
     pub(super) path_props: PathProperties,
-    pub(super) path_names: PathNames,
+    pub(super) path_names: PackedPathNames,
 }
 
 impl Default for PackedGraphPaths {
@@ -280,6 +280,28 @@ impl<'a> AllPathIds for &'a PackedGraphPaths {
 
     fn all_path_ids(self) -> Self::PathIds {
         self.path_names.name_id_map.values().copied()
+    }
+}
+
+impl<'a> PathNames for &'a PackedGraphPaths {
+    type PathName = packed::vector::IterView<'a, u8>;
+
+    fn get_path_name(self, id: PathId) -> Option<Self::PathName> {
+        self.path_names.name_iter(id)
+    }
+
+    fn get_path_id(self, name: &[u8]) -> Option<PathId> {
+        self.path_names.name_id_map.get(name).copied()
+    }
+}
+
+impl<'a> PathNamesMut for &'a mut PackedGraphPaths {
+    fn insert_name(self, name: &[u8]) -> Option<PathId> {
+        if self.get_path_id(name).is_some() {
+            None
+        } else {
+            Some(self.path_names.add_name(name))
+        }
     }
 }
 
