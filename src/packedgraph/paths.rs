@@ -134,6 +134,31 @@ impl<'a> Drop for PathMutContext<'a> {
     }
 }
 
+pub(super) struct MultiPathMutContext<'a> {
+    paths: Vec<PackedPathRefMut<'a>>,
+    path_properties: &'a mut PathProperties,
+}
+
+impl<'a> MultiPathMutContext<'a> {
+    pub(super) fn get_ref_muts<'b>(
+        &'b mut self,
+    ) -> std::slice::IterMut<'b, PackedPathRefMut<'a>> {
+        self.paths.iter_mut()
+    }
+}
+
+impl<'a> Drop for MultiPathMutContext<'a> {
+    fn drop(&mut self) {
+        for path in self.paths.iter() {
+            let path_id = path.path_id;
+            let ix = path_id.0 as usize;
+            let new_props = &path.properties;
+            self.path_properties.heads.set_pack(ix, new_props.head);
+            self.path_properties.tails.set_pack(ix, new_props.tail);
+        }
+    }
+}
+
 impl PackedGraphPaths {
     pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
         let path_id = self.paths.len() as u64;
@@ -192,6 +217,29 @@ impl PackedGraphPaths {
             path_ref_mut,
             path_properties,
         })
+    }
+
+    pub(super) fn get_multipath_mut_ctx<'a>(
+        &'a mut self,
+    ) -> MultiPathMutContext<'a> {
+        let mut_paths = &mut self.paths;
+        let path_properties = &mut self.path_props;
+
+        let paths = self
+            .paths
+            .iter_mut()
+            .enumerate()
+            .map(|(id, path)| {
+                let path_id = PathId(id as u64);
+                let properties = path_properties.get_record(path_id);
+                PackedPathRefMut::new(path_id, path, properties)
+            })
+            .collect::<Vec<_>>();
+
+        MultiPathMutContext {
+            paths,
+            path_properties,
+        }
     }
 }
 
@@ -315,5 +363,83 @@ mod tests {
 
         expected_steps.reverse();
         assert_eq!(steps_rev, expected_steps);
+    }
+
+    #[test]
+    fn packedgraph_multipaths() {
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let mut paths = PackedGraphPaths::default();
+
+        let path_1 = paths.create_path(b"path1");
+        let path_2 = paths.create_path(b"path2");
+        let path_3 = paths.create_path(b"path3");
+
+        let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
+
+        // Path 1: 1 2 3 4 5
+        // Path 2: 6 2 3 7 5
+        // Path 3: 1 6 2 3 4
+
+        let pre_1 = paths.path_props.get_record(path_1);
+        let pre_2 = paths.path_props.get_record(path_2);
+        let pre_3 = paths.path_props.get_record(path_3);
+
+        assert!(pre_1.head.is_null() && pre_1.tail.is_null());
+        assert!(pre_2.head.is_null() && pre_2.tail.is_null());
+        assert!(pre_3.head.is_null() && pre_3.tail.is_null());
+
+        let to_insert_1 = vec_hnd(vec![1, 2, 3, 4, 5]);
+        let to_insert_2 = vec_hnd(vec![6, 2, 3, 7, 5]);
+        let to_insert_3 = vec_hnd(vec![1, 6, 2, 3, 4]);
+
+        let to_insert = vec![
+            to_insert_1.clone(),
+            to_insert_2.clone(),
+            to_insert_3.clone(),
+        ];
+
+        let _step_updates = {
+            let mut mut_ctx = paths.get_multipath_mut_ctx();
+            let paths_mut = mut_ctx.get_ref_muts();
+
+            paths_mut
+                .zip(to_insert)
+                .map(|(path, steps)| {
+                    steps
+                        .into_iter()
+                        .map(|h| path.append_handle(h))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let post_1 = paths.path_props.get_record(path_1);
+        let post_2 = paths.path_props.get_record(path_2);
+        let post_3 = paths.path_props.get_record(path_3);
+
+        assert_eq!(post_1.head.to_vector_value(), 1);
+        assert_eq!(post_1.tail.to_vector_value(), 5);
+
+        assert_eq!(post_2.head.to_vector_value(), 1);
+        assert_eq!(post_2.tail.to_vector_value(), 5);
+
+        assert_eq!(post_3.head.to_vector_value(), 1);
+        assert_eq!(post_3.tail.to_vector_value(), 5);
+
+        let ref_1 = paths.path_ref(path_1).unwrap();
+        let ref_2 = paths.path_ref(path_2).unwrap();
+        let ref_3 = paths.path_ref(path_3).unwrap();
+
+        let get_steps = |path_ref: PackedPathRef<'_>| {
+            path_ref
+                .steps()
+                .map(|(_ix, step)| step.handle)
+                .collect::<Vec<_>>()
+        };
+
+        assert_eq!(get_steps(ref_1), to_insert_1);
+        assert_eq!(get_steps(ref_2), to_insert_2);
+        assert_eq!(get_steps(ref_3), to_insert_3);
     }
 }
