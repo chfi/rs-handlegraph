@@ -97,8 +97,8 @@ impl PathNames {
 #[derive(Debug, Clone)]
 pub struct PackedGraphPaths {
     paths: Vec<PackedPath>,
-    path_props: PathProperties,
-    path_names: PathNames,
+    pub(super) path_props: PathProperties,
+    pub(super) path_names: PathNames,
 }
 
 impl Default for PackedGraphPaths {
@@ -116,13 +116,21 @@ pub(super) struct PathMutContext<'a> {
     path_properties: &'a mut PathProperties,
 }
 
+impl<'a> PathMutContext<'a> {
+    pub(super) fn get_ref_mut<'b>(
+        &'b mut self,
+    ) -> &'b mut PackedPathRefMut<'a> {
+        &mut self.path_ref_mut
+    }
+}
+
 impl<'a> Drop for PathMutContext<'a> {
     fn drop(&mut self) {
         let path_id = self.path_ref_mut.path_id;
         let ix = path_id.0 as usize;
         let new_props = &self.path_ref_mut.properties;
         self.path_properties.heads.set_pack(ix, new_props.head);
-        self.path_properties.heads.set_pack(ix, new_props.tail);
+        self.path_properties.tails.set_pack(ix, new_props.tail);
     }
 }
 
@@ -142,6 +150,8 @@ impl PackedGraphPaths {
         self.paths.len()
     }
 
+
+    /*
     pub(super) fn path_ref_mut<'a>(
         &'a mut self,
         id: PathId,
@@ -151,6 +161,7 @@ impl PackedGraphPaths {
         let properties = self.path_props.get_record(id);
         Some(PackedPathRefMut::new(path_id, path, properties))
     }
+    */
 
     pub(super) fn path_properties_mut<'a>(
         &'a mut self,
@@ -240,52 +251,43 @@ mod tests {
 
     #[test]
     fn packedgraph_paths_add() {
-        let mut paths = PackedGraphPaths::default();
-
-        let path_id = paths.create_path(b"path1");
-
         let hnd = |x: u64| Handle::pack(x, false);
 
-        let (s1, s2, s3, s11) = {
-            let mut path_mut = paths.path_ref_mut(path_id).unwrap();
+        let mut paths = PackedGraphPaths::default();
 
-            let (_, s1) = path_mut.append_handle(hnd(1));
-            let (_, s2) = path_mut.append_handle(hnd(2));
-            let (_, s3) = path_mut.append_handle(hnd(3));
-            let (_, s11) = path_mut.append_handle(hnd(1));
+        let path_1 = paths.create_path(b"path1");
+        // let path_2 = paths.create_path(b"path2");
 
-            let head = path_mut.properties.get_head();
-            let tail = path_mut.properties.get_tail();
-            {
-                let mut iter = path_mut.path.iter(head, PathStepIx::null());
+        let pre_record_1 = paths.path_props.get_record(path_1);
 
-                println!("{:?}", iter.next());
-                println!("{:?}", iter.next());
-                println!("{:?}", iter.next());
-                println!("{:?}", iter.next());
-            }
-            (s1, s2, s3, s11)
+        println!("record before: {:#?}", pre_record_1);
+        assert!(pre_record_1.head.is_null());
+        assert!(pre_record_1.tail.is_null());
+
+        let steps_1 = {
+            let mut path_mut = paths.get_path_mut_ctx(path_1).unwrap();
+            let ref_mut = path_mut.get_ref_mut();
+
+            let steps = vec![1, 2, 3, 4, 3, 5]
+                .into_iter()
+                .map(|n| {
+                    let h = hnd(n);
+                    let s = ref_mut.append_handle(h);
+                    s
+                })
+                .collect::<Vec<_>>();
+
+            steps
         };
 
-        let occur = &mut paths.occurrences;
+        let post_record_1 = paths.path_props.get_record(path_1);
 
-        let o1 = occur.append_entry(path_id, s1);
-        let o2 = occur.append_entry(path_id, s2);
-        let o3 = occur.append_entry(path_id, s3);
-        let o11 = occur.append_entry(path_id, s11);
+        assert_eq!(post_record_1.head.to_vector_value(), 1);
+        assert_eq!(post_record_1.tail.to_vector_value(), 6);
 
-        occur.add_link(o1, o11);
+        println!("head after: {}", post_record_1.head.to_vector_value());
+        println!("tail after: {}", post_record_1.tail.to_vector_value());
 
-        let mut occur_iter = paths.occurrences.iter(o1);
-
-        println!("{:?}", occur_iter.next());
-        println!("{:?}", occur_iter.next());
-        println!("{:?}", occur_iter.next());
-        println!("{:?}", occur_iter.next());
-
-        /*
-        let node_rec = ix_map.get_index(NodeId::from(1)).unwrap();
-        let head = path_mut.occurrences.get_node_head(node_rec);
-        */
+        println!("record after: {:#?}", post_record_1);
     }
 }

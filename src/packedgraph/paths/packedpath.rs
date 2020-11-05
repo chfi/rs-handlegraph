@@ -241,8 +241,6 @@ impl PathUpdate {
         prop.set_head(self.head);
         prop.set_tail(self.tail);
     }
-
-    // pub(super) fn into_record(
 }
 
 pub struct PackedPathRef<'a> {
@@ -254,9 +252,7 @@ pub struct PackedPathRef<'a> {
 pub struct PackedPathRefMut<'a> {
     pub path_id: PathId,
     pub path: &'a mut PackedPath,
-    // pub properties: PathPropertyRef<'a>,
     pub properties: PathPropertyRecord,
-    // pub(super) updates: PathUpdate,
 }
 
 impl PathStep for (PathStepIx, PackedStep) {
