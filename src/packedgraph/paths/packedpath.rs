@@ -378,7 +378,7 @@ impl<'a> PackedPathRefMut<'a> {
     */
 
     #[must_use]
-    pub(super) fn append_handle(&mut self, handle: Handle) -> StepUpdate {
+    pub(crate) fn append_handle(&mut self, handle: Handle) -> StepUpdate {
         let tail = self.properties.tail;
         let step = self.path.append_handle(handle);
 
@@ -404,7 +404,7 @@ impl<'a> PackedPathRefMut<'a> {
     }
 
     #[must_use]
-    pub(super) fn prepend_handle(&mut self, handle: Handle) -> StepUpdate {
+    pub(crate) fn prepend_handle(&mut self, handle: Handle) -> StepUpdate {
         let head = self.properties.head;
         let step = self.path.append_handle(handle);
 

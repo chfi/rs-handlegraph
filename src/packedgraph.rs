@@ -386,6 +386,66 @@ mod tests {
     use super::*;
 
     #[test]
+    fn packedgraph_append_path() {
+        let hnd = |x: u64| Handle::pack(x, false);
+        let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
+        let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
+
+        use bstr::{BString, B};
+
+        let mut graph = PackedGraph::new();
+        let h1 = graph.append_handle(b"GTCA");
+        let h2 = graph.append_handle(b"AAGTGCTAGT");
+        let h3 = graph.append_handle(b"ATA");
+        let h4 = graph.append_handle(b"AA");
+        let h5 = graph.append_handle(b"GG");
+
+        graph.create_edge(edge(1, 2));
+        graph.create_edge(edge(4, 2));
+
+        graph.create_edge(edge(2, 3));
+        graph.create_edge(edge(2, 5));
+
+        graph.create_edge(edge(5, 3));
+
+        // path_1: 1 2 5 3
+        // path_2: 4 2 3
+        let path_1 = graph.paths.create_path(b"path1");
+        let path_2 = graph.paths.create_path(b"path2");
+
+        let ins_1 = vec_hnd(vec![1, 2, 5, 3]);
+        let ins_2 = vec_hnd(vec![4, 2, 3]);
+
+        graph.with_path_mut_ctx(path_1, |path_ref| {
+            ins_1
+                .clone()
+                .into_iter()
+                .map(|h| path_ref.append_handle(h))
+                .collect::<Vec<_>>()
+        });
+
+        graph.with_path_mut_ctx(path_2, |path_ref| {
+            ins_2
+                .clone()
+                .into_iter()
+                .map(|h| path_ref.append_handle(h))
+                .collect::<Vec<_>>()
+        });
+
+        let oc_1 = graph.nodes.handle_occur_record(hnd(1)).unwrap();
+        let oc_2 = graph.nodes.handle_occur_record(hnd(2)).unwrap();
+
+        let mut oc_iter = graph.occurrences.iter(oc_1);
+        println!("{:?}", oc_iter.next());
+        println!("{:?}", oc_iter.next());
+
+        let mut oc_iter = graph.occurrences.iter(oc_2);
+        println!("{:?}", oc_iter.next());
+        println!("{:?}", oc_iter.next());
+        println!("{:?}", oc_iter.next());
+    }
+
+    #[test]
     fn packedgraph_divide_handle() {
         use bstr::{BString, B};
 

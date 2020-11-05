@@ -172,29 +172,12 @@ impl NodeOccurrences {
         }
     }
 
-    pub(super) fn iter(
+    pub(crate) fn iter(
         &self,
         ix: NodeOccurRecordIx,
     ) -> PackedListIter<'_, Self> {
         PackedListIter::new(self, ix)
     }
-
-    /*
-    pub(super) fn set_last_next(
-        &mut self,
-        ix: NodeOccurRecordIx,
-        next: NodeOccurRecordIx,
-    ) {
-        let mut cur_ix = ix;
-        for record in self.iter(ix) {
-            if record.next != 0 {
-                cur_ix = record.next;
-            }
-        }
-
-        self.node_occur_next.set(cur_ix, next as u64);
-    }
-    */
 }
 
 impl PackedList for NodeOccurrences {

@@ -392,12 +392,12 @@ impl NodeRecords {
     }
 
     #[inline]
-    pub(super) fn handle_record(&self, h: Handle) -> Option<NodeRecordId> {
+    pub(crate) fn handle_record(&self, h: Handle) -> Option<NodeRecordId> {
         self.id_index_map.get_index(h.id())
     }
 
     #[inline]
-    pub(super) fn node_record_occur(
+    pub(crate) fn node_record_occur(
         &self,
         rec_id: NodeRecordId,
     ) -> Option<NodeOccurRecordIx> {
@@ -408,7 +408,7 @@ impl NodeRecords {
     /// Maps a handle into its corresponding occurrence record
     /// pointer, if the node for the handle exists in the PackedGraph.
     #[inline]
-    pub(super) fn handle_occur_record(
+    pub(crate) fn handle_occur_record(
         &self,
         h: Handle,
     ) -> Option<NodeOccurRecordIx> {
