@@ -69,7 +69,7 @@ impl PathNames {
     pub(super) fn name_iter(
         &self,
         id: PathId,
-    ) -> Option<packed::vector::Iter<'_>> {
+    ) -> Option<packed::vector::IterView<'_, u8>> {
         let vec_ix = id.0 as usize;
         if vec_ix >= self.lengths.len() {
             return None;
@@ -77,7 +77,7 @@ impl PathNames {
 
         let offset = self.offsets.get_unpack(vec_ix);
         let len = self.lengths.get_unpack(vec_ix);
-        let iter = self.names.iter_slice(offset, len);
+        let iter = self.names.iter_slice(offset, len).view();
 
         Some(iter)
     }

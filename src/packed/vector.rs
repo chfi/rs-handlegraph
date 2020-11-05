@@ -172,6 +172,10 @@ impl<'a> Iter<'a> {
             right_ix,
         }
     }
+
+    pub fn view<T: PackedElement>(self) -> IterView<'a, T> {
+        IterView::new(self)
+    }
 }
 
 impl<'a> Iterator for Iter<'a> {
@@ -231,6 +235,47 @@ impl<'a> DoubleEndedIterator for Iter<'a> {
         } else {
             None
         }
+    }
+}
+
+pub struct IterView<'a, T: PackedElement> {
+    iter: Iter<'a>,
+    _element: std::marker::PhantomData<T>,
+}
+
+impl<'a, T: PackedElement> IterView<'a, T> {
+    fn new(iter: Iter<'a>) -> Self {
+        Self {
+            iter,
+            _element: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<'a, T: PackedElement> Iterator for IterView<'a, T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next().map(T::unpack)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+    fn count(self) -> usize {
+        self.iter.count()
+    }
+    fn last(mut self) -> Option<Self::Item> {
+        self.iter.last().map(T::unpack)
+    }
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.iter.nth(n).map(T::unpack)
+    }
+}
+
+impl<'a, T: PackedElement> DoubleEndedIterator for IterView<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter.next_back().map(T::unpack)
     }
 }
 

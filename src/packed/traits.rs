@@ -38,6 +38,23 @@ impl PackedElement for bool {
     }
 }
 
+impl PackedElement for u8 {
+    #[inline]
+    fn unpack(v: u64) -> u8 {
+        use std::convert::TryFrom;
+        if let Ok(u) = u8::try_from(v) {
+            u
+        } else {
+            std::u8::MAX
+        }
+    }
+
+    #[inline]
+    fn pack(self) -> u64 {
+        u64::from(self)
+    }
+}
+
 /// A `Viewable` is a `PackedCollection` that we can get a "view" into
 /// a single element of. This lets us get a "reference" to a specific
 /// element in a packed collection.
