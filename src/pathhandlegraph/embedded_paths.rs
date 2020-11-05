@@ -46,6 +46,30 @@ pub trait AllPathRefsMut {
     fn all_paths_mut(self) -> Self::PathRefsMut;
 }
 
+pub trait WithPathRefsMut: Sized {
+    type MutCtx: PathRefMut;
+
+    fn with_path_mut<F>(
+        self,
+        id: PathId,
+        f: F,
+    ) -> Option<Vec<StepUpdate<<Self::MutCtx as PathBase>::StepIx>>>
+    where
+        for<'b> F: Fn(
+            &mut Self::MutCtx,
+        )
+            -> Vec<StepUpdate<<Self::MutCtx as PathBase>::StepIx>>;
+
+    fn with_paths_mut<F>(
+        self,
+        f: F,
+    ) -> Vec<(PathId, Vec<StepUpdate<<Self::MutCtx as PathBase>::StepIx>>)>
+    where
+        for<'b> F: Fn(
+            PathId,
+            &mut Self::MutCtx,
+        )
+            -> Vec<StepUpdate<<Self::MutCtx as PathBase>::StepIx>>;
 }
 
 /// A collection of embedded paths in a graph.

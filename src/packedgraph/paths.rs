@@ -149,7 +149,7 @@ impl<'a> PathRefMut for PathMutContext<'a> {
     }
 }
 
-pub(super) struct MultiPathMutContext<'a> {
+pub struct MultiPathMutContext<'a> {
     paths: Vec<PackedPathRefMut<'a>>,
     path_properties: &'a mut PathProperties,
 }
@@ -357,6 +357,24 @@ impl<'a, 'b> AllPathRefsMut for &'a mut MultiPathMutContext<'b> {
 
     fn all_paths_mut(self) -> Self::PathRefsMut {
         self.get_ref_muts()
+    }
+}
+
+impl<'a> WithPathRefsMut for &'a mut PackedGraphPaths {
+    type MutCtx = PackedPathRefMut<'a>;
+
+    fn with_path_mut<F>(self, id: PathId, f: F) -> Option<Vec<StepUpdate>>
+    where
+        for<'b> F: Fn(&mut Self::MutCtx) -> Vec<StepUpdate>,
+    {
+        self.with_path_mut_ctx(id, f)
+    }
+
+    fn with_paths_mut<F>(self, f: F) -> Vec<(PathId, Vec<StepUpdate>)>
+    where
+        for<'b> F: Fn(PathId, &mut Self::MutCtx) -> Vec<StepUpdate>,
+    {
+        self.with_multipath_mut_ctx(f)
     }
 }
 
