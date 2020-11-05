@@ -5,6 +5,16 @@ use crate::handle::Handle;
 #[repr(transparent)]
 pub struct PathId(pub u64);
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StepUpdate<StepIx: Sized + Copy + Eq> {
+    Insert { handle: Handle, step: StepIx },
+    // Remove { handle: Handle, step: StepIx },
+    // InsertSegment {
+    //     start: StepIx,
+    //     steps: Vec<(Handle, StepIx)>,
+    // },
+}
+
 pub trait PathStep: Sized + Copy + Eq {
     fn handle(&self) -> Handle;
 }
@@ -79,32 +89,12 @@ pub trait PathRef: Copy + PathBase {
     */
 }
 
-pub trait PathRefMutSteps: PathBase {
-    // type StepUpdate: Sized + Copy;
-
-    fn append_step(&mut self, handle: Handle) -> (Handle, Self::StepIx);
-
-    fn prepend_step(&mut self, handle: Handle) -> (Handle, Self::StepIx);
-
-    /*
-    fn append_iter<I>(self, iter: I) -> Vec<StepUpdate>
-    where
-        I: IntoIterator<Item = Handle>;
-
-    fn prepend_iter<I>(self, iter: I) -> Vec<StepUpdate>
-    where
-        I: IntoIterator<Item = Handle>;
-    */
-
-    // fn rewrite_segment<I>(self, iter: I, from: Self::Step, to: Self::Step) -> Vec<StepUpdate>;
-}
-
 /// An embedded path that can also be mutated by appending or
 /// prepending steps, or rewriting parts of it.
 pub trait PathRefMut: PathBase {
-    fn append(self, handle: Handle) -> Self::Step;
+    fn append_step(&mut self, handle: Handle) -> StepUpdate<Self::StepIx>;
 
-    fn prepend(self, handle: Handle) -> Self::Step;
+    fn prepend_step(&mut self, handle: Handle) -> StepUpdate<Self::StepIx>;
 
     // fn rewrite_segment(
     //     self,
@@ -113,5 +103,5 @@ pub trait PathRefMut: PathBase {
     //     new_segment: &[Handle],
     // ) -> Option<(PathStep, PathStep)>;
 
-    fn set_circularity(self, circular: bool);
+    fn set_circularity(&mut self, circular: bool);
 }

@@ -28,23 +28,12 @@ mod properties;
 pub use self::packedpath::*;
 pub use self::properties::*;
 
-/// A zero-based index into both the corresponding path in the vector
-/// of PackedPaths, as well as all the other property records for the
-/// path.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PathNameIx(usize);
-
-impl PathNameIx {
-    #[inline]
-    fn new<I: Into<usize>>(x: I) -> Self {
-        Self(x.into())
-    }
-}
+pub use self::packedpath::StepUpdate;
 
 #[derive(Debug, Clone)]
 pub struct PathNames {
     // TODO compress the names; don't store entire Vec<u8>s
-    name_id_map: FnvHashMap<Vec<u8>, PathNameIx>,
+    name_id_map: FnvHashMap<Vec<u8>, PathId>,
     names: PackedIntVec,
     lengths: PackedIntVec,
     offsets: PagedIntVec,
@@ -62,10 +51,10 @@ impl Default for PathNames {
 }
 
 impl PathNames {
-    pub(super) fn add_name(&mut self, name: &[u8]) -> PathNameIx {
-        let name_ix = PathNameIx::new(self.lengths.len());
+    pub(super) fn add_name(&mut self, name: &[u8]) -> PathId {
+        let path_id = PathId(self.lengths.len() as u64);
 
-        self.name_id_map.insert(name.into(), name_ix);
+        self.name_id_map.insert(name.into(), path_id);
 
         let name_len = name.len() as u64;
         let name_offset = self.lengths.len() as u64;
@@ -74,14 +63,14 @@ impl PathNames {
 
         name.iter().for_each(|&b| self.names.append(b as u64));
 
-        name_ix
+        path_id
     }
 
     pub(super) fn name_iter(
         &self,
-        ix: PathNameIx,
+        id: PathId,
     ) -> Option<packed::vector::Iter<'_>> {
-        let vec_ix = ix.0;
+        let vec_ix = id.0 as usize;
         if vec_ix >= self.lengths.len() {
             return None;
         }
@@ -131,6 +120,12 @@ impl<'a> Drop for PathMutContext<'a> {
         let new_props = &self.path_ref_mut.properties;
         self.path_properties.heads.set_pack(ix, new_props.head);
         self.path_properties.tails.set_pack(ix, new_props.tail);
+        self.path_properties
+            .circular
+            .set_pack(ix, new_props.circular);
+        self.path_properties
+            .deleted_steps
+            .set_pack(ix, new_props.deleted_steps);
     }
 }
 
@@ -161,6 +156,12 @@ impl<'a> Drop for MultiPathMutContext<'a> {
             let new_props = &path.properties;
             self.path_properties.heads.set_pack(ix, new_props.head);
             self.path_properties.tails.set_pack(ix, new_props.tail);
+            self.path_properties
+                .circular
+                .set_pack(ix, new_props.circular);
+            self.path_properties
+                .deleted_steps
+                .set_pack(ix, new_props.deleted_steps);
         }
     }
 }

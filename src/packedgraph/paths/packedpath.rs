@@ -12,9 +12,7 @@ use super::{
 
 use super::super::NodeIdIndexMap;
 
-use crate::pathhandlegraph::{
-    PathBase, PathId, PathRef, PathRefMutSteps, PathStep,
-};
+use crate::pathhandlegraph::{PathBase, PathId, PathRef, PathRefMut, PathStep};
 
 use super::properties::*;
 
@@ -243,15 +241,7 @@ impl<'a> PackedPathRef<'a> {
 /// The path ID must be provided separately, and the `Handle` must be
 /// transformed into a `NodeRecordId` so that the list for the node in
 /// question can be identified.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StepUpdate {
-    Insert { handle: Handle, step: PathStepIx },
-    // Remove { handle: Handle, step: PathStepIx },
-    // InsertSegment {
-    //     start: PathStepIx,
-    //     steps: Vec<(Handle, PathStepIx)>,
-    // },
-}
+pub type StepUpdate = crate::pathhandlegraph::StepUpdate<PathStepIx>;
 
 pub struct PackedPathRefMut<'a> {
     pub path_id: PathId,
@@ -435,17 +425,16 @@ impl<'a> PackedPathRefMut<'a> {
     }
 }
 
-/*
-impl<'a> PathRefMutSteps for PackedPathRefMut<'a> {
-    fn append_step(&mut self, handle: Handle) -> (Handle, PathStepIx) {
-        let update = self.append_handle(handle);
-        (handle, update.step)
+impl<'a> PathRefMut for PackedPathRefMut<'a> {
+    fn append_step(&mut self, handle: Handle) -> StepUpdate {
+        self.append_handle(handle)
     }
 
-    fn prepend_step(&mut self, handle: Handle) -> (Handle, PathStepIx) {
-        let update = self.prepend_handle(handle);
-        (handle, update.step)
+    fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
+        self.prepend_handle(handle)
+    }
+
+    fn set_circularity(&mut self, circular: bool) {
+        self.properties.circular = circular;
     }
 }
-
-    */
