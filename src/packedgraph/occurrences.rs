@@ -89,13 +89,14 @@ impl NodeOccurrences {
         &mut self,
         path: PathId,
         offset: PathStepIx,
+        next: NodeOccurRecordIx,
     ) -> NodeOccurRecordIx {
         let node_rec_ix =
             NodeOccurRecordIx::from_zero_based(self.path_ids.len());
 
         self.path_ids.append(path.0 as u64);
         self.node_occur_offsets.append(offset.pack());
-        self.node_occur_next.append(0);
+        self.node_occur_next.append(next.pack());
 
         node_rec_ix
     }

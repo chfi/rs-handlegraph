@@ -9,6 +9,7 @@ use super::{
     edges::EdgeListIx,
     graph::NARROW_PAGE_WIDTH,
     index::{NodeRecordId, OneBasedIndex, RecordIndex},
+    occurrences::NodeOccurRecordIx,
     sequence::Sequences,
 };
 
@@ -148,7 +149,7 @@ pub struct NodeRecords {
     id_index_map: NodeIdIndexMap,
     sequences: Sequences,
     removed_nodes: Vec<NodeId>,
-    node_occurrence_map: PagedIntVec,
+    pub(super) node_occurrence_map: PagedIntVec,
 }
 
 impl Default for NodeRecords {
@@ -393,5 +394,25 @@ impl NodeRecords {
     #[inline]
     pub(super) fn handle_record(&self, h: Handle) -> Option<NodeRecordId> {
         self.id_index_map.get_index(h.id())
+    }
+
+    #[inline]
+    pub(super) fn node_record_occur(
+        &self,
+        rec_id: NodeRecordId,
+    ) -> Option<NodeOccurRecordIx> {
+        let vec_ix = rec_id.to_zero_based()?;
+        Some(self.node_occurrence_map.get_unpack(vec_ix))
+    }
+
+    /// Maps a handle into its corresponding occurrence record
+    /// pointer, if the node for the handle exists in the PackedGraph.
+    #[inline]
+    pub(super) fn handle_occur_record(
+        &self,
+        h: Handle,
+    ) -> Option<NodeOccurRecordIx> {
+        self.handle_record(h)
+            .and_then(|r| self.node_record_occur(r))
     }
 }
