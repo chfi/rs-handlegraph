@@ -335,7 +335,7 @@ impl<'a> PathRefs for &'a PackedGraphPaths {
 impl<'a> AllPathRefs for &'a PackedGraphPaths {
     type PathIds = &'a PackedPathNames;
 
-    fn all_path_refs(self) -> Vec<Self::Path> {
+    fn all_paths_ref(self) -> Vec<Self::Path> {
         self.path_names
             .all_path_ids()
             .filter_map(|p_id| self.path_ref(p_id))
@@ -346,8 +346,17 @@ impl<'a> AllPathRefs for &'a PackedGraphPaths {
 impl<'a> PathRefsMut for &'a mut PackedGraphPaths {
     type PathMut = PathMutContext<'a>;
 
-    fn path_ref_mut(self, id: PathId) -> Option<PathMutContext<'a>> {
+    fn path_mut(self, id: PathId) -> Option<PathMutContext<'a>> {
         self.get_path_mut_ctx(id)
+    }
+}
+
+impl<'a, 'b> AllPathRefsMut for &'a mut MultiPathMutContext<'b> {
+    type MutCtx = &'a mut PackedPathRefMut<'b>;
+    type PathRefsMut = std::slice::IterMut<'a, PackedPathRefMut<'b>>;
+
+    fn all_paths_mut(self) -> Self::PathRefsMut {
+        self.get_ref_muts()
     }
 }
 

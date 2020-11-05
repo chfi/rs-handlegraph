@@ -1,6 +1,6 @@
 use crate::handle::Handle;
 
-use super::{PathId, PathRef, PathRefMut, StepHandle};
+use super::{PathBase, PathId, PathRef, PathRefMut, StepHandle, StepUpdate};
 
 pub trait AllPathIds: Sized {
     type PathIds: Iterator<Item = PathId>;
@@ -29,13 +29,23 @@ pub trait PathRefs: Sized {
 pub trait AllPathRefs: PathRefs {
     type PathIds: AllPathIds;
 
-    fn all_path_refs(self) -> Vec<Self::Path>;
+    fn all_paths_ref(self) -> Vec<Self::Path>;
 }
 
 pub trait PathRefsMut: Sized {
     type PathMut: PathRefMut;
 
-    fn path_ref_mut(self, id: PathId) -> Option<Self::PathMut>;
+    fn path_mut(self, id: PathId) -> Option<Self::PathMut>;
+}
+
+pub trait AllPathRefsMut {
+    // type MultiCtx: Sized;
+    type MutCtx: PathRefMut;
+    type PathRefsMut: Iterator<Item = Self::MutCtx>;
+
+    fn all_paths_mut(self) -> Self::PathRefsMut;
+}
+
 }
 
 /// A collection of embedded paths in a graph.

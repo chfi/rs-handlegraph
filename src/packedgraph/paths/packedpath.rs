@@ -443,3 +443,17 @@ impl<'a> PathRefMut for PackedPathRefMut<'a> {
         self.properties.circular = circular;
     }
 }
+
+impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
+    fn append_step(&mut self, handle: Handle) -> StepUpdate {
+        self.append_handle(handle)
+    }
+
+    fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
+        self.prepend_handle(handle)
+    }
+
+    fn set_circularity(&mut self, circular: bool) {
+        self.properties.circular = circular;
+    }
+}
