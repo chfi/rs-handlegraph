@@ -215,38 +215,24 @@ impl PackedDoubleList for PackedPath {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PathUpdate {
-    pub(super) head: PathStepIx,
-    pub(super) tail: PathStepIx,
-    // pub(super) deleted_steps: usize,
-}
-
-impl PathUpdate {
-    fn new(prop: &PathPropertyRef<'_>) -> Self {
-        let head = prop.get_head();
-        let tail = prop.get_tail();
-        Self { head, tail }
-    }
-
-    fn set_head(&mut self, head: PathStepIx) {
-        self.head = head;
-    }
-
-    fn set_tail(&mut self, tail: PathStepIx) {
-        self.tail = tail;
-    }
-
-    pub(super) fn apply(self, mut prop: PathPropertyMut<'_>) {
-        prop.set_head(self.head);
-        prop.set_tail(self.tail);
-    }
-}
-
 pub struct PackedPathRef<'a> {
-    pub path_id: PathId,
-    pub path: &'a PackedPath,
-    pub properties: PathPropertyRef<'a>,
+    pub(super) path_id: PathId,
+    pub(super) path: &'a PackedPath,
+    pub(super) properties: PathPropertyRef<'a>,
+}
+
+impl<'a> PackedPathRef<'a> {
+    pub(super) fn new(
+        path_id: PathId,
+        path: &'a PackedPath,
+        properties: PathPropertyRef<'a>,
+    ) -> Self {
+        PackedPathRef {
+            path_id,
+            path,
+            properties,
+        }
+    }
 }
 
 pub struct PackedPathRefMut<'a> {

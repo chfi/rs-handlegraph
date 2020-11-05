@@ -150,6 +150,15 @@ impl PackedGraphPaths {
         self.paths.len()
     }
 
+    pub(super) fn path_ref<'a>(
+        &'a self,
+        id: PathId,
+    ) -> Option<PackedPathRef<'a>> {
+        let path_id = id;
+        let path = self.paths.get(id.0 as usize)?;
+        let properties = self.path_props.record_ref(id);
+        Some(PackedPathRef::new(path_id, path, properties))
+    }
 
     /*
     pub(super) fn path_ref_mut<'a>(
@@ -256,15 +265,13 @@ mod tests {
         let mut paths = PackedGraphPaths::default();
 
         let path_1 = paths.create_path(b"path1");
-        // let path_2 = paths.create_path(b"path2");
 
-        let pre_record_1 = paths.path_props.get_record(path_1);
+        let pre_record = paths.path_props.get_record(path_1);
 
-        println!("record before: {:#?}", pre_record_1);
-        assert!(pre_record_1.head.is_null());
-        assert!(pre_record_1.tail.is_null());
+        assert!(pre_record.head.is_null());
+        assert!(pre_record.tail.is_null());
 
-        let steps_1 = {
+        let _step_updates = {
             let mut path_mut = paths.get_path_mut_ctx(path_1).unwrap();
             let ref_mut = path_mut.get_ref_mut();
 
@@ -280,14 +287,33 @@ mod tests {
             steps
         };
 
-        let post_record_1 = paths.path_props.get_record(path_1);
+        let post_record = paths.path_props.get_record(path_1);
 
-        assert_eq!(post_record_1.head.to_vector_value(), 1);
-        assert_eq!(post_record_1.tail.to_vector_value(), 6);
+        // Heads & tails are path step indices, not handles
+        assert_eq!(post_record.head.to_vector_value(), 1);
+        assert_eq!(post_record.tail.to_vector_value(), 6);
 
-        println!("head after: {}", post_record_1.head.to_vector_value());
-        println!("tail after: {}", post_record_1.tail.to_vector_value());
+        let path_ref = paths.path_ref(path_1).unwrap();
 
-        println!("record after: {:#?}", post_record_1);
+        // PackedPathRef implements the PathRef trait,
+        // so we can step through the path
+        let steps = path_ref
+            .steps()
+            .map(|(_ix, step)| step.handle)
+            .collect::<Vec<_>>();
+
+        let mut expected_steps =
+            vec![hnd(1), hnd(2), hnd(3), hnd(4), hnd(3), hnd(5)];
+        assert_eq!(steps, expected_steps);
+
+        // The step iterator is double-ended, so we can reverse it
+        let steps_rev = path_ref
+            .steps()
+            .rev()
+            .map(|(_ix, step)| step.handle)
+            .collect::<Vec<_>>();
+
+        expected_steps.reverse();
+        assert_eq!(steps_rev, expected_steps);
     }
 }
