@@ -111,7 +111,7 @@ where
 
 /// A "view" into an element at single index of any `PackedCollection`,
 /// unpacked from `u64` into `T`
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct ViewRef<'a, V, T>
 where
     V: PackedCollection + Sized,

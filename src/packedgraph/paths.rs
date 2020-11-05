@@ -241,6 +241,41 @@ impl PackedGraphPaths {
             path_properties,
         }
     }
+
+    pub(super) fn with_path_mut_ctx<'a, F>(
+        &'a mut self,
+        id: PathId,
+        mut f: F,
+    ) -> Option<Vec<StepUpdate>>
+    where
+        F: FnMut(&mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
+    {
+        let mut mut_ctx = self.get_path_mut_ctx(id)?;
+        let mut ref_mut = mut_ctx.get_ref_mut();
+
+        Some(f(ref_mut))
+    }
+
+    pub(super) fn with_multipath_mut_ctx<'a, F>(
+        &'a mut self,
+        mut f: F,
+    ) -> Vec<(PathId, Vec<StepUpdate>)>
+    where
+        F: Fn(PathId, &mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
+    {
+        let mut mut_ctx = self.get_multipath_mut_ctx();
+        let refs_mut = mut_ctx.get_ref_muts();
+
+        let results = refs_mut
+            .map(|path| {
+                let path_id = path.path_id;
+                let steps = f(path_id, path);
+                (path_id, steps)
+            })
+            .collect::<Vec<_>>();
+
+        results
+    }
 }
 
 #[cfg(test)]
@@ -363,6 +398,37 @@ mod tests {
 
         expected_steps.reverse();
         assert_eq!(steps_rev, expected_steps);
+    }
+
+    #[test]
+    fn packedgraph_path_with_mut_ctx() {
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let mut paths = PackedGraphPaths::default();
+
+        let path_1 = paths.create_path(b"path1");
+
+        let _steps = paths.with_path_mut_ctx(path_1, |ref_mut| {
+            vec![1, 2, 3, 4, 3, 5]
+                .into_iter()
+                .map(|n| ref_mut.append_handle(hnd(n)))
+                .collect::<Vec<_>>()
+        });
+
+        let post_record = paths.path_props.get_record(path_1);
+        assert_eq!(post_record.head.to_vector_value(), 1);
+        assert_eq!(post_record.tail.to_vector_value(), 6);
+
+        let path_ref = paths.path_ref(path_1).unwrap();
+
+        let steps = path_ref
+            .steps()
+            .map(|(_ix, step)| step.handle)
+            .collect::<Vec<_>>();
+
+        let mut expected_steps =
+            vec![hnd(1), hnd(2), hnd(3), hnd(4), hnd(3), hnd(5)];
+        assert_eq!(steps, expected_steps);
     }
 
     #[test]

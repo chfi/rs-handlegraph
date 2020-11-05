@@ -215,7 +215,7 @@ impl PackedDoubleList for PackedPath {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 pub struct PackedPathRef<'a> {
     pub(super) path_id: PathId,
     pub(super) path: &'a PackedPath,
