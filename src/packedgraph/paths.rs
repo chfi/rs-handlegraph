@@ -273,6 +273,16 @@ impl PackedGraphPaths {
     }
 }
 
+impl<'a> AllPathIds for &'a PackedGraphPaths {
+    type PathIds = std::iter::Copied<
+        std::collections::hash_map::Values<'a, Vec<u8>, PathId>,
+    >;
+
+    fn all_path_ids(self) -> Self::PathIds {
+        self.path_names.name_id_map.values().copied()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -2,6 +2,12 @@ use crate::handle::Handle;
 
 use super::{PathId, PathRef, PathRefMut, StepHandle};
 
+pub trait AllPathIds: Sized {
+    type PathIds: Iterator<Item = PathId>;
+
+    fn all_path_ids(self) -> Self::PathIds;
+}
+
 /// A collection of embedded paths in a graph.
 pub trait EmbeddedPaths: Sized {
     /// Iterator through all path IDs in the graph
