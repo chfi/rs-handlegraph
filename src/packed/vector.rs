@@ -265,7 +265,7 @@ impl<'a, T: PackedElement> Iterator for IterView<'a, T> {
     fn count(self) -> usize {
         self.iter.count()
     }
-    fn last(mut self) -> Option<Self::Item> {
+    fn last(self) -> Option<Self::Item> {
         self.iter.last().map(T::unpack)
     }
     fn nth(&mut self, n: usize) -> Option<Self::Item> {

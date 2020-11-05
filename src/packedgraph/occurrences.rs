@@ -229,3 +229,24 @@ impl PackedList for NodeOccurrences {
         self.get_record(rec.next)
     }
 }
+
+pub struct OccurrencesIter<'a> {
+    list_iter: PackedListIter<'a, NodeOccurrences>,
+}
+
+impl<'a> OccurrencesIter<'a> {
+    pub(crate) fn new(list_iter: PackedListIter<'a, NodeOccurrences>) -> Self {
+        Self { list_iter }
+    }
+}
+
+impl<'a> Iterator for OccurrencesIter<'a> {
+    type Item = (PathId, PathStepIx);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (_occ_ix, occ_rec) = self.list_iter.next()?;
+        let path_id = occ_rec.path_id;
+        let step_ix = occ_rec.offset;
+        Some((path_id, step_ix))
+    }
+}

@@ -47,7 +47,7 @@ impl PackedGraph {
         Default::default()
     }
 
-    pub(super) fn add_node_occurrence(
+    pub(super) fn apply_node_occurrence(
         &mut self,
         path_id: PathId,
         step_update: paths::StepUpdate,
@@ -71,7 +71,7 @@ impl PackedGraph {
         }
     }
 
-    pub(super) fn add_node_occurrences_iter<I>(
+    pub(super) fn apply_node_occurrences_iter<I>(
         &mut self,
         path_id: PathId,
         iter: I,
@@ -79,7 +79,7 @@ impl PackedGraph {
         I: IntoIterator<Item = paths::StepUpdate>,
     {
         iter.into_iter()
-            .for_each(|s| self.add_node_occurrence(path_id, s))
+            .for_each(|s| self.apply_node_occurrence(path_id, s))
     }
 
     pub(super) fn with_path_mut_ctx<'a, F>(&'a mut self, path_id: PathId, f: F)
@@ -89,7 +89,7 @@ impl PackedGraph {
     {
         let steps = self.paths.with_path_mut_ctx(path_id, f);
         if let Some(steps) = steps {
-            self.add_node_occurrences_iter(path_id, steps);
+            self.apply_node_occurrences_iter(path_id, steps);
         }
     }
 }

@@ -4,6 +4,10 @@ use crate::{
     mutablehandlegraph::{AdditiveHandleGraph, MutableHandleGraph},
 };
 
+use crate::pathhandlegraph::{
+    HandleOccurrences, MutHandleOccurrences, OccurBase, PathId,
+};
+
 pub mod edges;
 pub mod graph;
 pub mod index;
@@ -19,6 +23,9 @@ pub use self::{
     index::*,
     iter::{EdgeListHandleIter, PackedHandlesIter},
     nodes::{GraphVecIx, NodeIdIndexMap, NodeRecords},
+    occurrences::{
+        NodeOccurRecordIx, NodeOccurrences, OccurRecord, OccurrencesIter,
+    },
     paths::*,
     sequence::{PackedSeqIter, Sequences},
 };
@@ -123,6 +130,26 @@ impl<'a> HandleGraphRef for &'a PackedGraph {
     #[inline]
     fn total_length(self) -> usize {
         self.nodes.sequences().total_length()
+    }
+}
+
+impl OccurBase for PackedGraph {
+    type StepIx = PathStepIx;
+}
+
+impl<'a> HandleOccurrences for &'a PackedGraph {
+    type OccurIter = OccurrencesIter<'a>;
+
+    fn handle_occurrences(self, handle: Handle) -> Self::OccurIter {
+        let occ_ix = self.nodes.handle_occur_record(handle).unwrap();
+        let iter = self.occurrences.iter(occ_ix);
+        OccurrencesIter::new(iter)
+    }
+}
+
+impl<'a> MutHandleOccurrences for &'a mut PackedGraph {
+    fn apply_update(self, path_id: PathId, step: StepUpdate) {
+        self.apply_node_occurrence(path_id, step)
     }
 }
 
