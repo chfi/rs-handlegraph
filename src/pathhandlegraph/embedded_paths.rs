@@ -26,6 +26,12 @@ pub trait PathRefs: Sized {
     fn path_ref(self, id: PathId) -> Option<Self::Path>;
 }
 
+pub trait AllPathRefs: PathRefs {
+    type PathIds: AllPathIds;
+
+    fn all_path_refs(self) -> Vec<Self::Path>;
+}
+
 pub trait PathRefsMut: Sized {
     type PathMut: PathRefMut;
 

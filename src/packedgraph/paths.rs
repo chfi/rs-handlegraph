@@ -292,14 +292,13 @@ impl PackedGraphPaths {
         results
     }
 }
-
-impl<'a> AllPathIds for &'a PackedGraphPaths {
+impl<'a> AllPathIds for &'a PackedPathNames {
     type PathIds = std::iter::Copied<
         std::collections::hash_map::Values<'a, Vec<u8>, PathId>,
     >;
 
     fn all_path_ids(self) -> Self::PathIds {
-        self.path_names.name_id_map.values().copied()
+        self.name_id_map.values().copied()
     }
 }
 
@@ -315,24 +314,12 @@ impl<'a> PathNames for &'a PackedPathNames {
     }
 }
 
-impl<'a> PathNames for &'a PackedGraphPaths {
-    type PathName = packed::vector::IterView<'a, u8>;
-
-    fn get_path_name(self, id: PathId) -> Option<Self::PathName> {
-        self.path_names.name_iter(id)
-    }
-
-    fn get_path_id(self, name: &[u8]) -> Option<PathId> {
-        self.path_names.name_id_map.get(name).copied()
-    }
-}
-
-impl<'a> PathNamesMut for &'a mut PackedGraphPaths {
+impl<'a> PathNamesMut for &'a mut PackedPathNames {
     fn insert_name(self, name: &[u8]) -> Option<PathId> {
         if self.get_path_id(name).is_some() {
             None
         } else {
-            Some(self.path_names.add_name(name))
+            Some(self.add_name(name))
         }
     }
 }
@@ -342,6 +329,17 @@ impl<'a> PathRefs for &'a PackedGraphPaths {
 
     fn path_ref(self, id: PathId) -> Option<PackedPathRef<'a>> {
         self.path_ref(id)
+    }
+}
+
+impl<'a> AllPathRefs for &'a PackedGraphPaths {
+    type PathIds = &'a PackedPathNames;
+
+    fn all_path_refs(self) -> Vec<Self::Path> {
+        self.path_names
+            .all_path_ids()
+            .filter_map(|p_id| self.path_ref(p_id))
+            .collect()
     }
 }
 
