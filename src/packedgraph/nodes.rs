@@ -9,7 +9,7 @@ use super::{
     edges::EdgeListIx,
     graph::NARROW_PAGE_WIDTH,
     index::{NodeRecordId, OneBasedIndex, RecordIndex},
-    occurrences::NodeOccurRecordIx,
+    occurrences::OccurListIx,
     sequence::Sequences,
 };
 
@@ -242,7 +242,7 @@ impl NodeRecords {
     pub(super) fn handle_occurrence_record_ix(
         &self,
         handle: Handle,
-    ) -> Option<NodeOccurRecordIx> {
+    ) -> Option<OccurListIx> {
         let occur_ix = self.handle_occurrence_link(handle)?;
         let rec_ix = self.node_occurrence_map.get(occur_ix) as usize;
         Some(rec_ix)
@@ -251,7 +251,7 @@ impl NodeRecords {
     pub(super) fn set_handle_occurrence_record_head(
         &mut self,
         handle: Handle,
-        record_ix: NodeOccurRecordIx,
+        record_ix: OccurListIx,
     ) {
         let occur_ix = self.handle_occurrence_link(handle).unwrap();
         self.node_occurrence_map.set(occur_ix, record_ix as u64);
@@ -400,7 +400,7 @@ impl NodeRecords {
     pub(crate) fn node_record_occur(
         &self,
         rec_id: NodeRecordId,
-    ) -> Option<NodeOccurRecordIx> {
+    ) -> Option<OccurListIx> {
         let vec_ix = rec_id.to_zero_based()?;
         Some(self.node_occurrence_map.get_unpack(vec_ix))
     }
@@ -408,10 +408,7 @@ impl NodeRecords {
     /// Maps a handle into its corresponding occurrence record
     /// pointer, if the node for the handle exists in the PackedGraph.
     #[inline]
-    pub(crate) fn handle_occur_record(
-        &self,
-        h: Handle,
-    ) -> Option<NodeOccurRecordIx> {
+    pub(crate) fn handle_occur_record(&self, h: Handle) -> Option<OccurListIx> {
         self.handle_record(h)
             .and_then(|r| self.node_record_occur(r))
     }

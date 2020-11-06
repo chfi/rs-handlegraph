@@ -11,7 +11,7 @@ use std::num::NonZeroUsize;
 use super::{NodeRecordId, OneBasedIndex, PathStepIx, RecordIndex};
 
 use super::list;
-use super::list::PackedList;
+use super::list::{PackedList, PackedListMut};
 
 use crate::pathhandlegraph::*;
 
@@ -21,15 +21,15 @@ use crate::packed::*;
 /// natural numbers starting from 1, each denoting a *record*. A zero
 /// denotes the end of the list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct NodeOccurRecordIx(Option<NonZeroUsize>);
+pub struct OccurListIx(Option<NonZeroUsize>);
 
-crate::impl_one_based_index!(NodeOccurRecordIx);
+crate::impl_one_based_index!(OccurListIx);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OccurRecord {
     path_id: PathId,
     offset: PathStepIx,
-    next: NodeOccurRecordIx,
+    next: OccurListIx,
 }
 
 #[derive(Debug, Clone)]
@@ -37,6 +37,7 @@ pub struct NodeOccurrences {
     path_ids: PagedIntVec,
     node_occur_offsets: PagedIntVec,
     node_occur_next: PagedIntVec,
+    removed_records: Vec<OccurListIx>,
 }
 
 impl Default for NodeOccurrences {
@@ -45,14 +46,14 @@ impl Default for NodeOccurrences {
             path_ids: PagedIntVec::new(WIDE_PAGE_WIDTH),
             node_occur_offsets: PagedIntVec::new(NARROW_PAGE_WIDTH),
             node_occur_next: PagedIntVec::new(NARROW_PAGE_WIDTH),
+            removed_records: Default::default(),
         }
     }
 }
 
 impl NodeOccurrences {
-    pub(super) fn append_record(&mut self) -> NodeOccurRecordIx {
-        let node_rec_ix =
-            NodeOccurRecordIx::from_zero_based(self.path_ids.len());
+    pub(super) fn append_record(&mut self) -> OccurListIx {
+        let node_rec_ix = OccurListIx::from_zero_based(self.path_ids.len());
 
         self.path_ids.append(0);
         self.node_occur_offsets.append(0);
@@ -66,9 +67,9 @@ impl NodeOccurrences {
         &mut self,
         path: PathId,
         offsets: &[PathStepIx],
-    ) -> NodeOccurRecordIx {
+    ) -> OccurListIx {
         let node_rec_ix =
-            NodeOccurRecordIx::from_zero_based(self.path_ids.len());
+            OccurListIx::from_zero_based(self.path_ids.len());
 
         let mut count = self.path_ids.len();
         let mut next = node_rec_ix.pack();
@@ -81,7 +82,7 @@ impl NodeOccurrences {
             next = self.path_ids.len();
         }
 
-        NodeOccurRecordIx::unpack(next)
+        OccurListIx::unpack(next)
     }
     */
 
@@ -89,10 +90,9 @@ impl NodeOccurrences {
         &mut self,
         path: PathId,
         offset: PathStepIx,
-        next: NodeOccurRecordIx,
-    ) -> NodeOccurRecordIx {
-        let node_rec_ix =
-            NodeOccurRecordIx::from_zero_based(self.path_ids.len());
+        next: OccurListIx,
+    ) -> OccurListIx {
+        let node_rec_ix = OccurListIx::from_zero_based(self.path_ids.len());
 
         self.path_ids.append(path.0 as u64);
         self.node_occur_offsets.append(offset.pack());
@@ -101,11 +101,7 @@ impl NodeOccurrences {
         node_rec_ix
     }
 
-    pub(super) fn add_link(
-        &mut self,
-        from: NodeOccurRecordIx,
-        to: NodeOccurRecordIx,
-    ) {
+    pub(super) fn add_link(&mut self, from: OccurListIx, to: OccurListIx) {
         let from_ix = from.to_zero_based().unwrap();
         self.node_occur_next.set_pack(from_ix, to);
     }
@@ -117,7 +113,7 @@ impl NodeOccurrences {
     // pub(super) fn set_node_head(
     //     &mut self,
     //     node: NodeRecordId,
-    //     head: NodeOccurRecordIx,
+    //     head: OccurListIx,
     // ) {
     //     let ix = node.to_zero_based().unwrap();
     //     self.node_id_occur_ix_map.set_pack(ix, head);
@@ -126,14 +122,14 @@ impl NodeOccurrences {
     // pub(super) fn get_node_head(
     //     &self,
     //     node: NodeRecordId,
-    // ) -> NodeOccurRecordIx {
+    // ) -> OccurListIx {
     //     let ix = node.to_zero_based().unwrap();
     //     self.node_id_occur_ix_map.get_unpack(ix)
     // }
 
     pub(super) fn prepend_occurrence(
         &mut self,
-        ix: NodeOccurRecordIx,
+        ix: OccurListIx,
         path_id: PathId,
         offset: PathStepIx,
     ) {
@@ -141,7 +137,7 @@ impl NodeOccurrences {
 
         let rec_ix = self.append_record();
 
-        let next: NodeOccurRecordIx = self.node_occur_next.get_unpack(ix);
+        let next: OccurListIx = self.node_occur_next.get_unpack(ix);
 
         let rec_ix = rec_ix.to_zero_based().unwrap();
 
@@ -152,10 +148,10 @@ impl NodeOccurrences {
 
     pub(super) fn set_record(
         &mut self,
-        ix: NodeOccurRecordIx,
+        ix: OccurListIx,
         path_id: PathId,
         offset: PathStepIx,
-        next: NodeOccurRecordIx,
+        next: OccurListIx,
     ) -> bool {
         if let Some(ix) = ix.to_zero_based() {
             if ix >= self.path_ids.len() {
@@ -172,22 +168,29 @@ impl NodeOccurrences {
         }
     }
 
-    pub(crate) fn iter(&self, ix: NodeOccurRecordIx) -> list::Iter<'_, Self> {
-        list::Iter::new(self, ix)
+    pub(crate) fn iter(&self, head: OccurListIx) -> list::Iter<'_, Self> {
+        list::Iter::new(self, head)
+    }
+
+    pub(crate) fn iter_mut(
+        &mut self,
+        head: OccurListIx,
+    ) -> list::IterMut<'_, Self> {
+        list::IterMut::new(self, head)
     }
 }
 
 impl PackedList for NodeOccurrences {
-    type ListPtr = NodeOccurRecordIx;
+    type ListPtr = OccurListIx;
     type ListRecord = OccurRecord;
 
     #[inline]
-    fn next_pointer(rec: &OccurRecord) -> NodeOccurRecordIx {
+    fn next_pointer(rec: &OccurRecord) -> OccurListIx {
         rec.next
     }
 
     #[inline]
-    fn get_record(&self, ix: NodeOccurRecordIx) -> Option<OccurRecord> {
+    fn get_record(&self, ix: OccurListIx) -> Option<OccurRecord> {
         let ix = ix.to_zero_based()?;
         if ix >= self.path_ids.len() {
             return None;
@@ -207,6 +210,47 @@ impl PackedList for NodeOccurrences {
     #[inline]
     fn next_record(&self, rec: &OccurRecord) -> Option<OccurRecord> {
         self.get_record(rec.next)
+    }
+}
+
+impl PackedListMut for NodeOccurrences {
+    type ListLink = OccurListIx;
+
+    #[inline]
+    fn get_record_link(record: &OccurRecord) -> OccurListIx {
+        record.next
+    }
+
+    #[inline]
+    fn link_next(link: OccurListIx) -> OccurListIx {
+        link
+    }
+
+    #[inline]
+    fn remove_at_pointer(&mut self, ptr: OccurListIx) -> Option<OccurListIx> {
+        let ix = ptr.to_zero_based()?;
+
+        let next = self.node_occur_next.get_unpack(ix);
+
+        self.path_ids.set(ix, 0);
+        self.node_occur_offsets.set(ix, 0);
+        self.node_occur_next.set(ix, 0);
+
+        self.removed_records.push(ptr);
+
+        Some(next)
+    }
+
+    #[inline]
+    fn remove_next(&mut self, ptr: OccurListIx) -> Option<()> {
+        let ix = ptr.to_zero_based()?;
+
+        let next_ptr = self.node_occur_next.get_unpack(ix);
+
+        let new_next_ptr = self.remove_at_pointer(next_ptr)?;
+        self.node_occur_next.set_pack(ix, new_next_ptr);
+
+        Some(())
     }
 }
 

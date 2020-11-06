@@ -110,6 +110,8 @@ impl PackedListMut for EdgeLists {
         self.record_vec.set(h_ix, 0);
         self.record_vec.set(n_ix, 0);
 
+        self.removed_records.push(ptr);
+
         Some(next)
     }
 

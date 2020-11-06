@@ -3,7 +3,7 @@ pub(super) use super::{
     edges::{EdgeListIx, EdgeLists, EdgeVecIx},
     index::{NodeRecordId, OneBasedIndex, RecordIndex},
     nodes::{GraphVecIx, NodeIdIndexMap, NodeRecords},
-    occurrences::{NodeOccurRecordIx, NodeOccurrences, OccurRecord},
+    occurrences::{NodeOccurrences, OccurListIx, OccurRecord},
     paths::{PackedGraphPaths, PathStepIx},
     sequence::{PackedSeqIter, SeqRecordIx, Sequences},
 };

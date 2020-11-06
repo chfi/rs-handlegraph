@@ -23,9 +23,7 @@ pub use self::{
     index::*,
     iter::{EdgeListHandleIter, PackedHandlesIter},
     nodes::{GraphVecIx, NodeIdIndexMap, NodeRecords},
-    occurrences::{
-        NodeOccurRecordIx, NodeOccurrences, OccurRecord, OccurrencesIter,
-    },
+    occurrences::{NodeOccurrences, OccurListIx, OccurRecord, OccurrencesIter},
     paths::*,
     sequence::{PackedSeqIter, Sequences},
 };
