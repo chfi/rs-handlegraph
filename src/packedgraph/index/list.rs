@@ -112,6 +112,31 @@ impl<'a, T: PackedListMut> IterMut<'a, T> {
             Some(head)
         }
     }
+
+    pub fn remove_all_records_with<P>(&mut self, p: P) -> Option<T::ListPtr>
+    where
+        P: Fn(T::ListPtr, T::ListRecord) -> bool + Copy,
+    {
+        let head = self.head_ptr;
+        let tail = self.tail_ptr;
+
+        let mut new_head = head;
+
+        while let Some((prev_ptr, rec_ptr)) = find_record_with_prev_ix(self, p)
+        {
+            if prev_ptr.is_null() {
+                assert!(new_head == rec_ptr);
+                let next = self.list.remove_at_pointer(head)?;
+                new_head = T::link_next(next);
+            } else {
+                if tail == rec_ptr {
+                    self.tail_ptr = T::ListPtr::null();
+                }
+                self.list.remove_next(prev_ptr);
+            }
+        }
+        Some(new_head)
+    }
 }
 
 macro_rules! list_iter_impls {

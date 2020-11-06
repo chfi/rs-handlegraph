@@ -311,6 +311,21 @@ mod tests {
         assert_eq!(vec![hnd(6)], l_5);
     }
 
+    fn vec_edge_list(
+        edges: &EdgeLists,
+        head: EdgeListIx,
+    ) -> Vec<(u64, u64, u64)> {
+        edges
+            .iter(head)
+            .map(|(edge, (handle, next))| {
+                let edge = edge.to_vector_value();
+                let handle = handle.as_integer();
+                let next = next.to_vector_value();
+                (edge, handle, next)
+            })
+            .collect::<Vec<_>>()
+    }
+
     #[test]
     fn remove_edge_list_record_iter_mut() {
         let hnd = |x: u64| Handle::pack(x, false);
@@ -320,18 +335,6 @@ mod tests {
         };
 
         let mut edges = EdgeLists::default();
-
-        let vec_edge_list = |edges: &EdgeLists, head: EdgeListIx| {
-            edges
-                .iter(head)
-                .map(|(edge, (handle, next))| {
-                    let edge = edge.to_vector_value();
-                    let handle = handle.as_integer();
-                    let next = next.to_vector_value();
-                    (edge, handle, next)
-                })
-                .collect::<Vec<_>>()
-        };
 
         let handles =
             vec![1, 2, 3, 4, 5].into_iter().map(hnd).collect::<Vec<_>>();
@@ -364,7 +367,6 @@ mod tests {
             });
 
         assert_eq!(Some(head), new_head);
-
         let new_edge_vec = vec_edge_list(&edges, head);
 
         assert_eq!(
@@ -415,5 +417,56 @@ mod tests {
             .iter_mut(new_head.unwrap())
             .remove_record_with(|_, _| true);
         assert_eq!(new_head, None);
+    }
+
+    #[test]
+    fn remove_many_edge_records() {
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let edgevec = |es: &EdgeLists, ix: EdgeListIx| {
+            es.iter(ix).map(|(_, (h, _))| h).collect::<Vec<_>>()
+        };
+
+        let mut edges = EdgeLists::default();
+
+        let handles =
+            vec![1, 2, 3, 4, 5].into_iter().map(hnd).collect::<Vec<_>>();
+
+        let mut last_edge = EdgeListIx::null();
+
+        let mut edge_ixs = Vec::new();
+
+        // A single edge list, all edges have the same source and
+        // different targets
+        for &h in handles.iter() {
+            let edge = edges.append_record(h, last_edge);
+            edge_ixs.push(edge);
+            last_edge = edge;
+        }
+
+        let head = *edge_ixs.last().unwrap();
+        let tail = *edge_ixs.first().unwrap();
+
+        assert_eq!(head.to_vector_value(), 5);
+        assert_eq!(tail.to_vector_value(), 1);
+
+        let orig_edge_vec = vec_edge_list(&edges, head);
+
+        // Remove all odd nodes
+        let new_head = edges
+            .iter_mut(head)
+            .remove_all_records_with(|_, (h, _)| u64::from(h.id()) % 2 == 1);
+
+        assert_eq!(new_head.unwrap().to_vector_value(), 4);
+        let new_edge_vec = vec_edge_list(&edges, new_head.unwrap());
+        assert!(new_edge_vec.iter().all(|&(_, h, _)| h % 2 == 0));
+
+        // Remove all even nodes
+        let new_head = edges
+            .iter_mut(head)
+            .remove_all_records_with(|_, (h, _)| u64::from(h.id()) % 2 == 0);
+        assert_eq!(new_head, Some(EdgeListIx::null()));
+        let new_edge_vec = vec_edge_list(&edges, new_head.unwrap());
+        assert!(new_edge_vec.is_empty());
     }
 }
