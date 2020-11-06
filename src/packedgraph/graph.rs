@@ -14,6 +14,9 @@ use crate::pathhandlegraph::PathId;
 
 use crate::packed::traits::*;
 
+use super::list;
+use super::list::{PackedList, PackedListMut};
+
 use super::paths;
 
 pub(crate) static NARROW_PAGE_WIDTH: usize = 256;
@@ -67,6 +70,28 @@ impl PackedGraph {
                 self.nodes
                     .node_occurrence_map
                     .set_pack(vec_ix, new_occur_ix);
+            }
+            StepUpdate::Remove { handle, step } => {
+                let rec_id = self.nodes.handle_record(handle).unwrap();
+                let vec_ix = rec_id.to_zero_based().unwrap();
+
+                let occur_head =
+                    self.nodes.node_occurrence_map.get_unpack(vec_ix);
+
+                let new_occur_ix = self
+                    .occurrences
+                    .iter_mut(occur_head)
+                    .remove_record_with(|_, record| {
+                        record.path_id == path_id && record.offset == step
+                    });
+
+                if let Some(new_head) = new_occur_ix {
+                    if new_head != occur_head {
+                        self.nodes
+                            .node_occurrence_map
+                            .set_pack(vec_ix, new_head);
+                    }
+                }
             }
         }
     }
