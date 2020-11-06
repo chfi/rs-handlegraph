@@ -42,6 +42,8 @@ pub trait PackedListMut: PackedList {
 
     fn get_record_link(record: &Self::ListRecord) -> Self::ListLink;
 
+    fn link_next(link: Self::ListLink) -> Self::ListPtr;
+
     /// Remove the list record at the given pointer, if it exists.
     /// Returns the removed record's next pointer.
     fn remove_at_pointer(
@@ -89,7 +91,7 @@ where
 }
 
 impl<'a, T: PackedListMut> IterMut<'a, T> {
-    pub fn remove_record_with<P>(&mut self, p: P) -> Option<T::ListLink>
+    pub fn remove_record_with<P>(&mut self, p: P) -> Option<T::ListPtr>
     where
         P: Fn(T::ListPtr, T::ListRecord) -> bool,
     {
@@ -101,16 +103,16 @@ impl<'a, T: PackedListMut> IterMut<'a, T> {
         if prev_ptr.is_null() {
             assert!(head == rec_ptr);
             let next = self.list.remove_at_pointer(head)?;
-            Some(next)
+            Some(T::link_next(next))
         } else {
-            let head_record = self.list.get_record(head)?;
-            let head_link = T::get_record_link(&head_record);
+            // let head_record = self.list.get_record(head)?;
+            // let head_link = T::get_record_link(&head_record);
 
             if tail == rec_ptr {
                 self.tail_ptr = T::ListPtr::null();
             }
-            self.list.remove_next(rec_ptr);
-            Some(head_link)
+            self.list.remove_next(prev_ptr);
+            Some(head)
         }
     }
 }

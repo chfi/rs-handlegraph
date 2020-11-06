@@ -97,6 +97,11 @@ impl PackedListMut for EdgeLists {
     }
 
     #[inline]
+    fn link_next(link: EdgeListIx) -> EdgeListIx {
+        link
+    }
+
+    #[inline]
     fn remove_at_pointer(&mut self, ptr: EdgeListIx) -> Option<EdgeListIx> {
         let h_ix = ptr.to_record_ix(2, 0)?;
         let n_ix = h_ix + 1;
@@ -228,6 +233,10 @@ impl EdgeLists {
         list::Iter::new(self, ix)
     }
 
+    pub fn iter_mut(&mut self, ix: EdgeListIx) -> list::IterMut<'_, Self> {
+        list::IterMut::new(self, ix)
+    }
+
     /// Updates the first edge record in the provided edge list that
     /// fulfills the predicate `pred`, using the provided update
     /// function `f`.
@@ -344,6 +353,127 @@ mod tests {
         assert_eq!(vec![hnd(4), hnd(5), hnd(6)], l_3);
         assert_eq!(vec![hnd(5), hnd(6)], l_4);
         assert_eq!(vec![hnd(6)], l_5);
+    }
+
+    #[test]
+    fn remove_edge_list_record_iter_mut() {
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let edgevec = |es: &EdgeLists, ix: EdgeListIx| {
+            es.iter(ix).map(|(_, (h, _))| h).collect::<Vec<_>>()
+        };
+
+        let mut edges = EdgeLists::default();
+
+        let vec_edge_list = |edges: &EdgeLists, head: EdgeListIx| {
+            edges
+                .iter(head)
+                .map(|(edge, (handle, next))| {
+                    let edge = edge.to_vector_value();
+                    let handle = handle.as_integer();
+                    let next = next.to_vector_value();
+                    (edge, handle, next)
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let print_edge_list = |edges: &EdgeLists, head: EdgeListIx| {
+            println!("| {:>4} | {:>6} | {:>4} |", "edge", "handle", "next");
+            for (edge, (handle, next)) in edges.iter(head) {
+                let edge = edge.to_vector_value();
+                let handle = handle.as_integer();
+                let next = next.to_vector_value();
+                println!("| {:>4} | {:>6} | {:>4} |", edge, handle, next);
+            }
+            println!();
+        };
+
+        let handles =
+            vec![1, 2, 3, 4, 5].into_iter().map(hnd).collect::<Vec<_>>();
+
+        let mut last_edge = EdgeListIx::null();
+
+        let mut edge_ixs = Vec::new();
+
+        // A single edge list, all edges have the same source and
+        // different targets
+        for &h in handles.iter() {
+            let edge = edges.append_record(h, last_edge);
+            println!("{:?} -> {:?}", edge, last_edge);
+            edge_ixs.push(edge);
+            last_edge = edge;
+        }
+
+        println!("{:#?}", edge_ixs);
+
+        let head = *edge_ixs.last().unwrap();
+        let tail = *edge_ixs.first().unwrap();
+        println!("head\t{:?}", head);
+        println!("tail\t{:?}", tail);
+
+        assert_eq!(head.to_vector_value(), 5);
+        assert_eq!(tail.to_vector_value(), 1);
+
+        println!("original edge list");
+        // println!("{:?}", edges.iter(head).collect::<Vec<_>>());
+
+        let orig_edge_vec = vec_edge_list(&edges, head);
+
+        print_edge_list(&edges, head);
+
+        // Remove the first edge with an even node ID
+        let new_head =
+            edges.iter_mut(head).remove_record_with(|ix, (h, next)| {
+                let id = u64::from(h.id());
+                u64::from(h.id()) % 2 == 0
+            });
+        println!();
+
+        assert_eq!(Some(head), new_head);
+
+        let new_edge_vec = vec_edge_list(&edges, head);
+
+        assert_eq!(
+            new_edge_vec,
+            vec![(5, 10, 3), (3, 6, 2), (2, 4, 1), (1, 2, 0)]
+        );
+        println!("new head\t{:?}", new_head);
+
+        println!("edge list with first even node removed");
+        print_edge_list(&edges, head);
+
+        // Remove the first edge with an even handle
+        // let rem_1 = edges
+        //     .remove_edge_record(e_1, |(h, _)| usize::from(h.id()) % 2 == 0);
+        // let mod_edges = edgevec(&edges, e_1);
+        // The start of the list is still the same
+        // assert_eq!(rem_1, Some(e_1));
+        // assert_eq!(vec![hnd(1), hnd(3), hnd(4), hnd(5)], mod_edges);
+
+        // Remove handle 5
+        // let rem_last = edges.remove_edge_record(e_1, |(h, _)| h == hnd(5));
+        // let mod_edges = edgevec(&edges, e_1);
+
+        /*
+        // The start of the list is still the same
+        assert_eq!(rem_last, Some(e_1));
+        assert_eq!(vec![hnd(1), hnd(3), hnd(4)], mod_edges);
+        */
+
+        // Remove the first record
+        // Remove the first edge with an even handle, again
+
+        // let rem_1st = edges.remove_edge_record(e_1, |(h, _)| h == hnd(1));
+
+        // e_1 is still in the edge list, but marked as removed;
+        // the start of the list is the value in rem_1st, which is now equal to e_3
+        // let mod_edges = edgevec(&edges, rem_1st.unwrap());
+
+        /*
+        // The start of the list has changed
+        assert_eq!(rem_1st, Some(e_3));
+        assert_eq!(vec![hnd(3), hnd(4)], mod_edges);
+        */
     }
 
     #[test]
