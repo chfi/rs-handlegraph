@@ -50,6 +50,22 @@ pub trait PackedListMut: PackedList {
     fn remove_next(&mut self, ptr: Self::ListPtr) -> Option<()>;
 }
 
+pub trait PackedDoubleListMut: PackedDoubleList {
+    /// Remove the list record at the given pointer, if it exists.
+    /// Returns the removed record's previous and next pointers.
+    fn remove_at_pointer(
+        &mut self,
+        ptr: Self::ListPtr,
+    ) -> Option<(Self::ListPtr, Self::ListPtr)>;
+
+    // /// Remove the list record preceding the given pointer, if it exists.
+    // /// Should update the affected records' links accordingly.
+    // fn remove_prev(&mut self, ptr: Self::ListPtr) -> Option<()>;
+
+    /// Remove the list record after the given pointer, if it exists.
+    /// Should update the affected records' links accordingly.
+    fn remove_next(&mut self, ptr: Self::ListPtr) -> Option<()>;
+}
 /// An iterator through linked lists represented using PackedList
 pub struct Iter<'a, T: PackedList> {
     list: &'a T,

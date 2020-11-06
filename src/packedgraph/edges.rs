@@ -7,7 +7,7 @@ use super::graph::WIDE_PAGE_WIDTH;
 use super::{OneBasedIndex, RecordIndex};
 
 use super::list;
-use super::list::PackedList;
+use super::list::{PackedList, PackedListMut};
 
 /// The index for an edge record. Valid indices are natural numbers
 /// starting from 1, each denoting a *record*. An edge list index of
@@ -88,6 +88,22 @@ impl PackedList for EdgeLists {
     }
 }
 
+impl PackedListMut for EdgeLists {
+    fn remove_at_pointer(&mut self, ptr: EdgeListIx) -> Option<EdgeListIx> {
+        let record = self.get_record(ptr)?;
+        self.clear_record(ptr);
+        Some(record.1)
+    }
+
+    fn remove_next(&mut self, ptr: EdgeListIx) -> Option<()> {
+        let record_next_vec_ix = ptr.to_record_ix(2, 1)?;
+        let next_edge_ix = self.record_vec.get_unpack(record_next_vec_ix);
+        let next = self.remove_at_pointer(next_edge_ix)?;
+        self.record_vec.set_pack(record_next_vec_ix, next);
+        Some(())
+    }
+}
+
 impl Default for EdgeLists {
     fn default() -> Self {
         EdgeLists {
@@ -164,6 +180,22 @@ impl EdgeLists {
 
         self.record_vec.set_pack(h_ix, handle);
         self.record_vec.set_pack(n_ix, next);
+
+        Some(())
+    }
+
+    fn set_next(&mut self, ix: EdgeListIx, next: EdgeListIx) -> Option<()> {
+        let n_ix = ix.to_record_ix(2, 1)?;
+        self.record_vec.set_pack(n_ix, next);
+        Some(())
+    }
+
+    fn clear_record(&mut self, ix: EdgeListIx) -> Option<()> {
+        let h_ix = ix.to_record_ix(2, 0)?;
+        let n_ix = h_ix + 1;
+
+        self.record_vec.set(h_ix, 0);
+        self.record_vec.set(n_ix, 0);
 
         Some(())
     }
