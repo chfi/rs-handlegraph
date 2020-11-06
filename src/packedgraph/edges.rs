@@ -4,7 +4,10 @@ use std::num::NonZeroUsize;
 
 use super::graph::WIDE_PAGE_WIDTH;
 
-use super::{OneBasedIndex, PackedList, PackedListIter, RecordIndex};
+use super::{OneBasedIndex, RecordIndex};
+
+use super::list;
+use super::list::PackedList;
 
 /// The index for an edge record. Valid indices are natural numbers
 /// starting from 1, each denoting a *record*. An edge list index of
@@ -173,8 +176,8 @@ impl EdgeLists {
 
     /// Return an iterator that walks through the edge list starting
     /// at the provided index.
-    pub fn iter(&self, ix: EdgeListIx) -> PackedListIter<'_, Self> {
-        PackedListIter::new(self, ix)
+    pub fn iter(&self, ix: EdgeListIx) -> list::Iter<'_, Self> {
+        list::Iter::new(self, ix)
     }
 
     /// Updates the first edge record in the provided edge list that

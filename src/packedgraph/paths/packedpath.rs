@@ -6,11 +6,12 @@ use std::num::NonZeroUsize;
 
 use super::super::graph::NARROW_PAGE_WIDTH;
 
-use super::{
-    OneBasedIndex, PackedDoubleList, PackedList, PackedListIter, RecordIndex,
-};
+use super::{OneBasedIndex, RecordIndex};
 
 use super::super::NodeIdIndexMap;
+
+use crate::packedgraph::index::list;
+use list::{PackedDoubleList, PackedList};
 
 use crate::pathhandlegraph::{PathBase, PathId, PathRef, PathRefMut, PathStep};
 
@@ -179,8 +180,8 @@ impl PackedPath {
         &self,
         head: PathStepIx,
         tail: PathStepIx,
-    ) -> PackedListIter<'_, PackedPath> {
-        PackedListIter::new_double(self, head, tail)
+    ) -> list::Iter<'_, PackedPath> {
+        list::Iter::new_double(self, head, tail)
     }
 }
 
@@ -273,7 +274,7 @@ impl<'a> PathBase for PackedPathRefMut<'a> {
 }
 
 impl<'a> PathRef for PackedPathRef<'a> {
-    type Steps = PackedListIter<'a, PackedPath>;
+    type Steps = list::Iter<'a, PackedPath>;
 
     fn steps(self) -> Self::Steps {
         let head = self.properties.head;

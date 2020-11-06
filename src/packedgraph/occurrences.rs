@@ -8,10 +8,10 @@ use super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH};
 use std::num::NonZeroUsize;
 
 #[allow(unused_imports)]
-use super::{
-    NodeRecordId, OneBasedIndex, PackedList, PackedListIter, PathStepIx,
-    RecordIndex,
-};
+use super::{NodeRecordId, OneBasedIndex, PathStepIx, RecordIndex};
+
+use super::list;
+use super::list::PackedList;
 
 use crate::pathhandlegraph::*;
 
@@ -172,11 +172,8 @@ impl NodeOccurrences {
         }
     }
 
-    pub(crate) fn iter(
-        &self,
-        ix: NodeOccurRecordIx,
-    ) -> PackedListIter<'_, Self> {
-        PackedListIter::new(self, ix)
+    pub(crate) fn iter(&self, ix: NodeOccurRecordIx) -> list::Iter<'_, Self> {
+        list::Iter::new(self, ix)
     }
 }
 
@@ -214,11 +211,11 @@ impl PackedList for NodeOccurrences {
 }
 
 pub struct OccurrencesIter<'a> {
-    list_iter: PackedListIter<'a, NodeOccurrences>,
+    list_iter: list::Iter<'a, NodeOccurrences>,
 }
 
 impl<'a> OccurrencesIter<'a> {
-    pub(crate) fn new(list_iter: PackedListIter<'a, NodeOccurrences>) -> Self {
+    pub(crate) fn new(list_iter: list::Iter<'a, NodeOccurrences>) -> Self {
         Self { list_iter }
     }
 }

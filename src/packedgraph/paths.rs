@@ -10,10 +10,7 @@ use crate::{
 
 use fnv::FnvHashMap;
 
-use super::{
-    NodeRecordId, OneBasedIndex, PackedDoubleList, PackedList, PackedListIter,
-    RecordIndex,
-};
+use super::{NodeRecordId, OneBasedIndex, PackedDoubleList, RecordIndex};
 
 use super::NodeIdIndexMap;
 
