@@ -105,9 +105,6 @@ impl<'a, T: PackedListMut> IterMut<'a, T> {
             let next = self.list.remove_at_pointer(head)?;
             Some(T::link_next(next))
         } else {
-            // let head_record = self.list.get_record(head)?;
-            // let head_link = T::get_record_link(&head_record);
-
             if tail == rec_ptr {
                 self.tail_ptr = T::ListPtr::null();
             }
