@@ -38,34 +38,22 @@ pub trait PackedDoubleList: PackedList {
 /// A packed list that supports mutation by removing records, while
 /// updating the links in the list.
 pub trait PackedListMut: PackedList {
+    type ListLink: PartialEq + Copy;
+
+    fn get_record_link(record: &Self::ListRecord) -> Self::ListLink;
+
     /// Remove the list record at the given pointer, if it exists.
     /// Returns the removed record's next pointer.
     fn remove_at_pointer(
         &mut self,
         ptr: Self::ListPtr,
-    ) -> Option<Self::ListPtr>;
+    ) -> Option<Self::ListLink>;
 
     /// Remove the list record after the given pointer, if it exists.
-    /// Updates the provided record's next pointer accordingly.
+    /// Should update the provided record's next pointer accordingly.
     fn remove_next(&mut self, ptr: Self::ListPtr) -> Option<()>;
 }
 
-pub trait PackedDoubleListMut: PackedDoubleList {
-    /// Remove the list record at the given pointer, if it exists.
-    /// Returns the removed record's previous and next pointers.
-    fn remove_at_pointer(
-        &mut self,
-        ptr: Self::ListPtr,
-    ) -> Option<(Self::ListPtr, Self::ListPtr)>;
-
-    // /// Remove the list record preceding the given pointer, if it exists.
-    // /// Should update the affected records' links accordingly.
-    // fn remove_prev(&mut self, ptr: Self::ListPtr) -> Option<()>;
-
-    /// Remove the list record after the given pointer, if it exists.
-    /// Should update the affected records' links accordingly.
-    fn remove_next(&mut self, ptr: Self::ListPtr) -> Option<()>;
-}
 /// An iterator through linked lists represented using PackedList
 pub struct Iter<'a, T: PackedList> {
     list: &'a T,
@@ -79,6 +67,52 @@ pub struct IterMut<'a, T: PackedList> {
     head_ptr: T::ListPtr,
     tail_ptr: T::ListPtr,
     finished: bool,
+}
+
+fn find_record_with_prev_ix<'a, 'b, T, P>(
+    iter: &'a mut IterMut<'b, T>,
+    p: P,
+) -> Option<(T::ListPtr, T::ListPtr)>
+where
+    T: PackedList,
+    P: Fn(T::ListPtr, T::ListRecord) -> bool,
+{
+    let (prev_ptr, rec_ptr, _) = iter
+        .scan(T::ListPtr::null(), |prev_ptr, (rec_ptr, record)| {
+            let old_prev_ptr = *prev_ptr;
+            *prev_ptr = rec_ptr;
+            Some((old_prev_ptr, rec_ptr, record))
+        })
+        .find(|&(_, ptr, rec)| p(ptr, rec))?;
+
+    Some((prev_ptr, rec_ptr))
+}
+
+impl<'a, T: PackedListMut> IterMut<'a, T> {
+    pub fn remove_record_with<P>(&mut self, p: P) -> Option<T::ListLink>
+    where
+        P: Fn(T::ListPtr, T::ListRecord) -> bool,
+    {
+        let head = self.head_ptr;
+        let tail = self.tail_ptr;
+
+        let (prev_ptr, rec_ptr) = find_record_with_prev_ix(self, p)?;
+
+        if prev_ptr.is_null() {
+            assert!(head == rec_ptr);
+            let next = self.list.remove_at_pointer(head)?;
+            Some(next)
+        } else {
+            let head_record = self.list.get_record(head)?;
+            let head_link = T::get_record_link(&head_record);
+
+            if tail == rec_ptr {
+                self.tail_ptr = T::ListPtr::null();
+            }
+            self.list.remove_next(rec_ptr);
+            Some(head_link)
+        }
+    }
 }
 
 macro_rules! list_iter_impls {
