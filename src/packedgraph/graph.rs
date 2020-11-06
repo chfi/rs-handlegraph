@@ -92,4 +92,18 @@ impl PackedGraph {
             self.apply_node_occurrences_iter(path_id, steps);
         }
     }
+
+    pub(super) fn with_all_paths_mut_ctx<'a, F>(&'a mut self, f: F)
+    where
+        for<'b> F: Fn(
+                PathId,
+                &mut paths::PackedPathRefMut<'b>,
+            ) -> Vec<paths::StepUpdate>
+            + Sync,
+    {
+        let all_steps = self.paths.with_multipath_mut_ctx_par(f);
+        for (path_id, steps) in all_steps {
+            self.apply_node_occurrences_iter(path_id, steps);
+        }
+    }
 }

@@ -287,6 +287,27 @@ impl PackedGraphPaths {
         Some(f(ref_mut))
     }
 
+    pub(super) fn with_multipath_mut_ctx_par<'a, F>(
+        &'a mut self,
+        f: F,
+    ) -> Vec<(PathId, Vec<StepUpdate>)>
+    where
+        F: Fn(PathId, &mut PackedPathRefMut<'a>) -> Vec<StepUpdate> + Sync,
+    {
+        let mut mut_ctx = self.get_multipath_mut_ctx();
+        let refs_mut = mut_ctx.ref_muts_par();
+
+        let results = refs_mut
+            .map(|path| {
+                let path_id = path.path_id;
+                let steps = f(path_id, path);
+                (path_id, steps)
+            })
+            .collect::<Vec<_>>();
+
+        results
+    }
+
     pub(super) fn with_multipath_mut_ctx<'a, F>(
         &'a mut self,
         f: F,

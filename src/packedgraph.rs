@@ -416,30 +416,32 @@ mod tests {
         let ins_1 = vec_hnd(vec![1, 2, 5, 3]);
         let ins_2 = vec_hnd(vec![4, 2, 3]);
 
-        graph.with_path_mut_ctx(path_1, |path_ref| {
-            ins_1
-                .clone()
-                .into_iter()
+        graph.with_all_paths_mut_ctx(|path_id, path_ref| {
+            let ins = if path_id == path_1 {
+                ins_1.clone()
+            } else if path_id == path_2 {
+                ins_2.clone()
+            } else {
+                unreachable!();
+            };
+
+            ins.into_iter()
                 .map(|h| path_ref.append_handle(h))
                 .collect::<Vec<_>>()
         });
 
-        graph.with_path_mut_ctx(path_2, |path_ref| {
-            ins_2
-                .clone()
-                .into_iter()
-                .map(|h| path_ref.append_handle(h))
-                .collect::<Vec<_>>()
-        });
-
-        let oc_1 = graph.nodes.handle_occur_record(hnd(1)).unwrap();
-        let oc_2 = graph.nodes.handle_occur_record(hnd(2)).unwrap();
+        let oc_1 = graph.nodes.handle_occur_record(h1).unwrap();
+        let oc_2 = graph.nodes.handle_occur_record(h2).unwrap();
 
         let mut oc_iter = graph.occurrences.iter(oc_1);
         println!("{:?}", oc_iter.next());
         println!("{:?}", oc_iter.next());
+        println!("{:?}", oc_iter.next());
+
+        println!();
 
         let mut oc_iter = graph.occurrences.iter(oc_2);
+        println!("{:?}", oc_iter.next());
         println!("{:?}", oc_iter.next());
         println!("{:?}", oc_iter.next());
         println!("{:?}", oc_iter.next());
