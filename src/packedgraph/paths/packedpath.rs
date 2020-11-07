@@ -11,7 +11,7 @@ use super::{OneBasedIndex, RecordIndex};
 use super::super::NodeIdIndexMap;
 
 use crate::packedgraph::index::list;
-use list::{PackedDoubleList, PackedList};
+use list::{PackedDoubleList, PackedList, PackedListMut};
 
 use crate::pathhandlegraph::{PathBase, PathId, PathRef, PathRefMut, PathStep};
 
@@ -61,6 +61,7 @@ pub struct PackedStep {
 pub struct PackedPath {
     steps: RobustPagedIntVec,
     links: RobustPagedIntVec,
+    removed_steps: Vec<PathStepIx>,
 }
 
 impl PackedPath {
@@ -68,6 +69,7 @@ impl PackedPath {
         Self {
             steps: RobustPagedIntVec::new(NARROW_PAGE_WIDTH),
             links: RobustPagedIntVec::new(NARROW_PAGE_WIDTH),
+            removed_steps: Default::default(),
         }
     }
 
@@ -183,6 +185,14 @@ impl PackedPath {
     ) -> list::Iter<'_, PackedPath> {
         list::Iter::new_double(self, head, tail)
     }
+
+    pub(crate) fn iter_mut(
+        &mut self,
+        head: PathStepIx,
+        tail: PathStepIx,
+    ) -> list::IterMut<'_, PackedPath> {
+        list::IterMut::new_double(self, head, tail)
+    }
 }
 
 impl PackedList for PackedPath {
@@ -207,6 +217,64 @@ impl PackedList for PackedPath {
     }
 }
 
+impl PackedListMut for PackedPath {
+    type ListLink = (PathStepIx, PathStepIx);
+
+    #[inline]
+    fn get_record_link(record: &PackedStep) -> Self::ListLink {
+        (record.prev, record.next)
+    }
+
+    #[inline]
+    fn link_next(link: Self::ListLink) -> PathStepIx {
+        link.1
+    }
+
+    #[inline]
+    fn remove_at_pointer(&mut self, ptr: PathStepIx) -> Option<Self::ListLink> {
+        let step_ix = ptr.to_record_ix(1, 0)?;
+
+        let prev_ix = ptr.to_record_ix(2, 0)?;
+        let next_ix = prev_ix + 1;
+
+        let prev_ptr: PathStepIx = self.links.get_unpack(prev_ix);
+        let next_ptr: PathStepIx = self.links.get_unpack(next_ix);
+
+        match (prev_ptr.to_record_ix(2, 1), next_ptr.to_record_ix(2, 0)) {
+            (Some(p_ix), Some(n_ix)) => {
+                // update both pointers
+                self.links.set_pack(p_ix, next_ptr);
+                self.links.set_pack(n_ix, prev_ptr);
+            }
+            (None, Some(n_ix)) => {
+                // set next's previous pointer to zero
+                self.links.set_pack(n_ix, PathStepIx::null());
+            }
+            (Some(p_ix), None) => {
+                // set prev's next pointer to zero
+                self.links.set_pack(p_ix, PathStepIx::null());
+            }
+            (None, None) => (),
+        }
+
+        self.steps.set(step_ix, 0);
+
+        self.links.set(prev_ix, 0);
+        self.links.set(next_ix, 0);
+
+        self.removed_steps.push(ptr);
+
+        Some((prev_ptr, next_ptr))
+    }
+
+    #[inline]
+    fn remove_next(&mut self, ptr: PathStepIx) -> Option<()> {
+        let (prev_ptr, next_ptr) = self.remove_at_pointer(ptr)?;
+
+        Some(())
+    }
+}
+
 impl PackedDoubleList for PackedPath {
     #[inline]
     fn prev_pointer(rec: &PackedStep) -> PathStepIx {
@@ -219,7 +287,7 @@ pub struct PackedPathRef<'a> {
     pub(super) path_id: PathId,
     pub(super) path: &'a PackedPath,
     // pub(super) properties: PathPropertyRef<'a>,
-    properties: PathPropertyRecord,
+    pub(super) properties: PathPropertyRecord,
 }
 
 impl<'a> PackedPathRef<'a> {
