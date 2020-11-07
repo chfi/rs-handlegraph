@@ -269,7 +269,8 @@ impl PackedListMut for PackedPath {
 
     #[inline]
     fn remove_next(&mut self, ptr: PathStepIx) -> Option<()> {
-        let (prev_ptr, next_ptr) = self.remove_at_pointer(ptr)?;
+        let (_prev, next) = self.link_record(ptr)?;
+        let _ = self.remove_at_pointer(next)?;
 
         Some(())
     }

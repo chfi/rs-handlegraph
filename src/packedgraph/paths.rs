@@ -572,6 +572,118 @@ mod tests {
     }
 
     #[test]
+    fn removing_steps() {
+        let hnd = |x: u64| Handle::pack(x, false);
+        let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
+
+        let mut paths = PackedGraphPaths::default();
+
+        let path_1 = paths.create_path(b"path1");
+        let path_2 = paths.create_path(b"path2");
+        let path_3 = paths.create_path(b"path3");
+
+        let nodes_1 = vec_hnd(vec![1, 2, 3, 4, 5]);
+        let nodes_2 = vec_hnd(vec![6, 2, 3, 7, 5]);
+        let nodes_3 = vec_hnd(vec![1, 6, 2, 3, 4]);
+
+        let inserts = vec![nodes_1, nodes_2, nodes_3];
+
+        let print_step_updates = |step_updates: &[Vec<StepUpdate>]| {
+            for (i, steps) in step_updates.iter().enumerate() {
+                print!("{}", i);
+                for su in steps.iter() {
+                    let (u, handle, step) = match su {
+                        StepUpdate::Insert { handle, step } => {
+                            ("I", handle, step)
+                        }
+                        StepUpdate::Remove { handle, step } => {
+                            ("R", handle, step)
+                        }
+                    };
+                    let h = u64::from(handle.id());
+                    let s = step.pack();
+                    print!("\t({}, {:2}, {:2})", u, h, s);
+                }
+                println!();
+            }
+        };
+
+        let print_header = || {
+            println!("{:4}  {:4}", "head", "tail");
+        };
+
+        let print_path = |paths: &PackedGraphPaths, id: PathId| {
+            let path_ref = paths.path_ref(id).unwrap();
+            let head = path_ref.properties.head.pack();
+            let tail = path_ref.properties.tail.pack();
+            println!("path {:2} head {:4} tail {:4}", id.0, head, tail);
+            println!(
+                "    {:4}  {:4}  {:4}  {:4}",
+                "step", "node", "prev", "next"
+            );
+            for (step_ix, step) in path_ref.steps() {
+                let s_ix = step_ix.pack();
+                let h = u64::from(step.handle.id());
+                let p = step.prev.pack();
+                let n = step.next.pack();
+                println!("    {:4}  {:4}  {:4}  {:4}", s_ix, h, p, n);
+            }
+            println!();
+        };
+
+        let step_updates = {
+            let mut mut_ctx = paths.get_multipath_mut_ctx();
+            let paths_mut = mut_ctx.get_ref_muts();
+
+            paths_mut
+                .zip(inserts.iter())
+                .map(|(path, steps)| {
+                    steps
+                        .iter()
+                        .map(|h| path.append_handle(*h))
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        };
+
+        print_step_updates(&step_updates);
+
+        print_path(&paths, path_1);
+        print_path(&paths, path_2);
+        print_path(&paths, path_3);
+
+        let rem_1 = vec![1, 5];
+        let rem_2 = vec![2, 3, 4];
+        let rem_3 = vec![1, 3, 5];
+
+        let remove: Vec<Vec<usize>> = vec![rem_1, rem_2, rem_3];
+
+        let rem_step_updates = {
+            let mut mut_ctx = paths.get_multipath_mut_ctx();
+            let paths_mut = mut_ctx.get_ref_muts();
+
+            paths_mut
+                .zip(remove.iter())
+                .map(|(path, steps)| {
+                    steps
+                        .iter()
+                        .filter_map(|&step_ix| {
+                            let ix = PathStepIx::from_one_based(step_ix);
+                            path.remove_step(ix)
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .collect::<Vec<_>>()
+        };
+
+        print_path(&paths, path_1);
+        print_path(&paths, path_2);
+        print_path(&paths, path_3);
+
+        print_step_updates(&rem_step_updates);
+    }
+
+    #[test]
     fn packedgraphpaths_multipaths() {
         let hnd = |x: u64| Handle::pack(x, false);
 
