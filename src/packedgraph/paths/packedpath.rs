@@ -497,6 +497,33 @@ impl<'a> PackedPathRefMut<'a> {
 
         update
     }
+
+    fn remove_step_at_index(
+        &mut self,
+        rem_step_ix: PathStepIx,
+    ) -> Option<StepUpdate> {
+        let head = self.properties.head;
+        let tail = self.properties.tail;
+
+        let handle = self.path.step_record(rem_step_ix)?;
+
+        if tail == rem_step_ix {
+            let (prev, _) = self.path.link_record(rem_step_ix)?;
+            self.properties.tail = prev;
+        }
+
+        let new_head = self
+            .path
+            .iter_mut(head, tail)
+            .remove_record_with(|step_ix, step| step_ix == rem_step_ix)?;
+
+        self.properties.head = new_head;
+
+        Some(StepUpdate::Remove {
+            handle,
+            step: rem_step_ix,
+        })
+    }
 }
 
 impl<'a> PathRefMut for PackedPathRefMut<'a> {
@@ -506,6 +533,10 @@ impl<'a> PathRefMut for PackedPathRefMut<'a> {
 
     fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
         self.prepend_handle(handle)
+    }
+
+    fn remove_step(&mut self, rem_step_ix: Self::StepIx) -> Option<StepUpdate> {
+        self.remove_step_at_index(rem_step_ix)
     }
 
     fn set_circularity(&mut self, circular: bool) {
@@ -520,6 +551,9 @@ impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
 
     fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
         self.prepend_handle(handle)
+    }
+    fn remove_step(&mut self, step: Self::StepIx) -> Option<StepUpdate> {
+        self.remove_step_at_index(step)
     }
 
     fn set_circularity(&mut self, circular: bool) {

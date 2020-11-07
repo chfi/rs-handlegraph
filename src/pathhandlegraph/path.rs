@@ -96,6 +96,11 @@ pub trait PathRefMut: PathBase {
 
     fn prepend_step(&mut self, handle: Handle) -> StepUpdate<Self::StepIx>;
 
+    fn remove_step(
+        &mut self,
+        step: Self::StepIx,
+    ) -> Option<StepUpdate<Self::StepIx>>;
+
     // fn rewrite_segment(
     //     self,
     //     from: PathStep,

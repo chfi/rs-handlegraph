@@ -141,6 +141,10 @@ impl<'a> PathRefMut for PathMutContext<'a> {
         self.path_ref_mut.prepend_handle(handle)
     }
 
+    fn remove_step(&mut self, step: Self::StepIx) -> Option<StepUpdate> {
+        self.path_ref_mut.remove_step(step)
+    }
+
     fn set_circularity(&mut self, circular: bool) {
         self.path_ref_mut.properties.circular = circular;
     }
