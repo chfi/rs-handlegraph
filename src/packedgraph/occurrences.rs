@@ -27,8 +27,8 @@ crate::impl_one_based_index!(OccurListIx);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OccurRecord {
-    pub(super) path_id: PathId,
-    pub(super) offset: PathStepIx,
+    pub(crate) path_id: PathId,
+    pub(crate) offset: PathStepIx,
     next: OccurListIx,
 }
 

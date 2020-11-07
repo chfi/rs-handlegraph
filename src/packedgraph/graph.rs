@@ -118,6 +118,24 @@ impl PackedGraph {
         }
     }
 
+    pub(super) fn zip_all_paths_mut_ctx<'a, T, I, F>(
+        &'a mut self,
+        iter: I,
+        f: F,
+    ) where
+        I: Iterator<Item = T>,
+        for<'b> F: Fn(
+            T,
+            PathId,
+            &mut paths::PackedPathRefMut<'b>,
+        ) -> Vec<paths::StepUpdate>,
+    {
+        let all_steps = self.paths.zip_with_paths_mut_ctx(iter, f);
+        for (path_id, steps) in all_steps {
+            self.apply_node_occurrences_iter(path_id, steps);
+        }
+    }
+
     pub(super) fn with_all_paths_mut_ctx<'a, F>(&'a mut self, f: F)
     where
         for<'b> F: Fn(

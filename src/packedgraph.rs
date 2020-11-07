@@ -5,7 +5,8 @@ use crate::{
 };
 
 use crate::pathhandlegraph::{
-    HandleOccurrences, MutHandleOccurrences, OccurBase, PathId,
+    HandleOccurrences, MutHandleOccurrences, OccurBase, PathId, PathRef,
+    PathRefMut,
 };
 
 pub mod edges;
@@ -31,6 +32,7 @@ pub use self::{
 use self::graph::SeqRecordIx;
 
 use crate::packed;
+use crate::packed::PackedElement;
 
 impl<'a> AllHandles for &'a PackedGraph {
     type Handles = PackedHandlesIter<packed::deque::Iter<'a>>;
@@ -384,65 +386,203 @@ mod tests {
     use super::*;
 
     #[test]
-    fn packedgraph_append_path() {
+    fn packedgraph_mutate_paths() {
         let hnd = |x: u64| Handle::pack(x, false);
         let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
         let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
 
+        let print_path = |paths: &PackedGraphPaths, id: PathId| {
+            let path_ref = paths.path_ref(id).unwrap();
+            print!("{:2}   nodes: ", id.0);
+            for (step_ix, step) in path_ref.steps() {
+                let h = u64::from(step.handle.id());
+                print!("  {:2}", h);
+            }
+            println!();
+            print!("   step ix:  ");
+            for (step_ix, step) in path_ref.steps() {
+                let s_ix = step_ix.pack();
+                print!("  {:2}", s_ix);
+            }
+            println!();
+            println!();
+        };
+
         use bstr::{BString, B};
 
         let mut graph = PackedGraph::new();
-        let h1 = graph.append_handle(b"GTCA");
-        let h2 = graph.append_handle(b"AAGTGCTAGT");
-        let h3 = graph.append_handle(b"ATA");
-        let h4 = graph.append_handle(b"AA");
-        let h5 = graph.append_handle(b"GG");
 
-        graph.create_edge(edge(1, 2));
-        graph.create_edge(edge(4, 2));
+        let seqs = vec![
+            //                  Node
+            B("GTCA"),       //  1
+            B("AAGTGCTAGT"), //  2
+            B("ATA"),        //  3
+            B("AGTA"),       //  4
+            B("GTCCA"),      //  5
+            B("GGGT"),       //  6
+            B("AACT"),       //  7
+            B("AACAT"),      //  8
+            B("AGCC"),       //  9
+        ];
+        /*
+        1 ----- 8 --- 4 -----
+          \   /   \     \     \
+            2      \     \      6
+          /   \     \     \   /
+        5 ----- 7 --- 3 --- 9
+        */
 
-        graph.create_edge(edge(2, 3));
-        graph.create_edge(edge(2, 5));
+        let handles = seqs
+            .iter()
+            .map(|seq| graph.append_handle(seq))
+            .collect::<Vec<_>>();
 
-        graph.create_edge(edge(5, 3));
+        macro_rules! insert_edges {
+            ($graph:ident, [$(($from:literal, $to:literal)),*]) => {
+                $(
+                    $graph.create_edge(edge($from, $to));
+                )*
+            };
+        }
 
-        // path_1: 1 2 5 3
-        // path_2: 4 2 3
-        let path_1 = graph.paths.create_path(b"path1");
-        let path_2 = graph.paths.create_path(b"path2");
+        insert_edges!(
+            graph,
+            [
+                (1, 2),
+                (1, 8),
+                (5, 2),
+                (5, 7),
+                (2, 8),
+                (2, 7),
+                (7, 3),
+                (8, 3),
+                (8, 4),
+                (3, 9),
+                (4, 9),
+                (4, 6),
+                (9, 6)
+            ]
+        );
+        /* Paths
+                path_1: 1 8 4 6
+                path_2: 5 2 8 4 6
+                path_3: 1 2 8 4 9 6
+                path_4: 5 7 3 9 6
+        */
 
-        let ins_1 = vec_hnd(vec![1, 2, 5, 3]);
-        let ins_2 = vec_hnd(vec![4, 2, 3]);
-
-        graph.with_all_paths_mut_ctx(|path_id, path_ref| {
-            let ins = if path_id == path_1 {
-                ins_1.clone()
-            } else if path_id == path_2 {
-                ins_2.clone()
-            } else {
-                unreachable!();
+        let prep_path =
+            |graph: &mut PackedGraph, name: &[u8], steps: Vec<u64>| {
+                let path = graph.paths.create_path(name);
+                let hnds = vec_hnd(steps);
+                (path, hnds)
             };
 
-            ins.into_iter()
-                .map(|h| path_ref.append_handle(h))
+        let (path_1, p_1_steps) =
+            prep_path(&mut graph, b"path1", vec![1, 8, 4, 6]);
+
+        let (path_2, p_2_steps) =
+            prep_path(&mut graph, b"path2", vec![5, 2, 8, 4, 6]);
+
+        let (path_3, p_3_steps) =
+            prep_path(&mut graph, b"path3", vec![1, 2, 8, 4, 9, 6]);
+
+        let (path_4, p_4_steps) =
+            prep_path(&mut graph, b"path4", vec![5, 7, 3, 9, 6]);
+
+        let steps_vecs = vec![p_1_steps, p_2_steps, p_3_steps, p_4_steps];
+
+        graph.zip_all_paths_mut_ctx(
+            steps_vecs.into_iter(),
+            |steps, path_id, path| {
+                steps
+                    .into_iter()
+                    .map(|h| path.append_handle(h))
+                    .collect::<Vec<_>>()
+            },
+        );
+
+        /*
+        print_path(&graph.paths, path_1);
+        print_path(&graph.paths, path_2);
+        print_path(&graph.paths, path_3);
+        print_path(&graph.paths, path_4);
+        */
+
+        let get_occurs = |graph: &PackedGraph, id: u64| {
+            let oc_ix = graph.nodes.handle_occur_record(hnd(id)).unwrap();
+            let oc_iter = graph.occurrences.iter(oc_ix);
+            oc_iter
+                .map(|(_occ_ix, record)| {
+                    (record.path_id.0, record.offset.pack())
+                })
                 .collect::<Vec<_>>()
+        };
+
+        let occ_1 = get_occurs(&graph, 1);
+        let occ_2 = get_occurs(&graph, 2);
+
+        let occ_3 = get_occurs(&graph, 3);
+        let occ_6 = get_occurs(&graph, 6);
+
+        let occ_7 = get_occurs(&graph, 7);
+        let occ_8 = get_occurs(&graph, 8);
+
+        // remove node 7 from path 4
+        graph.with_path_mut_ctx(path_4, |path| {
+            if let Some(step) =
+                path.remove_step(PathStepIx::from_one_based(2usize))
+            {
+                vec![step]
+            } else {
+                Vec::new()
+            }
         });
 
-        let oc_1 = graph.nodes.handle_occur_record(h1).unwrap();
-        let oc_2 = graph.nodes.handle_occur_record(h2).unwrap();
+        let occ_7_new = get_occurs(&graph, 7);
+        assert!(occ_7_new.is_empty());
 
-        let mut oc_iter = graph.occurrences.iter(oc_1);
-        println!("{:?}", oc_iter.next());
-        println!("{:?}", oc_iter.next());
-        println!("{:?}", oc_iter.next());
+        // remove all nodes from path 3
+        graph.with_path_mut_ctx(path_3, |path| {
+            (0..6)
+                .into_iter()
+                .filter_map(|i| {
+                    path.remove_step(PathStepIx::from_one_based(
+                        (i + 1) as usize,
+                    ))
+                })
+                .collect()
+        });
 
-        println!();
+        // print_path(&graph.paths, path_3);
 
-        let mut oc_iter = graph.occurrences.iter(oc_2);
-        println!("{:?}", oc_iter.next());
-        println!("{:?}", oc_iter.next());
-        println!("{:?}", oc_iter.next());
-        println!("{:?}", oc_iter.next());
+        let occ_1_new = get_occurs(&graph, 1);
+        let occ_2_new = get_occurs(&graph, 2);
+        let occ_6_new = get_occurs(&graph, 6);
+        let occ_8_new = get_occurs(&graph, 8);
+
+        assert_eq!(occ_1_new, vec![(0, 1)]);
+        assert_eq!(occ_2_new, vec![(1, 2)]);
+        assert_eq!(occ_6_new, vec![(3, 5), (1, 5), (0, 4)]);
+        assert_eq!(occ_8_new, vec![(1, 3), (0, 2)]);
+
+        let path_steps = |graph: &PackedGraph, id: PathId| {
+            let path_ref = graph.paths.path_ref(id).unwrap();
+
+            path_ref
+                .steps()
+                .map(|(_step_ix, step)| u64::from(step.handle.id()))
+                .collect::<Vec<_>>()
+        };
+
+        let path_1_steps = path_steps(&graph, path_1);
+        let path_2_steps = path_steps(&graph, path_2);
+        let path_3_steps = path_steps(&graph, path_3);
+        let path_4_steps = path_steps(&graph, path_4);
+
+        assert_eq!(path_1_steps, vec![1, 8, 4, 6]);
+        assert_eq!(path_2_steps, vec![5, 2, 8, 4, 6]);
+        assert!(path_3_steps.is_empty());
+        assert_eq!(path_4_steps, vec![5, 3, 9, 6]);
     }
 
     #[test]

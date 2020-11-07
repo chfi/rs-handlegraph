@@ -309,6 +309,30 @@ impl PackedGraphPaths {
         results
     }
 
+    pub(super) fn zip_with_paths_mut_ctx<'a, T, I, F>(
+        &'a mut self,
+        iter: I,
+        f: F,
+    ) -> Vec<(PathId, Vec<StepUpdate>)>
+    where
+        I: Iterator<Item = T>,
+        F: Fn(T, PathId, &mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
+    {
+        let mut mut_ctx = self.get_multipath_mut_ctx();
+        let refs_mut = mut_ctx.get_ref_muts();
+
+        let results = refs_mut
+            .zip(iter)
+            .map(|(path, val)| {
+                let path_id = path.path_id;
+                let steps = f(val, path_id, path);
+                (path_id, steps)
+            })
+            .collect::<Vec<_>>();
+
+        results
+    }
+
     pub(super) fn with_multipath_mut_ctx<'a, F>(
         &'a mut self,
         f: F,
