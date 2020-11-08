@@ -44,7 +44,7 @@ where
 }
 
 /// Abstraction of an immutable embedded path.
-pub trait PathRef: Copy + PathBase {
+pub trait PathRef: PathBase {
     /// The iterator that will step through the length of the path.
     type Steps: DoubleEndedIterator<Item = Self::Step>;
 

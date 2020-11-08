@@ -390,12 +390,21 @@ impl<'a> PackedPathRefMut<'a> {
         path: &'a mut PackedPath,
         properties: PathPropertyRecord,
     ) -> Self {
-        // let updates = PathUpdate::new(&properties);
         PackedPathRefMut {
             path_id,
             path,
             properties,
-            // updates,
+        }
+    }
+
+    pub(crate) fn as_path_ref<'b>(&'b self) -> PackedPathRef<'b> {
+        let path_id = self.path_id;
+        let path = &self.path;
+        let properties = self.properties;
+        PackedPathRef {
+            path_id,
+            path,
+            properties,
         }
     }
 
@@ -524,6 +533,48 @@ impl<'a> PackedPathRefMut<'a> {
             handle,
             step: rem_step_ix,
         })
+    }
+}
+
+impl<'a> PathRef for PackedPathRefMut<'a> {
+    type Steps = list::Iter<'a, PackedPath>;
+
+    fn steps(self) -> Self::Steps {
+        let head = self.properties.head;
+        let tail = self.properties.tail;
+        self.path.iter(head, tail)
+    }
+
+    fn len(self) -> usize {
+        self.path.steps.len()
+    }
+
+    fn circular(self) -> bool {
+        self.properties.circular
+    }
+
+    fn first_step(self) -> Self::Step {
+        let head = self.properties.head;
+        let step = self.path.get_step(head);
+        (head, step)
+    }
+
+    fn last_step(self) -> Self::Step {
+        let tail = self.properties.tail;
+        let step = self.path.get_step(tail);
+        (tail, step)
+    }
+
+    fn next_step(self, step: Self::Step) -> Option<Self::Step> {
+        let next = self.path.next_step(step.0)?;
+        let next_step = self.path.get_step(next);
+        Some((next, next_step))
+    }
+
+    fn prev_step(self, step: Self::Step) -> Option<Self::Step> {
+        let prev = self.path.prev_step(step.0)?;
+        let prev_step = self.path.get_step(prev);
+        Some((prev, prev_step))
     }
 }
 
