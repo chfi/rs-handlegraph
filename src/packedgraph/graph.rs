@@ -50,6 +50,56 @@ impl PackedGraph {
         Default::default()
     }
 
+    pub(super) fn apply_node_occurrence_consumer<'a>(
+        receiver: std::sync::mpsc::Receiver<(PathId, Vec<paths::StepUpdate>)>,
+        nodes: &'a mut NodeRecords,
+        occurrences: &'a mut NodeOccurrences,
+    ) {
+        use paths::StepUpdate;
+        while let Ok((path_id, updates)) = receiver.recv() {
+            for step_update in updates {
+                match step_update {
+                    StepUpdate::Insert { handle, step } => {
+                        let rec_id = nodes.handle_record(handle).unwrap();
+                        let vec_ix = rec_id.to_zero_based().unwrap();
+
+                        let occur_ix =
+                            nodes.node_occurrence_map.get_unpack(vec_ix);
+
+                        let new_occur_ix =
+                            occurrences.append_entry(path_id, step, occur_ix);
+
+                        nodes
+                            .node_occurrence_map
+                            .set_pack(vec_ix, new_occur_ix);
+                    }
+                    StepUpdate::Remove { handle, step } => {
+                        let rec_id = nodes.handle_record(handle).unwrap();
+                        let vec_ix = rec_id.to_zero_based().unwrap();
+
+                        let occur_head =
+                            nodes.node_occurrence_map.get_unpack(vec_ix);
+
+                        let new_occur_ix = occurrences
+                            .iter_mut(occur_head)
+                            .remove_record_with(|_, record| {
+                                record.path_id == path_id
+                                    && record.offset == step
+                            });
+
+                        if let Some(new_head) = new_occur_ix {
+                            if new_head != occur_head {
+                                nodes
+                                    .node_occurrence_map
+                                    .set_pack(vec_ix, new_head);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub(super) fn apply_node_occurrence(
         &mut self,
         path_id: PathId,
@@ -148,5 +198,36 @@ impl PackedGraph {
         for (path_id, steps) in all_steps {
             self.apply_node_occurrences_iter(path_id, steps);
         }
+    }
+
+    pub(super) fn with_all_paths_mut_ctx_<F>(&mut self, f: F)
+    where
+        for<'b> F: Fn(
+                PathId,
+                &mut paths::PackedPathRefMut<'b>,
+            ) -> Vec<paths::StepUpdate>
+            + Sync,
+    {
+        use rayon::prelude::*;
+        use std::sync::mpsc;
+        use std::thread;
+
+        let (sender, receiver) =
+            mpsc::channel::<(PathId, Vec<paths::StepUpdate>)>();
+
+        let mut paths = &mut self.paths;
+        let mut nodes = &mut self.nodes;
+        let mut occurrences = &mut self.occurrences;
+
+        let mut mut_ctx = paths.get_multipath_mut_ctx();
+        let refs_mut = mut_ctx.ref_muts_par();
+
+        refs_mut.for_each_with(sender, |s, path| {
+            let path_id = path.path_id;
+            let updates = f(path_id, path);
+            s.send((path_id, updates)).unwrap();
+        });
+
+        Self::apply_node_occurrence_consumer(receiver, nodes, occurrences);
     }
 }
