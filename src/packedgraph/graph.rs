@@ -8,7 +8,7 @@ pub(super) use super::{
     sequence::{PackedSeqIter, SeqRecordIx, Sequences},
 };
 
-use crate::handle::{Handle, NodeId};
+use crate::handle::{Direction, Edge, Handle, NodeId};
 
 use crate::pathhandlegraph::PathId;
 
@@ -48,6 +48,53 @@ impl Default for PackedGraph {
 impl PackedGraph {
     pub fn new() -> Self {
         Default::default()
+    }
+
+    pub(super) fn remove_edge_impl(&mut self, edge: Edge) -> Option<()> {
+        let Edge(left, right) = edge;
+
+        let left_gix = self.nodes.handle_record(left)?;
+
+        let right_gix = self.nodes.handle_record(right)?;
+
+        let left_edge_dir = if left.is_reverse() {
+            Direction::Left
+        } else {
+            Direction::Right
+        };
+
+        let right_edge_dir = if right.is_reverse() {
+            Direction::Right
+        } else {
+            Direction::Left
+        };
+
+        let left_edge_list = self.nodes.get_edge_list(left_gix, left_edge_dir);
+
+        let right_edge_list =
+            self.nodes.get_edge_list(right_gix, right_edge_dir);
+
+        // remove the edge from `left`'s edge list
+        let new_left_head = self
+            .edges
+            .iter_mut(left_edge_list)
+            .remove_record_with(|_, (handle, _)| handle == right)?;
+
+        // remove the edge from `right`'s edge list
+        let new_right_head = self
+            .edges
+            .iter_mut(right_edge_list)
+            .remove_record_with(|_, (handle, _)| handle == left)?;
+
+        // update `left`'s edge list header
+        self.nodes
+            .set_edge_list(left_gix, left_edge_dir, new_left_head);
+
+        // update `right`'s edge list header
+        self.nodes
+            .set_edge_list(right_gix, right_edge_dir, new_right_head);
+
+        Some(())
     }
 
     pub(super) fn apply_node_occurrence_consumer<'a>(

@@ -1,7 +1,9 @@
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
-    mutablehandlegraph::{AdditiveHandleGraph, MutableHandleGraph},
+    mutablehandlegraph::{
+        AdditiveHandleGraph, MutableHandleGraph, SubtractiveHandleGraph,
+    },
 };
 
 use crate::pathhandlegraph::{
@@ -215,6 +217,25 @@ impl AdditiveHandleGraph for PackedGraph {
 
         self.nodes
             .set_edge_list(right_gix, right_edge_dir, right_to_left);
+    }
+}
+
+impl SubtractiveHandleGraph for PackedGraph {
+    fn remove_handle(&mut self, handle: Handle) -> bool {
+        unimplemented!();
+    }
+
+    fn remove_edge(&mut self, edge: Edge) -> bool {
+        let result = self.remove_edge_impl(edge);
+        if result.is_some() {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn clear_graph(&mut self) {
+        unimplemented!();
     }
 }
 
