@@ -142,7 +142,11 @@ impl NodeIdIndexMap {
             return None;
         }
         let index = id - self.min_id;
-        let rec_id = self.deque.get_unpack(index as usize);
+        let rec_id: NodeRecordId = self.deque.get_unpack(index as usize);
+
+        if rec_id.is_null() {
+            return None;
+        }
 
         Some(rec_id)
     }

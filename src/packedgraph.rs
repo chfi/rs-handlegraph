@@ -526,6 +526,107 @@ mod tests {
 
         graph
     }
+    #[test]
+    fn removing_nodes() {
+        let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
+
+        let path_steps = |graph: &PackedGraph, id: PathId| {
+            let path_ref = graph.paths.path_ref(id).unwrap();
+
+            path_ref
+                .steps()
+                .map(|(_step_ix, step)| u64::from(step.handle.id()))
+                .collect::<Vec<_>>()
+        };
+
+        let get_all_neighbors =
+            |graph: &PackedGraph, handles: &[Handle], dir: Direction| {
+                handles
+                    .iter()
+                    .copied()
+                    .map(|h| {
+                        let id = u64::from(h.id());
+                        (
+                            id,
+                            graph
+                                .neighbors(h, dir)
+                                .map(|h| u64::from(h.id()))
+                                .collect::<Vec<_>>(),
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            };
+
+        let mut graph = test_graph_with_paths();
+
+        // removing node 2 should affect the edges of nodes 1, 5, 8, 7,
+        // and remove path_2 (id 1) and path_3 (id 2)
+
+        let unaffected_left_edges = vec_hnd(vec![1, 3, 4, 5, 6, 9]);
+        let unaffected_right_edges = vec_hnd(vec![3, 4, 6, 7, 8, 9]);
+
+        let affected_left_edges = vec_hnd(vec![7, 8]);
+        let affected_right_edges = vec_hnd(vec![1, 5]);
+
+        let unaffected_left_pre =
+            get_all_neighbors(&graph, &unaffected_left_edges, Direction::Left);
+        let unaffected_right_pre = get_all_neighbors(
+            &graph,
+            &unaffected_right_edges,
+            Direction::Right,
+        );
+
+        let path_ids =
+            graph.paths.path_names.all_path_ids().collect::<Vec<_>>();
+
+        let path_1 = graph.paths.path_names.get_path_id(b"path1").unwrap();
+        let path_4 = graph.paths.path_names.get_path_id(b"path4").unwrap();
+
+        let steps_1_pre = path_steps(&graph, path_1);
+        let steps_4_pre = path_steps(&graph, path_4);
+
+        assert!(graph.has_node(NodeId::from(2)));
+
+        // remove the node
+        graph.remove_handle(hnd(2));
+
+        assert!(!graph.has_node(NodeId::from(2)));
+
+        let unaffected_left_post =
+            get_all_neighbors(&graph, &unaffected_left_edges, Direction::Left);
+        let unaffected_right_post = get_all_neighbors(
+            &graph,
+            &unaffected_right_edges,
+            Direction::Right,
+        );
+
+        let affected_left_post =
+            get_all_neighbors(&graph, &affected_left_edges, Direction::Left);
+        let affected_right_post =
+            get_all_neighbors(&graph, &affected_right_edges, Direction::Right);
+
+        let steps_1_post = path_steps(&graph, path_1);
+        let steps_4_post = path_steps(&graph, path_4);
+
+        // The unaffected nodes have the same edges
+        assert_eq!(unaffected_left_pre, unaffected_left_post);
+        assert_eq!(unaffected_right_pre, unaffected_right_post);
+
+        // The affected nodes do not have any edge to 2
+        assert_eq!(affected_left_post, vec![(7, vec![5]), (8, vec![1])]);
+        assert_eq!(affected_right_post, vec![(1, vec![8]), (5, vec![7])]);
+
+        // The paths that did not include 2 still exist and are the same
+        assert_eq!(steps_1_pre, steps_1_post);
+        assert_eq!(steps_4_pre, steps_4_post);
+
+        let path_2 = graph.paths.path_names.get_path_id(b"path2");
+        let path_3 = graph.paths.path_names.get_path_id(b"path3");
+
+        // The paths that did include 2 have been deleted
+        assert!(path_2.is_none());
+        assert!(path_3.is_none());
+    }
 
     #[test]
     fn removing_edges() {
