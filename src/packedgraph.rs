@@ -7,8 +7,9 @@ use crate::{
 };
 
 use crate::pathhandlegraph::{
-    HandleOccurrences, MutHandleOccurrences, OccurBase, PathId, PathRef,
-    PathRefMut,
+    AllPathIds, AllPathRefs, AllPathRefsMut, EmbeddedPaths, HandleOccurrences,
+    MutEmbeddedPaths, MutHandleOccurrences, OccurBase, PathId, PathNames,
+    PathNamesMut, PathRef, PathRefMut, PathRefs, PathRefsMut,
 };
 
 pub mod edges;
@@ -399,6 +400,16 @@ impl MutableHandleGraph for PackedGraph {
         // TODO update paths and occurrences once they're implmented
 
         handle.flip()
+    }
+}
+
+impl MutEmbeddedPaths for PackedGraph {
+    fn create_path(&mut self, name: &[u8], circular: bool) -> PathId {
+        self.paths.create_path(name)
+    }
+
+    fn remove_path(&mut self, id: PathId) {
+        self.remove_path_impl(id);
     }
 }
 

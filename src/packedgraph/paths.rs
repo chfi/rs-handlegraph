@@ -8,7 +8,7 @@ use crate::{
     handlegraph::*,
 };
 
-use fnv::FnvHashMap;
+use fnv::{FnvHashMap, FnvHashSet};
 
 use super::{NodeRecordId, OneBasedIndex, PackedDoubleList, RecordIndex};
 
@@ -199,6 +199,26 @@ impl PackedGraphPaths {
         PathId(path_id)
     }
 
+    pub(super) fn remove_path(
+        &mut self,
+        id: PathId,
+    ) -> Option<(Vec<StepUpdate>)> {
+        let mut steps = {
+            let path = self.path_ref(id)?;
+
+            path.steps()
+                .map(|(step_ix, step)| step_ix)
+                .collect::<Vec<_>>()
+        };
+
+        self.with_path_mut_ctx(id, move |path_ref| {
+            steps
+                .into_iter()
+                .filter_map(|step| path_ref.remove_step(step))
+                .collect()
+        })
+    }
+
     pub fn len(&self) -> usize {
         self.paths.len()
     }
@@ -280,7 +300,7 @@ impl PackedGraphPaths {
         f: F,
     ) -> Option<Vec<StepUpdate>>
     where
-        F: Fn(&mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
+        F: FnOnce(&mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
     {
         let mut mut_ctx = self.get_path_mut_ctx(id)?;
         let ref_mut = mut_ctx.paths.first_mut()?;

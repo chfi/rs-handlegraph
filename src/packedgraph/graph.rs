@@ -97,6 +97,14 @@ impl PackedGraph {
         Some(())
     }
 
+    pub(super) fn remove_path_impl(&mut self, id: PathId) -> Option<()> {
+        let step_updates = self.paths.remove_path(id)?;
+
+        self.apply_node_occurrences_iter(id, step_updates);
+
+        Some(())
+    }
+
     pub(super) fn apply_node_occurrence_consumer<'a>(
         receiver: std::sync::mpsc::Receiver<(PathId, Vec<paths::StepUpdate>)>,
         nodes: &'a mut NodeRecords,

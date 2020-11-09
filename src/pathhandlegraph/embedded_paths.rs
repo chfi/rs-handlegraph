@@ -101,10 +101,9 @@ pub trait EmbeddedPaths: Sized {
     fn path_count(self) -> usize;
 }
 
-pub trait AdditivePaths: EmbeddedPaths {
-    fn create_path(self, name: &[u8], circular: bool) -> PathId;
-
-    // fn destroy_path(self, path_id: PathId) -> bool;
+pub trait MutEmbeddedPaths {
+    fn create_path(&mut self, name: &[u8], circular: bool) -> PathId;
+    fn remove_path(&mut self, id: PathId);
 }
 
 pub trait PathOccurrences: EmbeddedPaths {
