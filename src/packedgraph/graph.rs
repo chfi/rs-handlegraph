@@ -8,9 +8,13 @@ pub(super) use super::{
     sequence::{PackedSeqIter, SeqRecordIx, Sequences},
 };
 
+use fnv::{FnvHashMap, FnvHashSet};
+
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
 use crate::pathhandlegraph::PathId;
+
+use crate::handlegraph::HandleNeighbors;
 
 use crate::packed::traits::*;
 
@@ -101,6 +105,50 @@ impl PackedGraph {
         let step_updates = self.paths.remove_path(id)?;
 
         self.apply_node_occurrences_iter(id, step_updates);
+
+        Some(())
+    }
+
+    pub(super) fn remove_handle_impl(&mut self, handle: Handle) -> Option<()> {
+        let rec_ix = self.nodes.handle_record(handle)?;
+
+        // Collect all the path IDs that this node is on, and all the
+        // occurrence list indices
+        let occur_head = self.nodes.node_record_occur(rec_ix)?;
+
+        let path_ids: FnvHashSet<_> = self
+            .occurrences
+            .iter(occur_head)
+            .map(|(_occ_ix, record)| record.path_id)
+            .collect();
+
+        // Remove those paths
+        for path in path_ids {
+            self.remove_path_impl(path);
+        }
+
+        // Remove the occurrences
+        self.occurrences
+            .iter_mut(occur_head)
+            .remove_all_records_with(|_, _| true);
+
+        // Remove the left and right edges of the node
+        let lefts = self.neighbors(handle, Direction::Left).collect::<Vec<_>>();
+
+        let rights =
+            self.neighbors(handle, Direction::Right).collect::<Vec<_>>();
+
+        for other in lefts {
+            let edge = Edge(other, handle);
+            self.remove_edge_impl(edge);
+        }
+
+        for other in rights {
+            let edge = Edge(handle, other);
+            self.remove_edge_impl(edge);
+        }
+
+        self.nodes.clear_node_record(handle.id())?;
 
         Some(())
     }

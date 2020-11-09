@@ -74,7 +74,7 @@ pub struct Sequences {
     sequences: PackedIntVec,
     lengths: PackedIntVec,
     offsets: PagedIntVec,
-    removed_records: Vec<usize>,
+    removed_records: Vec<SeqRecordIx>,
 }
 
 impl Default for Sequences {
@@ -114,6 +114,15 @@ impl Sequences {
         let length: usize = self.lengths.get_unpack(ix);
 
         (offset, length)
+    }
+
+    pub(super) fn clear_record(&mut self, seq_ix: SeqRecordIx) {
+        let ix = seq_ix.at_0();
+
+        self.offsets.set(ix, 0);
+        self.lengths.set(ix, 0);
+
+        self.removed_records.push(seq_ix);
     }
 
     fn append_record(&mut self, offset: usize, length: usize) -> SeqRecordIx {

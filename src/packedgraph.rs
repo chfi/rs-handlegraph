@@ -223,16 +223,11 @@ impl AdditiveHandleGraph for PackedGraph {
 
 impl SubtractiveHandleGraph for PackedGraph {
     fn remove_handle(&mut self, handle: Handle) -> bool {
-        unimplemented!();
+        self.remove_handle_impl(handle).is_some()
     }
 
     fn remove_edge(&mut self, edge: Edge) -> bool {
-        let result = self.remove_edge_impl(edge);
-        if result.is_some() {
-            true
-        } else {
-            false
-        }
+        self.remove_edge_impl(edge).is_some()
     }
 
     fn clear_graph(&mut self) {

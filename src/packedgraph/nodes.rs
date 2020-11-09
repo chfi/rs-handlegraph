@@ -10,7 +10,7 @@ use super::{
     graph::NARROW_PAGE_WIDTH,
     index::{NodeRecordId, OneBasedIndex, RecordIndex},
     occurrences::OccurListIx,
-    sequence::Sequences,
+    sequence::{SeqRecordIx, Sequences},
 };
 
 /// The index into the underlying packed vector that is used to
@@ -78,6 +78,11 @@ impl NodeIdIndexMap {
 
     pub(super) fn len(&self) -> usize {
         self.deque.len()
+    }
+
+    fn clear_node_id(&mut self, id: NodeId) {
+        let ix = u64::from(id) - self.min_id;
+        self.deque.set(ix as usize, 0);
     }
 
     /// Appends the provided NodeId to the Node id -> Graph index map,
@@ -229,35 +234,6 @@ impl NodeRecords {
         Some(g_rec_ix)
     }
 
-    /*
-    pub(super) fn handle_occurrence_link(
-        &self,
-        handle: Handle,
-    ) -> Option<NodeOccurIx> {
-        let g_ix = self.handle_record(handle)?;
-
-        Some(NodeOccurIx::from_graph_record_ix(g_ix))
-    }
-
-    pub(super) fn handle_occurrence_record_ix(
-        &self,
-        handle: Handle,
-    ) -> Option<OccurListIx> {
-        let occur_ix = self.handle_occurrence_link(handle)?;
-        let rec_ix = self.node_occurrence_map.get(occur_ix) as usize;
-        Some(rec_ix)
-    }
-
-    pub(super) fn set_handle_occurrence_record_head(
-        &mut self,
-        handle: Handle,
-        record_ix: OccurListIx,
-    ) {
-        let occur_ix = self.handle_occurrence_link(handle).unwrap();
-        self.node_occurrence_map.set(occur_ix, record_ix as u64);
-    }
-    */
-
     fn insert_node(&mut self, n_id: NodeId) -> Option<NodeRecordId> {
         if n_id == NodeId::from(0) {
             return None;
@@ -275,6 +251,30 @@ impl NodeRecords {
         let record_ix = self.append_node_graph_record(next_ix)?;
 
         Some(record_ix)
+    }
+
+    pub(super) fn clear_node_record(&mut self, n_id: NodeId) -> Option<()> {
+        let rec_id = self.id_index_map.get_index(n_id)?;
+
+        let occ_map_ix = rec_id.to_record_ix(1, 0)?;
+        let rec_ix = rec_id.to_record_ix(2, 0)?;
+        let seq_ix = SeqRecordIx::from_one_based_ix(rec_id)?;
+
+        // clear node occurrence heads
+        self.node_occurrence_map.set(occ_map_ix, 0);
+
+        // clear node record/edge list heads
+        self.records_vec.set(rec_ix, 0);
+        self.records_vec.set(rec_ix, 1);
+
+        // clear sequence record
+        self.sequences.clear_record(seq_ix);
+
+        self.id_index_map.clear_node_id(n_id);
+
+        self.removed_nodes.push(n_id);
+
+        Some(())
     }
 
     #[inline]
