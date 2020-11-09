@@ -202,7 +202,7 @@ impl PackedGraphPaths {
     pub(super) fn remove_path(
         &mut self,
         id: PathId,
-    ) -> Option<(Vec<StepUpdate>)> {
+    ) -> Option<Vec<StepUpdate>> {
         let mut steps = {
             let path = self.path_ref(id)?;
 

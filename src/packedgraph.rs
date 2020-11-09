@@ -417,6 +417,144 @@ impl MutEmbeddedPaths for PackedGraph {
 mod tests {
     use super::*;
 
+    fn test_graph_with_paths() -> PackedGraph {
+        let hnd = |x: u64| Handle::pack(x, false);
+        let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
+        let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
+
+        use bstr::{BString, B};
+
+        let mut graph = PackedGraph::new();
+
+        let seqs = vec![
+            //                  Node
+            B("GTCA"),       //  1
+            B("AAGTGCTAGT"), //  2
+            B("ATA"),        //  3
+            B("AGTA"),       //  4
+            B("GTCCA"),      //  5
+            B("GGGT"),       //  6
+            B("AACT"),       //  7
+            B("AACAT"),      //  8
+            B("AGCC"),       //  9
+        ];
+        /*
+        1 ----- 8 --- 4 -----
+          \   /   \     \     \
+            2      \     \      6
+          /   \     \     \   /
+        5 ----- 7 --- 3 --- 9
+        */
+
+        let handles = seqs
+            .iter()
+            .map(|seq| graph.append_handle(seq))
+            .collect::<Vec<_>>();
+
+        macro_rules! insert_edges {
+            ($graph:ident, [$(($from:literal, $to:literal)),*]) => {
+                $(
+                    $graph.create_edge(edge($from, $to));
+                )*
+            };
+        }
+
+        insert_edges!(
+            graph,
+            [
+                (1, 2),
+                (1, 8),
+                (5, 2),
+                (5, 7),
+                (2, 8),
+                (2, 7),
+                (7, 3),
+                (8, 3),
+                (8, 4),
+                (3, 9),
+                (4, 9),
+                (4, 6),
+                (9, 6)
+            ]
+        );
+        /* Paths
+                path_1: 1 8 4 6
+                path_2: 5 2 8 4 6
+                path_3: 1 2 8 4 9 6
+                path_4: 5 7 3 9 6
+        */
+
+        let prep_path =
+            |graph: &mut PackedGraph, name: &[u8], steps: Vec<u64>| {
+                let path = graph.paths.create_path(name);
+                let hnds = vec_hnd(steps);
+                (path, hnds)
+            };
+
+        let (path_1, p_1_steps) =
+            prep_path(&mut graph, b"path1", vec![1, 8, 4, 6]);
+
+        let (path_2, p_2_steps) =
+            prep_path(&mut graph, b"path2", vec![5, 2, 8, 4, 6]);
+
+        let (path_3, p_3_steps) =
+            prep_path(&mut graph, b"path3", vec![1, 2, 8, 4, 9, 6]);
+
+        let (path_4, p_4_steps) =
+            prep_path(&mut graph, b"path4", vec![5, 7, 3, 9, 6]);
+
+        let steps_vecs = vec![p_1_steps, p_2_steps, p_3_steps, p_4_steps];
+
+        graph.zip_all_paths_mut_ctx(
+            steps_vecs.into_iter(),
+            |steps, path_id, path| {
+                steps
+                    .into_iter()
+                    .map(|h| path.append_handle(h))
+                    .collect::<Vec<_>>()
+            },
+        );
+
+        graph
+    }
+
+    #[test]
+    fn add_remove_paths() {
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let mut graph = test_graph_with_paths();
+
+        let get_occurs = |graph: &PackedGraph, id: u64| {
+            let oc_ix = graph.nodes.handle_occur_record(hnd(id)).unwrap();
+            let oc_iter = graph.occurrences.iter(oc_ix);
+            oc_iter
+                .map(|(_occ_ix, record)| {
+                    (record.path_id.0, record.offset.pack())
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let node_7_occ = get_occurs(&graph, 7);
+        let node_8_occ = get_occurs(&graph, 8);
+
+        let path_3 = graph.paths.path_names.get_path_id(b"path3").unwrap();
+        let path_4 = graph.paths.path_names.get_path_id(b"path4").unwrap();
+
+        graph.remove_path(path_4);
+
+        let node_7_occ_1 = get_occurs(&graph, 7);
+        let node_8_occ_1 = get_occurs(&graph, 8);
+
+        assert!(node_7_occ_1.is_empty());
+        assert_eq!(node_8_occ, node_8_occ_1);
+
+        graph.remove_path(path_3);
+
+        let node_8_occ_2 = get_occurs(&graph, 8);
+
+        assert_eq!(node_8_occ_2, vec![(1, 3), (0, 2)]);
+    }
+
     #[test]
     fn packedgraph_mutate_paths() {
         let hnd = |x: u64| Handle::pack(x, false);
