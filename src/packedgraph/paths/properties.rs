@@ -106,6 +106,11 @@ pub struct PathProperties {
     pub(super) deleted_steps: PackedIntVec,
 }
 
+crate::impl_space_usage!(
+    PathProperties,
+    [heads, tails, deleted, circular, deleted_steps]
+);
+
 impl Default for PathProperties {
     fn default() -> PathProperties {
         Self {

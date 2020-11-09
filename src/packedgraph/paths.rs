@@ -36,6 +36,30 @@ pub struct PackedPathNames {
     offsets: PagedIntVec,
 }
 
+impl succinct::SpaceUsage for PackedPathNames {
+    #[inline]
+    fn is_stack_only() -> bool {
+        false
+    }
+
+    #[inline]
+    fn heap_bytes(&self) -> usize {
+        // hashmap capacity only provides a lower bound, so this isn't
+        // 100% accurate, but it's a small enough part of the entire
+        // PackedGraph that it should be fine
+        let map_capacity = self.name_id_map.capacity();
+        let map_values_size = map_capacity * PathId::stack_bytes();
+        let map_keys_size: usize =
+            self.name_id_map.keys().map(|k| k.heap_bytes()).sum();
+
+        map_values_size
+            + map_keys_size
+            + self.names.heap_bytes()
+            + self.lengths.heap_bytes()
+            + self.offsets.heap_bytes()
+    }
+}
+
 impl Default for PackedPathNames {
     fn default() -> Self {
         PackedPathNames {
@@ -97,6 +121,8 @@ pub struct PackedGraphPaths {
     pub(super) path_props: PathProperties,
     pub(super) path_names: PackedPathNames,
 }
+
+crate::impl_space_usage!(PackedGraphPaths, [paths, path_props, path_names]);
 
 impl Default for PackedGraphPaths {
     fn default() -> Self {

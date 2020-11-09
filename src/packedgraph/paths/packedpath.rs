@@ -22,6 +22,8 @@ use crate::packed::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathStepIx(Option<NonZeroUsize>);
 
+crate::impl_space_usage_stack_newtype!(PathStepIx);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct PathLinkRecordIx(usize);
@@ -63,6 +65,8 @@ pub struct PackedPath {
     links: RobustPagedIntVec,
     removed_steps: Vec<PathStepIx>,
 }
+
+crate::impl_space_usage!(PackedPath, [steps, links, removed_steps]);
 
 impl PackedPath {
     pub(super) fn new() -> Self {

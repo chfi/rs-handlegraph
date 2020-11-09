@@ -168,4 +168,34 @@ macro_rules! impl_one_based_index {
     };
 }
 
+#[macro_export]
+macro_rules! impl_one_based_index_default {
+    ($index:ty) => {
+        impl Default for $index {
+            #[inline]
+            fn default() -> Self {
+                Self::null()
+            }
+        }
+    };
+}
+
+#[macro_export]
+macro_rules! impl_space_usage_stack_newtype {
+    ($type:ty) => {
+        impl succinct::SpaceUsage for $type {
+            #[inline]
+            fn is_stack_only() -> bool {
+                true
+            }
+            #[inline]
+            fn heap_bytes(&self) -> usize {
+                0
+            }
+        }
+    };
+}
+
 impl_one_based_index!(NodeRecordId);
+impl_space_usage_stack_newtype!(NodeRecordId);
+// impl_one_based_index_default!(NodeRecordId);

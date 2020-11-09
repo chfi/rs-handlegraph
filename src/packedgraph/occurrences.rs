@@ -24,6 +24,7 @@ use crate::packed::*;
 pub struct OccurListIx(Option<NonZeroUsize>);
 
 crate::impl_one_based_index!(OccurListIx);
+crate::impl_space_usage_stack_newtype!(OccurListIx);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OccurRecord {
@@ -39,6 +40,16 @@ pub struct NodeOccurrences {
     node_occur_next: PagedIntVec,
     removed_records: Vec<OccurListIx>,
 }
+
+crate::impl_space_usage!(
+    NodeOccurrences,
+    [
+        path_ids,
+        node_occur_offsets,
+        node_occur_next,
+        removed_records
+    ]
+);
 
 impl Default for NodeOccurrences {
     fn default() -> Self {

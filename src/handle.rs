@@ -8,6 +8,8 @@ use std::ops::Add;
 #[repr(transparent)]
 pub struct NodeId(u64);
 
+crate::impl_space_usage_stack_newtype!(NodeId);
+
 impl std::fmt::Display for NodeId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)

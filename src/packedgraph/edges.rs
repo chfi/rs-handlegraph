@@ -19,6 +19,7 @@ use super::list::{PackedList, PackedListMut};
 pub struct EdgeListIx(Option<NonZeroUsize>);
 
 crate::impl_one_based_index!(EdgeListIx);
+crate::impl_space_usage_stack_newtype!(EdgeListIx);
 
 /// The index into the underlying packed vector that is used to
 /// represent the edge lists.
@@ -63,6 +64,8 @@ pub struct EdgeLists {
     record_vec: PagedIntVec,
     removed_records: Vec<EdgeListIx>,
 }
+
+crate::impl_space_usage!(EdgeLists, [record_vec, removed_records]);
 
 pub type EdgeRecord = (Handle, EdgeListIx);
 

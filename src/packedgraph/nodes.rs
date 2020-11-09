@@ -61,6 +61,8 @@ pub struct NodeIdIndexMap {
     min_id: u64,
 }
 
+crate::impl_space_usage!(NodeIdIndexMap, [deque]);
+
 impl Default for NodeIdIndexMap {
     fn default() -> Self {
         Self {
@@ -160,6 +162,17 @@ pub struct NodeRecords {
     removed_nodes: Vec<NodeId>,
     pub(super) node_occurrence_map: PagedIntVec,
 }
+
+crate::impl_space_usage!(
+    NodeRecords,
+    [
+        records_vec,
+        id_index_map,
+        sequences,
+        removed_nodes,
+        node_occurrence_map
+    ]
+);
 
 impl Default for NodeRecords {
     fn default() -> NodeRecords {

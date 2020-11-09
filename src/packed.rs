@@ -12,12 +12,13 @@ pub use self::{
 #[macro_export]
 macro_rules! impl_space_usage {
     ($for:ty, [$first:ident $(, $field:ident)*]) => {
-        impl SpaceUsage for $for {
+        impl succinct::SpaceUsage for $for {
             #[inline]
             fn is_stack_only() -> bool {
                 false
             }
 
+            #[inline]
             fn heap_bytes(&self) -> usize {
                 self.$first.heap_bytes()
                     $(

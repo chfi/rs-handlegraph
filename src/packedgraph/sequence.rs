@@ -43,6 +43,8 @@ const fn decode_dna_base(byte: u64) -> u8 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SeqRecordIx(usize);
 
+crate::impl_space_usage_stack_newtype!(SeqRecordIx);
+
 impl SeqRecordIx {
     #[inline]
     fn new<I: Into<usize>>(x: I) -> Self {
@@ -76,6 +78,11 @@ pub struct Sequences {
     offsets: PagedIntVec,
     removed_records: Vec<SeqRecordIx>,
 }
+
+crate::impl_space_usage!(
+    Sequences,
+    [sequences, lengths, offsets, removed_records]
+);
 
 impl Default for Sequences {
     fn default() -> Self {

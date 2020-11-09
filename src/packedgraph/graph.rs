@@ -34,6 +34,8 @@ pub struct PackedGraph {
     pub(super) paths: PackedGraphPaths,
 }
 
+crate::impl_space_usage!(PackedGraph, [nodes, edges, occurrences, paths]);
+
 impl Default for PackedGraph {
     fn default() -> Self {
         let nodes = Default::default();
