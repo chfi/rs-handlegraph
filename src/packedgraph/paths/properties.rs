@@ -131,6 +131,15 @@ impl PathProperties {
         self.heads.len()
     }
 
+    pub(super) fn clear_record(&mut self, id: PathId) {
+        let ix = id.0 as usize;
+        self.heads.set(ix, 0);
+        self.tails.set(ix, 0);
+        self.deleted.set(ix, 0);
+        self.circular.set(ix, 0);
+        self.deleted_steps.set(ix, 0);
+    }
+
     pub(super) fn get_record(&self, id: PathId) -> PathPropertyRecord {
         let ix = id.0 as usize;
         PathPropertyRecord {

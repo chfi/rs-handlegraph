@@ -54,13 +54,24 @@ impl PackedPathNames {
         self.name_id_map.insert(name.into(), path_id);
 
         let name_len = name.len() as u64;
-        let name_offset = self.lengths.len() as u64;
+        let name_offset = self.names.len() as u64;
         self.lengths.append(name_len);
         self.offsets.append(name_offset);
 
         name.iter().for_each(|&b| self.names.append(b as u64));
 
         path_id
+    }
+
+    pub(super) fn remove_id(&mut self, id: PathId) -> Option<()> {
+        let name = self.name_iter(id)?.collect::<Vec<_>>();
+        let _id = self.name_id_map.remove(&name);
+        let ix = id.0 as usize;
+
+        self.offsets.set(ix, 0);
+        self.lengths.set(ix, 0);
+
+        Some(())
     }
 
     pub(super) fn name_iter(
@@ -203,6 +214,8 @@ impl PackedGraphPaths {
         &mut self,
         id: PathId,
     ) -> Option<Vec<StepUpdate>> {
+        let ix = id.0;
+
         let mut steps = {
             let path = self.path_ref(id)?;
 
@@ -211,12 +224,21 @@ impl PackedGraphPaths {
                 .collect::<Vec<_>>()
         };
 
-        self.with_path_mut_ctx(id, move |path_ref| {
+        let step_updates = self.with_path_mut_ctx(id, move |path_ref| {
             steps
                 .into_iter()
                 .filter_map(|step| path_ref.remove_step(step))
                 .collect()
-        })
+        })?;
+
+        self.path_names.remove_id(id)?;
+
+        self.path_props.clear_record(id);
+
+        // can't remove the path quite yet, as all the elements to the
+        // right will be shifted back -- need to fix that somehow
+        // self.paths.remove(ix);
+        Some(step_updates)
     }
 
     pub fn len(&self) -> usize {
