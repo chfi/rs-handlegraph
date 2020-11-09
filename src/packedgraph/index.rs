@@ -1,5 +1,7 @@
 use std::num::NonZeroUsize;
 
+use fnv::FnvHashMap;
+
 pub mod list;
 
 pub use list::*;
@@ -107,6 +109,37 @@ pub trait RecordIndex: Copy {
     fn at_0(self) -> usize {
         self.record_ix(0)
     }
+}
+
+/// Given a sorted slice of elements to be removed, where the elements
+/// are numbers from a tightly packed sequence of indices, returns a
+/// hashmap that maps kept indices in the old sequence, into tightly
+/// packed indices in the new sequence that excludes the removed
+/// elements.
+pub(crate) fn removed_id_map(removed: &[usize]) -> FnvHashMap<usize, usize> {
+    let mut result = FnvHashMap::default();
+
+    let mut iter = removed.iter().copied();
+
+    let mut next_ix = if let Some(ix) = iter.next() {
+        ix
+    } else {
+        return result;
+    };
+    let mut previous = next_ix;
+
+    for old_ix in iter {
+        if old_ix - previous > 1 {
+            for ix in (previous + 1)..old_ix {
+                result.insert(ix, next_ix);
+                next_ix += 1;
+            }
+        }
+
+        previous = old_ix;
+    }
+
+    result
 }
 
 #[macro_export]
