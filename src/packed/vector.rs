@@ -31,15 +31,7 @@ impl Default for PackedIntVec {
     }
 }
 
-impl SpaceUsage for PackedIntVec {
-    fn is_stack_only() -> bool {
-        false
-    }
-
-    fn heap_bytes(&self) -> usize {
-        self.vector.heap_bytes()
-    }
-}
+crate::impl_space_usage!(PackedIntVec, [vector]);
 
 impl PackedIntVec {
     const FACTOR: f64 = 1.25;

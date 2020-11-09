@@ -14,15 +14,7 @@ pub struct PagedIntVec {
     pages: Vec<PackedIntVec>,
 }
 
-impl SpaceUsage for PagedIntVec {
-    fn is_stack_only() -> bool {
-        false
-    }
-
-    fn heap_bytes(&self) -> usize {
-        self.anchors.heap_bytes() + self.pages.heap_bytes()
-    }
-}
+crate::impl_space_usage!(PagedIntVec, [anchors, pages]);
 
 impl Default for PagedIntVec {
     fn default() -> Self {

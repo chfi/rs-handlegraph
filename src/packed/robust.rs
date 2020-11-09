@@ -13,15 +13,7 @@ pub struct RobustPagedIntVec {
     other_pages: PagedIntVec,
 }
 
-impl SpaceUsage for RobustPagedIntVec {
-    fn is_stack_only() -> bool {
-        false
-    }
-
-    fn heap_bytes(&self) -> usize {
-        self.first_page.heap_bytes() + self.other_pages.heap_bytes()
-    }
-}
+crate::impl_space_usage!(RobustPagedIntVec, [first_page, other_pages]);
 
 impl RobustPagedIntVec {
     pub fn new(page_size: usize) -> Self {
