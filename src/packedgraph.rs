@@ -417,6 +417,20 @@ impl MutEmbeddedPaths for PackedGraph {
 mod tests {
     use super::*;
 
+    fn hnd(x: u64) -> Handle {
+        Handle::pack(x, false)
+    }
+
+    // returns the occurrence list for the provided node as a vector
+    // of tuples in the format (PathId, StepIx)
+    fn get_occurs(graph: &PackedGraph, id: u64) -> Vec<(u64, u64)> {
+        let oc_ix = graph.nodes.handle_occur_record(hnd(id)).unwrap();
+        let oc_iter = graph.occurrences.iter(oc_ix);
+        oc_iter
+            .map(|(_occ_ix, record)| (record.path_id.0, record.offset.pack()))
+            .collect::<Vec<_>>()
+    }
+
     fn test_graph_with_paths() -> PackedGraph {
         let hnd = |x: u64| Handle::pack(x, false);
         let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
@@ -519,20 +533,47 @@ mod tests {
     }
 
     #[test]
+    fn removing_edges() {
+        let mut graph = test_graph_with_paths();
+
+        let get_neighbors = |graph: &PackedGraph, x: u64| {
+            let left =
+                graph.neighbors(hnd(x), Direction::Left).collect::<Vec<_>>();
+            let right = graph
+                .neighbors(hnd(x), Direction::Right)
+                .collect::<Vec<_>>();
+            (left, right)
+        };
+
+        let nbors_9 = get_neighbors(&graph, 9);
+        let nbors_6 = get_neighbors(&graph, 6);
+
+        // remove the edge (9, 6)
+        let edge = Edge(hnd(9), hnd(6));
+
+        graph.remove_edge(edge);
+
+        let nbors_post_9 = get_neighbors(&graph, 9);
+        let nbors_post_6 = get_neighbors(&graph, 6);
+
+        // node 9's left edges are the same
+        assert_eq!(nbors_9.0, nbors_post_9.0);
+
+        // node 6's right edges are the same
+        assert_eq!(nbors_6.1, nbors_post_6.1);
+
+        // node 9 only had one right edge
+        assert!(nbors_post_9.1.is_empty());
+
+        // node 6's only left edge is now to node 4
+        assert_eq!(nbors_post_6.0, vec![hnd(4)]);
+    }
+
+    #[test]
     fn add_remove_paths() {
         let hnd = |x: u64| Handle::pack(x, false);
 
         let mut graph = test_graph_with_paths();
-
-        let get_occurs = |graph: &PackedGraph, id: u64| {
-            let oc_ix = graph.nodes.handle_occur_record(hnd(id)).unwrap();
-            let oc_iter = graph.occurrences.iter(oc_ix);
-            oc_iter
-                .map(|(_occ_ix, record)| {
-                    (record.path_id.0, record.offset.pack())
-                })
-                .collect::<Vec<_>>()
-        };
 
         let node_7_occ = get_occurs(&graph, 7);
         let node_8_occ = get_occurs(&graph, 8);
