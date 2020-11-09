@@ -1,3 +1,5 @@
+use succinct::SpaceUsage;
+
 use super::paged::PagedIntVec;
 use super::vector::PackedIntVec;
 
@@ -9,6 +11,16 @@ use quickcheck::{Arbitrary, Gen};
 pub struct RobustPagedIntVec {
     first_page: PackedIntVec,
     other_pages: PagedIntVec,
+}
+
+impl SpaceUsage for RobustPagedIntVec {
+    fn is_stack_only() -> bool {
+        false
+    }
+
+    fn heap_bytes(&self) -> usize {
+        self.first_page.heap_bytes() + self.other_pages.heap_bytes()
+    }
 }
 
 impl RobustPagedIntVec {

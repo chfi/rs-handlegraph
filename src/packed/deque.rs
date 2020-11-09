@@ -1,3 +1,5 @@
+use succinct::SpaceUsage;
+
 use super::vector::PackedIntVec;
 
 use super::traits::*;
@@ -9,6 +11,16 @@ pub struct PackedDeque {
     vector: PackedIntVec,
     start_ix: usize,
     num_entries: usize,
+}
+
+impl SpaceUsage for PackedDeque {
+    fn is_stack_only() -> bool {
+        false
+    }
+
+    fn heap_bytes(&self) -> usize {
+        self.vector.heap_bytes()
+    }
 }
 
 impl PackedDeque {

@@ -1,4 +1,4 @@
-use succinct::{IntVec, IntVecMut, IntVector};
+use succinct::{IntVec, IntVecMut, IntVector, SpaceUsage};
 
 use super::traits::*;
 
@@ -28,6 +28,16 @@ impl Default for PackedIntVec {
             num_entries,
             width,
         }
+    }
+}
+
+impl SpaceUsage for PackedIntVec {
+    fn is_stack_only() -> bool {
+        false
+    }
+
+    fn heap_bytes(&self) -> usize {
+        self.vector.heap_bytes()
     }
 }
 
