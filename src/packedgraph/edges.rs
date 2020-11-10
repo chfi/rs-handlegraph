@@ -271,12 +271,23 @@ impl EdgeLists {
         }
     }
 
+    /// Defragments the edge list record vector and return a map
+    /// describing how the indices of the still-existing records are
+    /// transformed. Uses the `removed_records` vector, and empties it.
+    ///
+    /// Returns None if there are no removed records.
     pub(super) fn defragment(
         &mut self,
     ) -> Option<FnvHashMap<EdgeListIx, EdgeListIx>> {
+        self.removed_records.sort();
+
         let first_removed = self.removed_records.first().copied()?;
 
-        let max_ix = EdgeListIx::from_zero_based(self.len());
+        let num_records = self.len();
+
+        let total_records = num_records + self.removed_records.len();
+
+        let max_ix = EdgeListIx::from_zero_based(total_records);
 
         // build the map for all indices after the first removed one
         let mut id_map =
@@ -287,10 +298,6 @@ impl EdgeLists {
             let p = EdgeListIx::unpack(ix);
             id_map.insert(p, p);
         }
-
-        let num_records = self.len();
-
-        let total_records = num_records + self.removed_records.len();
 
         let mut new_record_vec = PagedIntVec::new(WIDE_PAGE_WIDTH);
         new_record_vec.reserve(num_records * EdgeVecIx::RECORD_WIDTH);
@@ -307,9 +314,14 @@ impl EdgeLists {
                 let handle = self.record_vec.get_unpack::<Handle>(old_vec_ix);
                 let next =
                     self.record_vec.get_unpack::<EdgeListIx>(old_vec_ix + 1);
-                let next = id_map.get(&next)?;
 
-                Some((handle, *next, *new_ix))
+                let next = if next.is_null() {
+                    next
+                } else {
+                    *id_map.get(&next)?
+                };
+
+                Some((handle, next, *new_ix))
             })
             .for_each(|(handle, next, new_ix)| {
                 new_record_vec.append(handle.pack());
@@ -525,5 +537,99 @@ mod tests {
         assert_eq!(new_head, Some(EdgeListIx::null()));
         let new_edge_vec = vec_edge_list(&edges, new_head.unwrap());
         assert!(new_edge_vec.is_empty());
+    }
+
+    #[test]
+    fn edges_defrag() {
+        let mut edges = EdgeLists::default();
+
+        let hnd = |x: u64| Handle::pack(x, false);
+        let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
+
+        let append_slice = |edges: &mut EdgeLists, handles: &[Handle]| {
+            let mut last = EdgeListIx::null();
+            let mut edge_ixs = Vec::new();
+            for &h in handles.iter() {
+                let edge = edges.append_record(h, last);
+                edge_ixs.push(edge);
+                last = edge;
+            }
+            edge_ixs
+        };
+
+        let edges_vec = |edges: &EdgeLists, head: EdgeListIx| {
+            edges
+                .iter(head)
+                .map(|(_, (h, x))| {
+                    let h = u64::from(h.id());
+                    let x = x.pack();
+                    (h, x)
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let list_1 =
+            append_slice(&mut edges, &vec_hnd(vec![100, 101, 102, 103]));
+        let list_2 =
+            append_slice(&mut edges, &vec_hnd(vec![200, 201, 202, 203]));
+        let list_3 =
+            append_slice(&mut edges, &vec_hnd(vec![300, 301, 302, 303]));
+
+        let edge_ix = |x: usize| EdgeListIx::from_one_based(x);
+
+        let head_1 = edge_ix(4);
+        let head_2 = edge_ix(8);
+        let head_3 = edge_ix(12);
+
+        let remove_edge_in =
+            |edges: &mut EdgeLists, head: EdgeListIx, rem: usize| {
+                let rem_ix = EdgeListIx::from_one_based(rem);
+                edges
+                    .iter_mut(head)
+                    .remove_record_with(|x, _| x == rem_ix)
+                    .unwrap()
+            };
+
+        // Remove edges at indices 4, 6, 7, 11
+        let new_head_1 = remove_edge_in(&mut edges, head_1, 4);
+
+        let new_head_2 = remove_edge_in(&mut edges, head_2, 7);
+        let new_head_2 = remove_edge_in(&mut edges, new_head_2, 6);
+
+        let new_head_3 = remove_edge_in(&mut edges, head_3, 11);
+
+        let defrag_map_1 = edges.defragment().unwrap();
+
+        let new_head_1 = *defrag_map_1.get(&new_head_1).unwrap();
+        let new_head_2 = *defrag_map_1.get(&new_head_2).unwrap();
+        let new_head_3 = *defrag_map_1.get(&new_head_3).unwrap();
+
+        assert_eq!(
+            edges_vec(&edges, new_head_1),
+            vec![(102, 2), (101, 1), (100, 0)]
+        );
+
+        assert_eq!(edges_vec(&edges, new_head_2), vec![(203, 4), (200, 0)]);
+
+        assert_eq!(
+            edges_vec(&edges, new_head_3),
+            vec![(303, 7), (301, 6), (300, 0)]
+        );
+
+        let new_head_1 = remove_edge_in(&mut edges, new_head_1, 2);
+        let new_head_1 = remove_edge_in(&mut edges, new_head_1, 1);
+
+        let new_head_3 = remove_edge_in(&mut edges, new_head_3, 7);
+        let new_head_3 = remove_edge_in(&mut edges, new_head_3, 8);
+
+        let defrag_map_2 = edges.defragment().unwrap();
+
+        let new_head_1 = *defrag_map_2.get(&new_head_1).unwrap();
+        let new_head_2 = *defrag_map_2.get(&new_head_2).unwrap();
+        let new_head_3 = *defrag_map_2.get(&new_head_3).unwrap();
+
+        assert_eq!(edges_vec(&edges, new_head_1), vec![(102, 0)]);
+        assert_eq!(edges_vec(&edges, new_head_2), vec![(203, 2), (200, 0)]);
+        assert_eq!(edges_vec(&edges, new_head_3), vec![(300, 0)]);
     }
 }
