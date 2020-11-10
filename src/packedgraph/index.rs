@@ -134,6 +134,7 @@ where
     } else {
         return result;
     };
+    let first_ix = next_ix;
     let mut previous = next_ix;
 
     let mut insert_next = |start: T, end: T| {
@@ -152,6 +153,10 @@ where
     }
 
     insert_next(previous, max_ix + T::one());
+
+    for ix in num_iter::range(T::one(), first_ix) {
+        result.insert(ix, ix);
+    }
 
     result
 }
@@ -177,6 +182,7 @@ where
     } else {
         return result;
     };
+    let first_ix = next_ix;
     let mut previous = next_ix;
 
     let mut insert_next = |start: u64, end: u64| {
@@ -196,6 +202,11 @@ where
     }
 
     insert_next(previous, max_ix.pack() + 1);
+
+    for ix in 1..first_ix {
+        let ix = T::unpack(ix);
+        result.insert(ix, ix);
+    }
 
     result
 }
@@ -307,9 +318,9 @@ mod tests {
             id_map.iter().map(|(&k, &v)| (k, v)).collect::<Vec<_>>();
         id_map_vec.sort();
 
-        let expected = vec![7, 8, 9, 12, 14, 16, 17, 19, 20]
+        let expected = vec![1, 2, 3, 7, 8, 9, 12, 14, 16, 17, 19, 20]
             .into_iter()
-            .zip(4..)
+            .zip(1..)
             .collect::<Vec<_>>();
 
         assert_eq!(id_map_vec, expected);
@@ -336,9 +347,9 @@ mod tests {
             id_map.iter().map(|(&k, &v)| (k, v)).collect::<Vec<_>>();
         id_map_vec.sort();
 
-        let expected = vec![7, 8, 9, 12, 14, 16, 17, 19, 20]
+        let expected = vec![1, 2, 3, 7, 8, 9, 12, 14, 16, 17, 19, 20]
             .into_iter()
-            .zip(4..)
+            .zip(1..)
             .map(|(from, to)| {
                 (
                     NodeRecordId::from_one_based(from as usize),
