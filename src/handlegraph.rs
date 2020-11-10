@@ -8,7 +8,7 @@ pub use self::iter::*;
 
 /// Access all the handles in the graph as an iterator, and related
 /// methods.
-pub trait AllHandles: Sized {
+pub extern trait AllHandles: Sized {
     type Handles: Iterator<Item = Handle>;
     fn all_handles(self) -> Self::Handles;
 
