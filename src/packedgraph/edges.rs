@@ -1,5 +1,7 @@
 use crate::{handle::Handle, packed::*};
 
+use fnv::FnvHashMap;
+
 use std::num::NonZeroUsize;
 
 use super::graph::WIDE_PAGE_WIDTH;
@@ -267,6 +269,57 @@ impl EdgeLists {
         } else {
             false
         }
+    }
+
+    pub(super) fn defragment(
+        &mut self,
+    ) -> Option<FnvHashMap<EdgeListIx, EdgeListIx>> {
+        let first_removed = self.removed_records.first().copied()?;
+
+        let max_ix = EdgeListIx::from_zero_based(self.len());
+
+        // build the map for all indices after the first removed one
+        let mut id_map =
+            super::index::removed_id_map_as_u64(&self.removed_records, max_ix);
+
+        // the interval before the first removed index is mapped to itself
+        for ix in 1..(first_removed.pack()) {
+            let p = EdgeListIx::unpack(ix);
+            id_map.insert(p, p);
+        }
+
+        let num_records = self.len();
+
+        let total_records = num_records + self.removed_records.len();
+
+        let mut new_record_vec = PagedIntVec::new(WIDE_PAGE_WIDTH);
+        new_record_vec.reserve(num_records * EdgeVecIx::RECORD_WIDTH);
+
+        (0..total_records)
+            .into_iter()
+            .filter_map(|ix| {
+                let old_ix = EdgeListIx::from_zero_based(ix);
+
+                let new_ix = id_map.get(&old_ix)?;
+
+                let old_vec_ix = old_ix.to_record_ix(2, 0)?;
+
+                let handle = self.record_vec.get_unpack::<Handle>(old_vec_ix);
+                let next =
+                    self.record_vec.get_unpack::<EdgeListIx>(old_vec_ix + 1);
+                let next = id_map.get(&next)?;
+
+                Some((handle, *next, *new_ix))
+            })
+            .for_each(|(handle, next, new_ix)| {
+                new_record_vec.append(handle.pack());
+                new_record_vec.append(next.pack());
+            });
+
+        self.record_vec = new_record_vec;
+        self.removed_records.clear();
+
+        Some(id_map)
     }
 }
 

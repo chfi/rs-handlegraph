@@ -24,7 +24,10 @@ pub mod sequence;
 pub use self::{
     edges::{EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx},
     graph::PackedGraph,
-    index::*,
+    index::{
+        list, NodeRecordId, OneBasedIndex, PackedDoubleList, PackedList,
+        PackedListMut, RecordIndex,
+    },
     iter::{EdgeListHandleIter, PackedHandlesIter},
     nodes::{GraphVecIx, NodeIdIndexMap, NodeRecords},
     occurrences::{NodeOccurrences, OccurListIx, OccurRecord, OccurrencesIter},
