@@ -20,7 +20,7 @@ use crate::packed::*;
 /// The index for a node path occurrence record. Valid indices are
 /// natural numbers starting from 1, each denoting a *record*. A zero
 /// denotes the end of the list.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct OccurListIx(Option<NonZeroUsize>);
 
 crate::impl_one_based_index!(OccurListIx);

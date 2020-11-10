@@ -15,7 +15,7 @@ use super::list::{PackedList, PackedListMut};
 ///
 /// As zero is used to represent no edge/the empty edge list,
 /// `Option<NonZeroUsize>` is a natural fit for representing this.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EdgeListIx(Option<NonZeroUsize>);
 
 crate::impl_one_based_index!(EdgeListIx);

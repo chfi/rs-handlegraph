@@ -95,7 +95,7 @@ impl<T: OneBasedIndex> PackedElement for T {
 ///
 /// This index is 1-based, with 0 denoting missing data, the empty
 /// record, or the empty list, depending on the context.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodeRecordId(Option<NonZeroUsize>);
 
 /// A 0-based index into a collection that nominally uses 1-based
@@ -124,7 +124,7 @@ pub trait RecordIndex: Copy {
 /// elements.
 pub(crate) fn removed_id_map<T>(removed: &[T], max_ix: T) -> FnvHashMap<T, T>
 where
-    T: PrimInt + NumAssign + ToPrimitive + std::hash::Hash + std::fmt::Display,
+    T: PrimInt + NumAssign + ToPrimitive + std::hash::Hash,
 {
     let mut result = FnvHashMap::default();
 
@@ -136,20 +136,22 @@ where
     };
     let mut previous = next_ix;
 
+    let mut insert_next = |start: T, end: T| {
+        for ix in num_iter::range(start + T::one(), end) {
+            result.insert(ix, next_ix);
+            next_ix += T::one();
+        }
+    };
+
     for old_ix in iter {
         if old_ix - previous > T::one() {
-            for ix in num_iter::range(previous + T::one(), old_ix) {
-                result.insert(ix, next_ix);
-                next_ix += T::one();
-            }
+            insert_next(previous, old_ix);
         }
 
         previous = old_ix;
     }
-    for ix in num_iter::range_inclusive(previous + T::one(), max_ix) {
-        result.insert(ix, next_ix);
-        next_ix += T::one();
-    }
+
+    insert_next(previous, max_ix + T::one());
 
     result
 }
@@ -244,3 +246,28 @@ macro_rules! impl_space_usage_stack_newtype {
 impl_one_based_index!(NodeRecordId);
 impl_space_usage_stack_newtype!(NodeRecordId);
 // impl_one_based_index_default!(NodeRecordId);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn removal_id_map() {
+        let indices: Vec<usize> = (1..=20).into_iter().collect();
+
+        let to_remove: Vec<usize> = vec![4, 5, 6, 10, 11, 13, 15, 18];
+
+        let id_map = removed_id_map(&to_remove, 20);
+
+        let mut id_map_vec: Vec<(usize, usize)> =
+            id_map.iter().map(|(&k, &v)| (k, v)).collect::<Vec<_>>();
+        id_map_vec.sort();
+
+        let expected = vec![7, 8, 9, 12, 14, 16, 17, 19, 20]
+            .into_iter()
+            .zip(4..)
+            .collect::<Vec<_>>();
+
+        assert_eq!(id_map_vec, expected);
+    }
+}
