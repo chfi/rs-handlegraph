@@ -1,5 +1,11 @@
 use std::num::NonZeroUsize;
 
+use num_traits::{
+    identities,
+    identities::{One, Zero},
+    Num, NumAssign, PrimInt, ToPrimitive,
+};
+
 use fnv::FnvHashMap;
 
 pub mod list;
@@ -116,11 +122,13 @@ pub trait RecordIndex: Copy {
 /// hashmap that maps kept indices in the old sequence, into tightly
 /// packed indices in the new sequence that excludes the removed
 /// elements.
-pub(crate) fn removed_id_map(removed: &[usize]) -> FnvHashMap<usize, usize> {
+pub(crate) fn removed_id_map<T>(removed: &[T], max_ix: T) -> FnvHashMap<T, T>
+where
+    T: PrimInt + NumAssign + ToPrimitive + std::hash::Hash + std::fmt::Display,
+{
     let mut result = FnvHashMap::default();
 
     let mut iter = removed.iter().copied();
-
     let mut next_ix = if let Some(ix) = iter.next() {
         ix
     } else {
@@ -129,14 +137,18 @@ pub(crate) fn removed_id_map(removed: &[usize]) -> FnvHashMap<usize, usize> {
     let mut previous = next_ix;
 
     for old_ix in iter {
-        if old_ix - previous > 1 {
-            for ix in (previous + 1)..old_ix {
+        if old_ix - previous > T::one() {
+            for ix in num_iter::range(previous + T::one(), old_ix) {
                 result.insert(ix, next_ix);
-                next_ix += 1;
+                next_ix += T::one();
             }
         }
 
         previous = old_ix;
+    }
+    for ix in num_iter::range_inclusive(previous + T::one(), max_ix) {
+        result.insert(ix, next_ix);
+        next_ix += T::one();
     }
 
     result
