@@ -13,7 +13,8 @@ pub trait AllHandles: Sized {
     fn all_handles(self) -> Self::Handles;
 
     #[inline]
-    fn node_count(self) -> usize {
+    #[no_mangle]
+    extern fn node_count(self) -> usize {
         self.all_handles().count()
     }
 

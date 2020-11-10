@@ -97,27 +97,30 @@ impl crate::packed::PackedElement for Handle {
 
 impl Handle {
     #[inline]
-    pub fn as_integer(self) -> u64 {
+    #[no_mangle]
+    pub extern fn as_integer(self) -> u64 {
         self.0
     }
 
     #[inline]
+    #[no_mangle]
     pub const fn from_integer(i: u64) -> Self {
         Handle(i)
     }
 
     #[inline]
-    pub fn unpack_number(self) -> u64 {
+    #[no_mangle]
+    pub extern fn unpack_number(self) -> u64 {
         self.as_integer() >> 1
     }
 
     #[inline]
-    pub fn unpack_bit(self) -> bool {
+    pub extern fn unpack_bit(self) -> bool {
         self.as_integer() & 1 != 0
     }
 
     #[inline]
-    pub fn new<T: Into<NodeId>>(id: T, orient: Orientation) -> Handle {
+    pub extern fn new<T: Into<NodeId>>(id: T, orient: Orientation) -> Handle {
         let id: NodeId = id.into();
         let uint: u64 = id.into();
         let is_reverse = orient != Orientation::Forward;
@@ -144,12 +147,14 @@ impl Handle {
     }
 
     #[inline]
-    pub fn id(self) -> NodeId {
+    #[no_mangle]
+    pub extern fn id(self) -> NodeId {
         NodeId(self.unpack_number())
     }
 
     #[inline]
-    pub fn is_reverse(&self) -> bool {
+    #[no_mangle]
+    pub extern fn is_reverse(&self) -> bool {
         self.unpack_bit()
     }
 
@@ -159,7 +164,8 @@ impl Handle {
     }
 
     #[inline]
-    pub fn forward(self) -> Self {
+    #[no_mangle]
+    pub extern fn forward(self) -> Self {
         if self.is_reverse() {
             self.flip()
         } else {
@@ -173,7 +179,8 @@ pub struct Edge(pub Handle, pub Handle);
 
 impl Edge {
     /// Construct an edge, taking the orientation of the handles into account
-    pub fn edge_handle(left: Handle, right: Handle) -> Edge {
+    
+    pub extern fn edge_handle(left: Handle, right: Handle) -> Edge {
         let flipped_right = right.flip();
         let flipped_left = left.flip();
 

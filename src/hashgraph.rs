@@ -31,7 +31,7 @@ impl<'a> AllHandles for &'a HashGraph {
     }
 
     #[inline]
-    fn node_count(self) -> usize {
+    extern fn node_count(self) -> usize {
         self.graph.len()
     }
 

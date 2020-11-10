@@ -50,7 +50,7 @@ impl<'a> AllHandles for &'a PackedGraph {
     }
 
     #[inline]
-    fn node_count(self) -> usize {
+    extern fn node_count(self) -> usize {
         self.nodes.node_count()
     }
 
