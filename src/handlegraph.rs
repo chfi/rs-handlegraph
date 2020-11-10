@@ -8,7 +8,7 @@ pub use self::iter::*;
 
 /// Access all the handles in the graph as an iterator, and related
 /// methods.
-pub extern trait AllHandles: Sized {
+pub trait AllHandles: Sized {
     type Handles: Iterator<Item = Handle>;
     fn all_handles(self) -> Self::Handles;
 
@@ -19,7 +19,8 @@ pub extern trait AllHandles: Sized {
     }
 
     #[inline]
-    fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
+    #[no_mangle]
+    extern fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
         let n_id = n_id.into();
         self.all_handles().any(|h| h.id() == n_id)
     }
@@ -36,10 +37,10 @@ pub trait AllHandlesPar {
 pub trait AllEdges: Sized {
     type Edges: Iterator<Item = Edge>;
 
-    fn all_edges(self) -> Self::Edges;
+    extern fn all_edges(self) -> Self::Edges;
 
     #[inline]
-    fn edge_count(self) -> usize {
+    extern fn edge_count(self) -> usize {
         self.all_edges().count()
     }
 }
@@ -114,7 +115,7 @@ pub trait HandleGraphRef:
 ///
 /// Also contains some methods that don't fit into any of the other traits.
 pub trait HandleGraph {
-    fn min_node_id(&self) -> NodeId;
+    extern fn min_node_id(&self) -> NodeId;
 
-    fn max_node_id(&self) -> NodeId;
+    extern fn max_node_id(&self) -> NodeId;
 }

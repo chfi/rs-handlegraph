@@ -36,7 +36,7 @@ impl<'a> AllHandles for &'a HashGraph {
     }
 
     #[inline]
-    fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
+    extern fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
         self.graph.contains_key(&n_id.into())
     }
 }
@@ -58,7 +58,7 @@ impl<'a> AllEdges for &'a HashGraph {
     type Edges = EdgesIter<&'a HashGraph>;
 
     #[inline]
-    fn all_edges(self) -> Self::Edges {
+    extern fn all_edges(self) -> Self::Edges {
         EdgesIter::new(self)
     }
 }
@@ -118,12 +118,12 @@ impl<'a> HandleSequences for &'a HashGraph {
 
 impl HandleGraph for HashGraph {
     #[inline]
-    fn min_node_id(&self) -> NodeId {
+    extern fn min_node_id(&self) -> NodeId {
         self.min_id
     }
 
     #[inline]
-    fn max_node_id(&self) -> NodeId {
+    extern fn max_node_id(&self) -> NodeId {
         self.max_id
     }
 }

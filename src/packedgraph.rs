@@ -55,7 +55,7 @@ impl<'a> AllHandles for &'a PackedGraph {
     }
 
     #[inline]
-    fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
+    extern fn has_node<I: Into<NodeId>>(self, n_id: I) -> bool {
         self.nodes.has_node(n_id)
     }
 }
@@ -63,12 +63,14 @@ impl<'a> AllHandles for &'a PackedGraph {
 impl<'a> AllEdges for &'a PackedGraph {
     type Edges = EdgesIter<&'a PackedGraph>;
 
-    fn all_edges(self) -> Self::Edges {
+    #[no_mangle]
+    extern fn all_edges(self) -> Self::Edges {
         EdgesIter::new(self)
     }
 
     #[inline]
-    fn edge_count(self) -> usize {
+    #[no_mangle]
+    extern fn edge_count(self) -> usize {
         self.edges.len()
     }
 }
@@ -123,11 +125,13 @@ impl<'a> HandleSequences for &'a PackedGraph {
 
 impl HandleGraph for PackedGraph {
     #[inline]
-    fn min_node_id(&self) -> NodeId {
+    #[no_mangle]
+    extern fn min_node_id(&self) -> NodeId {
         self.nodes.min_id().into()
     }
     #[inline]
-    fn max_node_id(&self) -> NodeId {
+    #[no_mangle]
+    extern fn max_node_id(&self) -> NodeId {
         self.nodes.max_id().into()
     }
 }
