@@ -19,12 +19,12 @@ use super::properties::*;
 
 use crate::packed::*;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PathStepIx(Option<NonZeroUsize>);
 
 crate::impl_space_usage_stack_newtype!(PathStepIx);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
 pub struct PathLinkRecordIx(usize);
 

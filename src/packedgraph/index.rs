@@ -95,7 +95,7 @@ impl<T: OneBasedIndex> PackedElement for T {
 ///
 /// This index is 1-based, with 0 denoting missing data, the empty
 /// record, or the empty list, depending on the context.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct NodeRecordId(Option<NonZeroUsize>);
 
 /// A 0-based index into a collection that nominally uses 1-based
@@ -152,6 +152,50 @@ where
     }
 
     insert_next(previous, max_ix + T::one());
+
+    result
+}
+
+/// Given a sorted slice of elements to be removed, where the elements
+/// are values that can be packed into u64s using PackedElement, and
+/// whose u64-representations from a tightly packed sequence of
+/// indices, returns a hashmap that maps kept indices in the old
+/// sequence, into tightly packed indices in the new sequence that
+/// excludes the removed elements.
+pub(crate) fn removed_id_map_as_u64<T>(
+    removed: &[T],
+    max_ix: T,
+) -> FnvHashMap<T, T>
+where
+    T: PackedElement + std::hash::Hash + Eq,
+{
+    let mut result: FnvHashMap<T, T> = FnvHashMap::default();
+
+    let mut iter = removed.iter().copied();
+    let mut next_ix = if let Some(ix) = iter.next() {
+        ix.pack()
+    } else {
+        return result;
+    };
+    let mut previous = next_ix;
+
+    let mut insert_next = |start: u64, end: u64| {
+        for ix in num_iter::range(start + 1, end) {
+            result.insert(T::unpack(ix), T::unpack(next_ix));
+            next_ix += 1;
+        }
+    };
+
+    for old_ix in iter {
+        let old_ix = old_ix.pack();
+        if old_ix - previous > 1 {
+            insert_next(previous, old_ix);
+        }
+
+        previous = old_ix;
+    }
+
+    insert_next(previous, max_ix.pack() + 1);
 
     result
 }
@@ -266,6 +310,41 @@ mod tests {
         let expected = vec![7, 8, 9, 12, 14, 16, 17, 19, 20]
             .into_iter()
             .zip(4..)
+            .collect::<Vec<_>>();
+
+        assert_eq!(id_map_vec, expected);
+    }
+
+    #[test]
+    fn removal_id_map_node_record_id() {
+        let indices: Vec<NodeRecordId> = (1..=20)
+            .into_iter()
+            .map(|x| NodeRecordId::from_one_based(x as usize))
+            .collect();
+
+        let to_remove: Vec<NodeRecordId> = vec![4, 5, 6, 10, 11, 13, 15, 18]
+            .into_iter()
+            .map(|x| NodeRecordId::from_one_based(x as usize))
+            .collect();
+
+        let id_map = removed_id_map_as_u64(
+            &to_remove,
+            NodeRecordId::from_one_based(20usize),
+        );
+
+        let mut id_map_vec: Vec<(_, _)> =
+            id_map.iter().map(|(&k, &v)| (k, v)).collect::<Vec<_>>();
+        id_map_vec.sort();
+
+        let expected = vec![7, 8, 9, 12, 14, 16, 17, 19, 20]
+            .into_iter()
+            .zip(4..)
+            .map(|(from, to)| {
+                (
+                    NodeRecordId::from_one_based(from as usize),
+                    NodeRecordId::from_one_based(to as usize),
+                )
+            })
             .collect::<Vec<_>>();
 
         assert_eq!(id_map_vec, expected);
