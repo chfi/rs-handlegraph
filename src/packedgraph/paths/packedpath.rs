@@ -1,5 +1,10 @@
 #![allow(dead_code)]
 
+use super::super::defragment;
+use super::super::defragment::Defragment;
+
+use fnv::FnvHashMap;
+
 use crate::handle::Handle;
 
 use std::num::NonZeroUsize;
@@ -63,22 +68,24 @@ pub struct PackedStep {
 pub struct PackedPath {
     steps: RobustPagedIntVec,
     links: RobustPagedIntVec,
-    removed_steps: Vec<PathStepIx>,
+    removed_steps: usize,
+    path_deleted: bool,
 }
 
-crate::impl_space_usage!(PackedPath, [steps, links, removed_steps]);
+crate::impl_space_usage!(PackedPath, [steps, links]);
 
 impl PackedPath {
     pub(super) fn new() -> Self {
         Self {
             steps: RobustPagedIntVec::new(NARROW_PAGE_WIDTH),
             links: RobustPagedIntVec::new(NARROW_PAGE_WIDTH),
-            removed_steps: Default::default(),
+            removed_steps: 0,
+            path_deleted: false,
         }
     }
 
     pub fn len(&self) -> usize {
-        self.steps.len()
+        self.steps.len() - self.removed_steps
     }
 
     pub(super) fn append_handle(&mut self, handle: Handle) -> PathStepIx {
@@ -266,7 +273,7 @@ impl PackedListMut for PackedPath {
         self.links.set(prev_ix, 0);
         self.links.set(next_ix, 0);
 
-        self.removed_steps.push(ptr);
+        self.removed_steps += 1;
 
         Some((prev_ptr, next_ptr))
     }
@@ -284,6 +291,64 @@ impl PackedDoubleList for PackedPath {
     #[inline]
     fn prev_pointer(rec: &PackedStep) -> PathStepIx {
         rec.prev
+    }
+}
+
+impl Defragment for PackedPath {
+    type Updates = FnvHashMap<PathStepIx, PathStepIx>;
+
+    fn defragment(&mut self) -> Option<Self::Updates> {
+        if self.removed_steps == 0 {
+            return None;
+        }
+
+        let total_len = self.len() + self.removed_steps;
+        let new_length = self.len();
+
+        let mut step_ix_map: FnvHashMap<PathStepIx, PathStepIx> =
+            FnvHashMap::default();
+
+        let mut new_steps = RobustPagedIntVec::new(NARROW_PAGE_WIDTH);
+        let mut new_links = RobustPagedIntVec::new(NARROW_PAGE_WIDTH);
+        new_steps.reserve(new_length);
+        new_links.reserve(new_length * 2);
+
+        let mut next_ix = 0usize;
+
+        for ix in 0..total_len {
+            let handle = self.steps.get(ix);
+
+            if handle != 0 {
+                let step_ix = PathStepIx::from_zero_based(ix);
+                let new_ix = PathStepIx::from_zero_based(next_ix);
+
+                new_steps.append(handle);
+                new_links.append(0);
+                new_links.append(0);
+
+                step_ix_map.insert(step_ix, new_ix);
+
+                next_ix += 1;
+            }
+        }
+
+        for ix in 0..new_length {
+            let link_ix = ix * 2;
+            let old_prev: PathStepIx = new_links.get_unpack(link_ix);
+            let old_next: PathStepIx = new_links.get_unpack(link_ix + 1);
+
+            if !old_prev.is_null() {
+                let prev = step_ix_map.get(&old_prev).unwrap();
+                new_links.set_pack(link_ix, *prev);
+            }
+
+            if !old_next.is_null() {
+                let next = step_ix_map.get(&old_next).unwrap();
+                new_links.set_pack(link_ix, *next);
+            }
+        }
+
+        Some(step_ix_map)
     }
 }
 

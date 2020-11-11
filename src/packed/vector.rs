@@ -1,4 +1,4 @@
-use succinct::{IntVec, IntVecMut, IntVector, SpaceUsage};
+use succinct::{IntVec, IntVecMut, IntVector};
 
 use super::traits::*;
 

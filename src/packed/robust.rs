@@ -1,5 +1,3 @@
-use succinct::SpaceUsage;
-
 use super::paged::PagedIntVec;
 use super::vector::PackedIntVec;
 
@@ -25,8 +23,7 @@ impl RobustPagedIntVec {
         }
     }
 
-    #[allow(dead_code)]
-    pub(super) fn resize(&mut self, new_size: usize) {
+    pub fn resize(&mut self, new_size: usize) {
         if new_size > self.page_width() {
             self.first_page.resize(self.page_width());
             self.other_pages.resize(new_size - self.page_width());
@@ -36,8 +33,7 @@ impl RobustPagedIntVec {
         }
     }
 
-    #[allow(dead_code)]
-    pub(super) fn reserve(&mut self, capacity: usize) {
+    pub fn reserve(&mut self, capacity: usize) {
         if capacity > self.page_width() {
             self.first_page.reserve(self.page_width());
             self.other_pages.reserve(capacity - self.page_width());

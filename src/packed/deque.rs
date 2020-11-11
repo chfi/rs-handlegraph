@@ -1,8 +1,5 @@
-use succinct::SpaceUsage;
-
-use super::vector::PackedIntVec;
-
 use super::traits::*;
+use super::vector::PackedIntVec;
 
 use quickcheck::{Arbitrary, Gen};
 
