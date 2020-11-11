@@ -276,36 +276,12 @@ impl Sequences {
 }
 
 impl Defragment for Sequences {
-    type Index = usize;
-
-    /// Unlike Defragment implementations for things like edges, where each removed record has the same size, in this case we're actually interested in the offsets of each sequence start in the `sequences` field.
-    fn defrag_ids(&mut self) -> Option<fnv::FnvHashMap<usize, usize>> {
-        // We iterate through the kept sequence records to get their original offsets and lengths
-
-        let removed = self
-            .removed_records
-            .iter()
-            .copied()
-            .collect::<fnv::FnvHashSet<_>>();
-
-        let mut next_offset = 0;
-
-        let mut offsets: fnv::FnvHashMap<usize, usize> =
-            fnv::FnvHashMap::default();
-
-        for ix in 0..self.fragmented_len() {
-            let seq_ix = SeqRecordIx(ix);
-            if !removed.contains(&seq_ix) {
-                let (orig_offset, length) = self.get_record(seq_ix);
-                let new_offset = next_offset;
-
-                offsets.insert(orig_offset, new_offset);
-                next_offset += length;
-            }
-        }
-
-        Some(offsets)
-    }
+    /// Unlike Defragment implementations for things like edges, where
+    /// the pre-defragmentation identifiers are used by other objects,
+    /// and the updates need to be provided to ensure other objects
+    /// don't hold invalidated indices, that's not the case here, as
+    /// the sequence offsets are internal.
+    type Updates = ();
 
     fn fragmented_len(&self) -> usize {
         self.offsets.len()
@@ -313,13 +289,11 @@ impl Defragment for Sequences {
 
     fn defragment(&mut self) -> Option<()> {
         let total_len = self.fragmented_len();
+        let mut next_offset = 0;
 
         let mut sequences = PackedIntVec::default();
         let mut lengths = PackedIntVec::default();
         let mut offsets = PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH);
-
-        let mut next_offset = 0;
-
         for ix in 0..total_len {
             let seq_ix = SeqRecordIx(ix);
             let (old_offset, length) = self.get_record(seq_ix);
@@ -333,7 +307,6 @@ impl Defragment for Sequences {
                 next_offset += length;
             }
         }
-
         self.sequences = sequences;
         self.lengths = lengths;
         self.offsets = offsets;
@@ -432,9 +405,7 @@ mod tests {
         assert_eq!(seqs.get_record(s2), (0, 0));
         assert_eq!(seqs.get_record(s3), (28, 9));
 
-        let _new_offsets = seqs.defrag_ids().unwrap();
-
-        seqs.defragment().unwrap();
+        let _new_offsets = seqs.defragment().unwrap();
 
         let total_len = seqs.sequences.len();
         assert_eq!(total_len, 29);
@@ -449,9 +420,7 @@ mod tests {
         assert_eq!(seqs.get_record(s1), (13, 7));
         assert_eq!(seqs.get_record(s2), (20, 9));
 
-        let _new_offsets = seqs.defrag_ids().unwrap();
-
-        seqs.defragment().unwrap();
+        let _new_offsets = seqs.defragment().unwrap();
 
         let total_len = seqs.sequences.len();
         assert_eq!(total_len, 16);

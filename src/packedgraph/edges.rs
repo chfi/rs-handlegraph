@@ -276,18 +276,10 @@ impl EdgeLists {
 }
 
 impl Defragment for EdgeLists {
-    type Index = EdgeListIx;
+    type Updates = FnvHashMap<EdgeListIx, EdgeListIx>;
 
     fn fragmented_len(&self) -> usize {
         self.len() + self.removed_records.len()
-    }
-
-    fn defrag_ids(&mut self) -> Option<FnvHashMap<EdgeListIx, EdgeListIx>> {
-        let total_records = self.fragmented_len();
-        defragment::build_id_map_1_based(
-            &mut self.removed_records,
-            total_records,
-        )
     }
 
     /// Defragments the edge list record vector and return a map
@@ -295,9 +287,13 @@ impl Defragment for EdgeLists {
     /// transformed. Uses the `removed_records` vector, and empties it.
     ///
     /// Returns None if there are no removed records.
-    fn defragment(&mut self) -> Option<()> {
+    fn defragment(&mut self) -> Option<Self::Updates> {
         let total_records = self.fragmented_len();
-        let mut id_map = self.defrag_ids()?;
+
+        let id_map = defragment::build_id_map_1_based(
+            &mut self.removed_records,
+            total_records,
+        )?;
 
         let mut new_record_vec = PagedIntVec::new(WIDE_PAGE_WIDTH);
         new_record_vec.reserve(self.len() * EdgeVecIx::RECORD_WIDTH);
@@ -308,29 +304,22 @@ impl Defragment for EdgeLists {
                 let old_ix = EdgeListIx::from_zero_based(ix);
                 let old_vec_ix = old_ix.to_record_ix(2, 0)?;
 
-                let new_ix = id_map.get(&old_ix)?;
+                let _new_ix = id_map.get(&old_ix)?;
+                let handle = self.record_vec.get(old_vec_ix);
+                let next = self.record_vec.get_unpack(old_vec_ix + 1);
+                let next = id_map.get(&next).copied().unwrap_or(next);
 
-                let handle = self.record_vec.get_unpack::<Handle>(old_vec_ix);
-                let next =
-                    self.record_vec.get_unpack::<EdgeListIx>(old_vec_ix + 1);
-
-                let next = if next.is_null() {
-                    next
-                } else {
-                    *id_map.get(&next)?
-                };
-
-                Some((handle, next, *new_ix))
+                Some((handle, next))
             })
-            .for_each(|(handle, next, new_ix)| {
-                new_record_vec.append(handle.pack());
+            .for_each(|(handle, next)| {
+                new_record_vec.append(handle);
                 new_record_vec.append(next.pack());
             });
 
         self.record_vec = new_record_vec;
         self.removed_records.clear();
 
-        Some(())
+        Some(id_map)
     }
 }
 
@@ -597,8 +586,7 @@ mod tests {
 
         let new_head_3 = remove_edge_in(&mut edges, head_3, 11);
 
-        let defrag_map_1 = edges.defrag_ids().unwrap();
-        edges.defragment().unwrap();
+        let defrag_map_1 = edges.defragment().unwrap();
 
         let new_head_1 = *defrag_map_1.get(&new_head_1).unwrap();
         let new_head_2 = *defrag_map_1.get(&new_head_2).unwrap();
@@ -622,8 +610,7 @@ mod tests {
         let new_head_3 = remove_edge_in(&mut edges, new_head_3, 7);
         let new_head_3 = remove_edge_in(&mut edges, new_head_3, 8);
 
-        let defrag_map_2 = edges.defrag_ids().unwrap();
-        edges.defragment().unwrap();
+        let defrag_map_2 = edges.defragment().unwrap();
 
         let new_head_1 = *defrag_map_2.get(&new_head_1).unwrap();
         let new_head_2 = *defrag_map_2.get(&new_head_2).unwrap();
