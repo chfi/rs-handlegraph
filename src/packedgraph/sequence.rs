@@ -1,5 +1,8 @@
 use crate::packed::*;
 
+use super::defragment;
+use super::defragment::Defragment;
+
 use super::graph::{NodeRecordId, RecordIndex};
 
 use super::index::OneBasedIndex;
@@ -40,7 +43,7 @@ const fn decode_dna_base(byte: u64) -> u8 {
 // An index into both the offset record and the length record for some
 // sequence. It's a simple index into a packed vector, but the order
 // must be the same as the node records vector in the graph.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SeqRecordIx(usize);
 
 crate::impl_space_usage_stack_newtype!(SeqRecordIx);
@@ -247,13 +250,12 @@ impl Sequences {
         self.lengths.iter().sum::<u64>() as usize
     }
 
-    pub(super) fn iter(
+    fn iter_impl(
         &self,
-        seq_ix: SeqRecordIx,
+        offset: usize,
+        len: usize,
         reverse: bool,
     ) -> PackedSeqIter<'_> {
-        let (offset, len) = self.get_record(seq_ix);
-
         let iter = self.sequences.iter_slice(offset, len);
 
         PackedSeqIter {
@@ -261,6 +263,85 @@ impl Sequences {
             length: len,
             reverse,
         }
+    }
+
+    pub(super) fn iter(
+        &self,
+        seq_ix: SeqRecordIx,
+        reverse: bool,
+    ) -> PackedSeqIter<'_> {
+        let (offset, len) = self.get_record(seq_ix);
+        self.iter_impl(offset, len, reverse)
+    }
+}
+
+impl Defragment for Sequences {
+    type Index = usize;
+
+    /// Unlike Defragment implementations for things like edges, where each removed record has the same size, in this case we're actually interested in the offsets of each sequence start in the `sequences` field.
+    fn defrag_ids(&mut self) -> Option<fnv::FnvHashMap<usize, usize>> {
+        // We iterate through the kept sequence records to get their original offsets and lengths
+
+        let removed = self
+            .removed_records
+            .iter()
+            .copied()
+            .collect::<fnv::FnvHashSet<_>>();
+
+        let mut next_offset = 0;
+
+        let mut offsets: fnv::FnvHashMap<usize, usize> =
+            fnv::FnvHashMap::default();
+
+        for ix in 0..self.fragmented_len() {
+            let seq_ix = SeqRecordIx(ix);
+            if !removed.contains(&seq_ix) {
+                let (orig_offset, length) = self.get_record(seq_ix);
+                let new_offset = next_offset;
+
+                offsets.insert(orig_offset, new_offset);
+                next_offset += length;
+            }
+        }
+
+        Some(offsets)
+    }
+
+    fn fragmented_len(&self) -> usize {
+        self.offsets.len()
+    }
+
+    fn defragment(&mut self) -> Option<()> {
+        let offsets_map = self.defrag_ids()?;
+
+        let mut sequences = PackedIntVec::default();
+        let mut lengths = PackedIntVec::default();
+        let mut offsets = PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH);
+
+        (0..self.fragmented_len())
+            .into_iter()
+            .filter_map(|ix| {
+                let old_ix = SeqRecordIx(ix);
+
+                let (old_offset, length) = self.get_record(old_ix);
+                let new_offset = *offsets_map.get(&old_offset)?;
+
+                Some((old_offset, new_offset, length))
+            })
+            .for_each(|(old_offset, new_offset, length)| {
+                let seq_iter = self.iter_impl(old_offset, length, false);
+                lengths.append(length as u64);
+                offsets.append(new_offset as u64);
+                seq_iter.for_each(|b| sequences.append(encode_dna_base(b)));
+            });
+
+        self.sequences = sequences;
+        self.lengths = lengths;
+        self.offsets = offsets;
+
+        self.removed_records.clear();
+
+        Some(())
     }
 }
 

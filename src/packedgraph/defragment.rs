@@ -1,6 +1,12 @@
 use crate::packedgraph::index::{OneBasedIndex, RecordIndex};
 
-pub(crate) fn build_id_map<I: OneBasedIndex + Ord + std::hash::Hash>(
+use num_traits::{
+    identities,
+    identities::{One, Zero},
+    Num, NumAssign, PrimInt, ToPrimitive,
+};
+
+pub(crate) fn build_id_map_1_based<I: OneBasedIndex + Ord + std::hash::Hash>(
     removed: &mut [I],
     total_records: usize,
 ) -> Option<fnv::FnvHashMap<I, I>> {
@@ -12,16 +18,22 @@ pub(crate) fn build_id_map<I: OneBasedIndex + Ord + std::hash::Hash>(
     Some(super::index::removed_id_map_as_u64(&removed, max_ix))
 }
 
+// pub(crate) fn build_id_map_record_ix<I: RecordIndex + Ord + std::hash::Hash>(removed: &mut [I],
+//                                                                              total_records: usize,
+// ) -> Option<fnv::FnvHashMap<I, I>> {
+// }
+
 /// Trait for (packed) collections that can be defragmented.
 pub trait Defragment {
-    type Index: OneBasedIndex;
+    type Index: Ord + std::hash::Hash;
 
-    /// Defragments the collection and returns a map from indices in
-    /// the fragmented collection into the kept indices in the
-    /// defragmented collection.
-    fn defragment(
+    fn defrag_ids(
         &mut self,
     ) -> Option<fnv::FnvHashMap<Self::Index, Self::Index>>;
+
+    fn fragmented_len(&self) -> usize;
+
+    fn defragment(&mut self) -> Option<()>;
 }
 
 /*
