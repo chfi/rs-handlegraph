@@ -45,7 +45,7 @@ impl PackedIntVec {
         self.width
     }
 
-    pub(super) fn resize(&mut self, size: usize) {
+    pub fn resize(&mut self, size: usize) {
         if size < self.num_entries {
             let capacity = self.vector.len() as f64 / (Self::FACTOR.powi(2));
             let capacity = capacity as usize;
@@ -67,7 +67,7 @@ impl PackedIntVec {
         self.num_entries = size;
     }
 
-    pub(super) fn reserve(&mut self, size: usize) {
+    pub fn reserve(&mut self, size: usize) {
         if size > self.vector.len() as usize {
             self.vector.resize(size as u64, 0);
         }

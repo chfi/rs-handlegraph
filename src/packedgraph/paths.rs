@@ -14,6 +14,9 @@ use super::{NodeRecordId, OneBasedIndex, PackedDoubleList, RecordIndex};
 
 use super::NodeIdIndexMap;
 
+use super::defragment;
+use super::defragment::Defragment;
+
 use crate::pathhandlegraph::*;
 
 use crate::packed;
@@ -34,6 +37,7 @@ pub struct PackedPathNames {
     names: PackedIntVec,
     lengths: PackedIntVec,
     offsets: PagedIntVec,
+    removed: usize,
 }
 
 impl succinct::SpaceUsage for PackedPathNames {
@@ -67,7 +71,58 @@ impl Default for PackedPathNames {
             names: Default::default(),
             lengths: Default::default(),
             offsets: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
+            removed: 0,
         }
+    }
+}
+
+impl Defragment for PackedPathNames {
+    type Updates = ();
+
+    fn defragment(&mut self) -> Option<()> {
+        let total_len = self.offsets.len();
+
+        let mut next_offset = 0;
+        let mut next_id = 0;
+
+        let new_len = total_len - self.removed;
+
+        let mut new_names = Self::default();
+
+        new_names.lengths.reserve(new_len);
+        new_names.offsets.reserve(new_len);
+        new_names.name_id_map.reserve(new_len);
+
+        for ix in 0..total_len {
+            let length = self.lengths.get(ix);
+
+            if length != 0 {
+                let name = self
+                    .name_iter(PathId(ix as u64))
+                    .unwrap()
+                    .collect::<Vec<_>>();
+
+                new_names.lengths.append(length);
+                new_names.offsets.append(next_offset);
+                name.iter().for_each(|&b| new_names.names.append(b as u64));
+
+                new_names.name_id_map.insert(name, PathId(next_id));
+
+                next_offset += length;
+                next_id += 1;
+            }
+        }
+
+        crate::assign_for_fields!(
+            self,
+            new_names,
+            [name_id_map, lengths, offsets, names],
+            |mut x| std::mem::take(&mut x)
+        );
+
+        self.removed = 0;
+
+        Some(())
     }
 }
 
@@ -94,6 +149,8 @@ impl PackedPathNames {
 
         self.offsets.set(ix, 0);
         self.lengths.set(ix, 0);
+
+        self.removed += 1;
 
         Some(())
     }

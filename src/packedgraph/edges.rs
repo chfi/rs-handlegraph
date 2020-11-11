@@ -278,17 +278,13 @@ impl EdgeLists {
 impl Defragment for EdgeLists {
     type Updates = FnvHashMap<EdgeListIx, EdgeListIx>;
 
-    fn fragmented_len(&self) -> usize {
-        self.len() + self.removed_records.len()
-    }
-
     /// Defragments the edge list record vector and return a map
     /// describing how the indices of the still-existing records are
     /// transformed. Uses the `removed_records` vector, and empties it.
     ///
     /// Returns None if there are no removed records.
     fn defragment(&mut self) -> Option<Self::Updates> {
-        let total_records = self.fragmented_len();
+        let total_records = self.len() + self.removed_records.len();
 
         let id_map = defragment::build_id_map_1_based(
             &mut self.removed_records,
