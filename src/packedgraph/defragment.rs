@@ -29,37 +29,56 @@ pub trait Defragment {
     fn defragment(&mut self) -> Option<Self::Updates>;
 }
 
-/*
-#[macre_export]
-macro_rules! impl_defragment {
-    ($for:ty, $ix:ty, $removed:ident, [($field0:ident, $vec0:ty) $(, ($fieldn:ident, $vecn:ty))*]) => {
+#[macro_export]
+macro_rules! defragment_loop_impl {
+    ($for:ty, [$(($field:ident, $init:expr)),*]) => {
         impl $for {
-            pub(crate) fn defragment_(&mut self) -> Option<fnv::FnvHashMap<$ix, $ix>> {
-                self.$removed.sort();
+            fn testing_stuff(&mut self) {
+            $(
+                let mut $field = $init;
 
-                let first_removed = self.$removed.first().copied()?;
-
-                let num_records = self.len();
-
-
-                let total_records = num_records + self.$removed.len();
-
-                let max_ix = $ix::from_zero_based(total_records);
+            )*
 
 
-                let mut id_map =
-                    crate::packedgraph::index::removed_id_map_as_u64(&self.$removed, max_ix);
-
-                for ix in 1..(first_removed.pack()) {
-                    let x = $ix::unpack(ix);
-                    id_map.insert(x, x);
-                }
-
-                let mut $field0 = $vec0::new(
-
-
+                $(
+                    self.$field = $field;
+                )*
             }
         }
-    }
+    };
 }
-    */
+
+#[macro_export]
+macro_rules! defragment_loop {
+    // ($self:ident, $length:ident, $inner:expr, [$(($field:ident, $init:expr)),*]) => {
+    ($self:ident, $length:ident, [$(($field:ident, $init:expr)),*], $inner:expr) => {
+        $(
+            let mut $field = $init;
+
+        )*
+
+            for ix in 0..$length {
+                $inner(ix);
+            }
+
+        $(
+            $self.$field = $field;
+        )*
+    };
+}
+
+#[macro_export]
+macro_rules! defragment_block {
+    ($self:ident, [$(($field:ident, $init:expr)),*], $inner:block) => {
+        $(
+            let mut $field = $init;
+
+        )*
+
+            $inner
+
+        $(
+            $self.$field = $field;
+        )*
+    };
+}

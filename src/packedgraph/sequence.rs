@@ -273,6 +273,35 @@ impl Sequences {
         let (offset, len) = self.get_record(seq_ix);
         self.iter_impl(offset, len, reverse)
     }
+
+    fn testing_stuff(&mut self) {
+        let total_length = self.offsets.len();
+
+        let mut next_offset = 0;
+
+        crate::defragment_loop!(
+            self,
+            total_length,
+            [
+                (sequences, PackedIntVec::default()),
+                (lengths, PackedIntVec::default()),
+                (offsets, PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH))
+            ],
+            |ix: usize| {
+                let seq_ix = SeqRecordIx(ix);
+                let (old_offset, length) = self.get_record(seq_ix);
+                if length != 0 {
+                    let new_offset = next_offset;
+                    let seq_iter = self.iter_impl(old_offset, length, false);
+                    lengths.append(length as u64);
+                    offsets.append(new_offset as u64);
+                    seq_iter.for_each(|b| sequences.append(encode_dna_base(b)));
+
+                    next_offset += length;
+                }
+            }
+        );
+    }
 }
 
 impl Defragment for Sequences {
@@ -290,6 +319,64 @@ impl Defragment for Sequences {
     fn defragment(&mut self) -> Option<()> {
         let total_len = self.fragmented_len();
         let mut next_offset = 0;
+        /*
+        crate::defragment_loop!(
+            self,
+            total_len,
+            [
+                (sequences, PackedIntVec::default()),
+                (lengths, PackedIntVec::default()),
+                (offsets, PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH))
+            ],
+            |ix: usize| {
+                let seq_ix = SeqRecordIx(ix);
+                let (old_offset, length) = self.get_record(seq_ix);
+                if length != 0 {
+                    let new_offset = next_offset;
+                    let seq_iter = self.iter_impl(old_offset, length, false);
+                    lengths.append(length as u64);
+                    offsets.append(new_offset as u64);
+                    seq_iter.for_each(|b| sequences.append(encode_dna_base(b)));
+                    next_offset += length;
+                }
+            }
+        );
+
+        self.removed_records.clear();
+
+        Some(())
+            */
+
+        let total_len = self.fragmented_len();
+        let mut next_offset = 0;
+
+        crate::defragment_block!(
+            self,
+            [
+                (sequences, PackedIntVec::default()),
+                (lengths, PackedIntVec::default()),
+                (offsets, PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH))
+            ],
+            {
+                for ix in 0..total_len {
+                    let seq_ix = SeqRecordIx(ix);
+                    let (old_offset, length) = self.get_record(seq_ix);
+                    if length != 0 {
+                        let new_offset = next_offset;
+                        let seq_iter =
+                            self.iter_impl(old_offset, length, false);
+                        lengths.append(length as u64);
+                        offsets.append(new_offset as u64);
+                        seq_iter
+                            .for_each(|b| sequences.append(encode_dna_base(b)));
+
+                        next_offset += length;
+                    }
+                }
+            }
+        );
+
+        /*
 
         let mut sequences = PackedIntVec::default();
         let mut lengths = PackedIntVec::default();
@@ -310,6 +397,8 @@ impl Defragment for Sequences {
         self.sequences = sequences;
         self.lengths = lengths;
         self.offsets = offsets;
+
+        */
 
         self.removed_records.clear();
 
