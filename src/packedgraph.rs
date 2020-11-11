@@ -21,6 +21,8 @@ pub mod occurrences;
 pub mod paths;
 pub mod sequence;
 
+mod defragment;
+
 pub use self::{
     edges::{EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx},
     graph::PackedGraph,

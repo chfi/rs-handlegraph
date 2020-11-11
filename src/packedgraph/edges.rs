@@ -4,6 +4,9 @@ use fnv::FnvHashMap;
 
 use std::num::NonZeroUsize;
 
+use super::defragment;
+use super::defragment::Defragment;
+
 use super::graph::WIDE_PAGE_WIDTH;
 
 use super::{OneBasedIndex, RecordIndex};
@@ -270,46 +273,31 @@ impl EdgeLists {
             false
         }
     }
+}
+
+impl Defragment for EdgeLists {
+    type Index = EdgeListIx;
 
     /// Defragments the edge list record vector and return a map
     /// describing how the indices of the still-existing records are
     /// transformed. Uses the `removed_records` vector, and empties it.
     ///
     /// Returns None if there are no removed records.
-    pub(super) fn defragment(
-        &mut self,
-    ) -> Option<FnvHashMap<EdgeListIx, EdgeListIx>> {
-        self.removed_records.sort();
-
-        let first_removed = self.removed_records.first().copied()?;
-
-        let num_records = self.len();
-
-        let total_records = num_records + self.removed_records.len();
-
-        let max_ix = EdgeListIx::from_zero_based(total_records);
-
-        // build the map for all indices after the first removed one
+    fn defragment(&mut self) -> Option<FnvHashMap<EdgeListIx, EdgeListIx>> {
+        let total_records = self.len() + self.removed_records.len();
         let mut id_map =
-            super::index::removed_id_map_as_u64(&self.removed_records, max_ix);
-
-        // the interval before the first removed index is mapped to itself
-        for ix in 1..(first_removed.pack()) {
-            let p = EdgeListIx::unpack(ix);
-            id_map.insert(p, p);
-        }
+            defragment::build_id_map(&mut self.removed_records, total_records)?;
 
         let mut new_record_vec = PagedIntVec::new(WIDE_PAGE_WIDTH);
-        new_record_vec.reserve(num_records * EdgeVecIx::RECORD_WIDTH);
+        new_record_vec.reserve(self.len() * EdgeVecIx::RECORD_WIDTH);
 
         (0..total_records)
             .into_iter()
             .filter_map(|ix| {
                 let old_ix = EdgeListIx::from_zero_based(ix);
+                let old_vec_ix = old_ix.to_record_ix(2, 0)?;
 
                 let new_ix = id_map.get(&old_ix)?;
-
-                let old_vec_ix = old_ix.to_record_ix(2, 0)?;
 
                 let handle = self.record_vec.get_unpack::<Handle>(old_vec_ix);
                 let next =
