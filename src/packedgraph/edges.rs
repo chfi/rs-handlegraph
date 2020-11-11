@@ -597,7 +597,8 @@ mod tests {
 
         let new_head_3 = remove_edge_in(&mut edges, head_3, 11);
 
-        let defrag_map_1 = edges.defragment().unwrap();
+        let defrag_map_1 = edges.defrag_ids().unwrap();
+        edges.defragment().unwrap();
 
         let new_head_1 = *defrag_map_1.get(&new_head_1).unwrap();
         let new_head_2 = *defrag_map_1.get(&new_head_2).unwrap();
@@ -621,7 +622,8 @@ mod tests {
         let new_head_3 = remove_edge_in(&mut edges, new_head_3, 7);
         let new_head_3 = remove_edge_in(&mut edges, new_head_3, 8);
 
-        let defrag_map_2 = edges.defragment().unwrap();
+        let defrag_map_2 = edges.defrag_ids().unwrap();
+        edges.defragment().unwrap();
 
         let new_head_1 = *defrag_map_2.get(&new_head_1).unwrap();
         let new_head_2 = *defrag_map_2.get(&new_head_2).unwrap();

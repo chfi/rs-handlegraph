@@ -324,6 +324,9 @@ impl Defragment for Sequences {
                 let old_ix = SeqRecordIx(ix);
 
                 let (old_offset, length) = self.get_record(old_ix);
+                if length == 0 {
+                    return None;
+                }
                 let new_offset = *offsets_map.get(&old_offset)?;
 
                 Some((old_offset, new_offset, length))
@@ -399,5 +402,65 @@ mod tests {
 
         assert_eq!(B("TTT"), seq_bstr(&seqs, seq_indices[0]));
         assert_eq!(B("GTGT"), seq_bstr(&seqs, seq_indices[1]));
+    }
+
+    #[test]
+    fn defragment_sequence() {
+        let mut seqs = Sequences::default();
+        let g0 = NodeRecordId::unpack(1);
+        let g1 = NodeRecordId::unpack(2);
+        let g2 = NodeRecordId::unpack(3);
+        let g3 = NodeRecordId::unpack(4);
+        seqs.append_empty_record();
+        seqs.append_empty_record();
+        seqs.append_empty_record();
+        seqs.append_empty_record();
+
+        let s0 = seqs.add_sequence(g0, b"GTCCACTTTGTGT").unwrap();
+        let s1 = seqs.add_sequence(g1, b"GTCCAGT").unwrap();
+        let s2 = seqs.add_sequence(g2, b"CACGCTGT").unwrap();
+        let s3 = seqs.add_sequence(g3, b"AAATGTAAA").unwrap();
+
+        let total_len = seqs.sequences.len();
+        assert_eq!(total_len, 37);
+
+        assert_eq!(seqs.get_record(s0), (0, 13));
+        assert_eq!(seqs.get_record(s1), (13, 7));
+        assert_eq!(seqs.get_record(s2), (20, 8));
+        assert_eq!(seqs.get_record(s3), (28, 9));
+
+        seqs.clear_record(s2);
+
+        assert_eq!(seqs.get_record(s0), (0, 13));
+        assert_eq!(seqs.get_record(s1), (13, 7));
+        assert_eq!(seqs.get_record(s2), (0, 0));
+        assert_eq!(seqs.get_record(s3), (28, 9));
+
+        let _new_offsets = seqs.defrag_ids().unwrap();
+
+        seqs.defragment().unwrap();
+
+        let total_len = seqs.sequences.len();
+        assert_eq!(total_len, 29);
+
+        assert_eq!(seqs.get_record(s0), (0, 13));
+        assert_eq!(seqs.get_record(s1), (13, 7));
+        assert_eq!(seqs.get_record(s2), (20, 9));
+
+        seqs.clear_record(s0);
+
+        assert_eq!(seqs.get_record(s0), (0, 0));
+        assert_eq!(seqs.get_record(s1), (13, 7));
+        assert_eq!(seqs.get_record(s2), (20, 9));
+
+        let _new_offsets = seqs.defrag_ids().unwrap();
+
+        seqs.defragment().unwrap();
+
+        let total_len = seqs.sequences.len();
+        assert_eq!(total_len, 16);
+
+        assert_eq!(seqs.get_record(s0), (0, 7));
+        assert_eq!(seqs.get_record(s1), (7, 9));
     }
 }
