@@ -373,7 +373,6 @@ impl Defragment for PackedPath {
 pub struct PackedPathRef<'a> {
     pub(super) path_id: PathId,
     pub(super) path: &'a PackedPath,
-    // pub(super) properties: PathPropertyRef<'a>,
     pub(super) properties: PathPropertyRecord,
 }
 
@@ -697,4 +696,115 @@ impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
     fn set_circularity(&mut self, circular: bool) {
         self.properties.circular = circular;
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use quickcheck::{Arbitrary, Gen};
+
+    impl PackedPath {
+        fn generate_from_length(length: usize) -> (PackedPath, usize) {
+            let mut path = PackedPath::default();
+            let mut head = path.append_handle(Handle::pack(1, false));
+            for id in 2..=length {
+                let handle = Handle::pack(id, false);
+                head = path.insert_after(head, handle).unwrap();
+            }
+            (path, length)
+        }
+
+        fn add_gen_steps(
+            &mut self,
+            head: &mut PathStepIx,
+            tail: &mut PathStepIx,
+            max_id: &mut usize,
+            prepend: bool,
+            count: usize,
+        ) {
+            if prepend {
+                for i in 0..count {
+                    let handle = Handle::pack(*max_id + i + 1, false);
+                    *head = self.insert_before(*head, handle).unwrap();
+                }
+            } else {
+                for i in 0..count {
+                    let handle = Handle::pack(*max_id + i + 1, false);
+                    *tail = self.insert_after(*tail, handle).unwrap();
+                }
+            }
+            *max_id += count;
+        }
+
+        fn insert_gen_step<G: Gen>(
+            &mut self,
+            head: &PathStepIx,
+            tail: &PathStepIx,
+            max_id: &mut usize,
+            offset: usize,
+        ) {
+            let offset_step =
+                self.iter(*head, *tail).nth(offset).map(|(ix, _)| ix);
+            if let Some(step_ix) = offset_step {
+                if &step_ix == head || &step_ix == tail {
+                    return;
+                }
+                let handle = Handle::pack(*max_id + 1, false);
+
+                self.insert_after(step_ix, handle);
+                *max_id += 1;
+            }
+        }
+
+        fn insert_into_middle(
+            &mut self,
+            head: &PathStepIx,
+            tail: &PathStepIx,
+            max_id: &mut usize,
+        ) {
+            let length = self.iter(*head, *tail).count();
+            let middle = self
+                .iter(*head, *tail)
+                .map(|(ix, _)| ix)
+                .nth((length / 2) - 1)
+                .unwrap();
+            let handle = Handle::pack(*max_id + 1, false);
+
+            let _new_step = self.insert_after(middle, handle).unwrap();
+
+            *max_id += 1;
+        }
+
+        fn remove_gen_steps(
+            &mut self,
+            head: &mut PathStepIx,
+            tail: &mut PathStepIx,
+            from_head: bool,
+            count: usize,
+        ) {
+            if from_head {
+                for _step in 0..count {
+                    *head = self
+                        .iter_mut(*head, PathStepIx::null())
+                        .remove_record_with(|_, _| true)
+                        .unwrap();
+                }
+            } else {
+                let step_indices = self
+                    .iter(*head, *tail)
+                    .rev()
+                    .take(count + 1)
+                    .map(|(ix, _)| ix)
+                    .collect::<Vec<_>>();
+                let new_tail = *step_indices.last().unwrap();
+                for step in step_indices.into_iter().take(count) {
+                    self.iter_mut(*head, *tail)
+                        .remove_record_with(|step_ix, _| step_ix == step);
+                }
+                *tail = new_tail;
+            }
+        }
+    }
+
 }
