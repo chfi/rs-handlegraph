@@ -3,8 +3,6 @@ use super::vector::PackedIntVec;
 
 use super::traits::*;
 
-use quickcheck::{Arbitrary, Gen};
-
 #[derive(Debug, Clone)]
 pub struct RobustPagedIntVec {
     first_page: PackedIntVec,
@@ -102,36 +100,35 @@ impl PackedCollection for RobustPagedIntVec {
     }
 }
 
-impl Arbitrary for RobustPagedIntVec {
-    fn arbitrary<G: Gen>(g: &mut G) -> RobustPagedIntVec {
-        let only_first = bool::arbitrary(g);
-
-        let page_pow = u32::arbitrary(g) % 4;
-        let page_size = 16 << page_pow;
-
-        assert!(page_size % 2 == 0 && page_size >= 16 && page_size <= 256);
-        let mut paged = RobustPagedIntVec::new(page_size);
-        let mut values: Vec<u64> = Vec::arbitrary(g);
-
-        if !only_first {
-            while values.len() < page_size {
-                let v = u64::arbitrary(g);
-                values.push(v);
-            }
-        }
-
-        values.into_iter().for_each(|v| paged.append(v));
-
-        paged
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
-    use quickcheck::quickcheck;
-
     use super::*;
+    use quickcheck::{quickcheck, Arbitrary, Gen};
+
+    impl Arbitrary for RobustPagedIntVec {
+        fn arbitrary<G: Gen>(g: &mut G) -> RobustPagedIntVec {
+            let only_first = bool::arbitrary(g);
+
+            let page_pow = u32::arbitrary(g) % 4;
+            let page_size = 16 << page_pow;
+
+            assert!(page_size % 2 == 0 && page_size >= 16 && page_size <= 256);
+            let mut paged = RobustPagedIntVec::new(page_size);
+            let mut values: Vec<u64> = Vec::arbitrary(g);
+
+            if !only_first {
+                while values.len() < page_size {
+                    let v = u64::arbitrary(g);
+                    values.push(v);
+                }
+            }
+
+            values.into_iter().for_each(|v| paged.append(v));
+
+            paged
+        }
+    }
 
     quickcheck! {
         fn prop_robust_append(paged: RobustPagedIntVec, value: u64) -> bool {

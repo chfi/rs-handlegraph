@@ -2,8 +2,6 @@ use succinct::{IntVec, IntVecMut, IntVector};
 
 use super::traits::*;
 
-use quickcheck::{Arbitrary, Gen};
-
 #[derive(Debug, Clone)]
 pub struct PackedIntVec {
     vector: IntVector<u64>,
@@ -289,24 +287,23 @@ impl std::iter::FromIterator<u64> for PackedIntVec {
     }
 }
 
-impl Arbitrary for PackedIntVec {
-    fn arbitrary<G: Gen>(g: &mut G) -> PackedIntVec {
-        let mut intvec = PackedIntVec::new();
-        let u64_vec: Vec<u64> = Vec::arbitrary(g);
-
-        for v in u64_vec {
-            intvec.append(v);
-        }
-        intvec
-    }
-}
-
 #[cfg(test)]
 mod tests {
-
-    use quickcheck::quickcheck;
-
     use super::*;
+
+    use quickcheck::{quickcheck, Arbitrary, Gen};
+
+    impl Arbitrary for PackedIntVec {
+        fn arbitrary<G: Gen>(g: &mut G) -> PackedIntVec {
+            let mut intvec = PackedIntVec::new();
+            let u64_vec: Vec<u64> = Vec::arbitrary(g);
+
+            for v in u64_vec {
+                intvec.append(v);
+            }
+            intvec
+        }
+    }
 
     #[test]
     fn test_intvec_append() {

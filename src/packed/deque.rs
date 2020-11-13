@@ -1,8 +1,6 @@
 use super::traits::*;
 use super::vector::PackedIntVec;
 
-use quickcheck::{Arbitrary, Gen};
-
 #[derive(Debug, Default, Clone)]
 pub struct PackedDeque {
     vector: PackedIntVec,
@@ -201,31 +199,30 @@ impl std::iter::FromIterator<u64> for PackedDeque {
     }
 }
 
-impl Arbitrary for PackedDeque {
-    fn arbitrary<G: Gen>(g: &mut G) -> PackedDeque {
-        let front: Vec<u64> = Vec::arbitrary(g);
-        let back: Vec<u64> = Vec::arbitrary(g);
-        let front_first = bool::arbitrary(g);
-
-        let mut deque = PackedDeque::new();
-
-        if front_first {
-            front.into_iter().for_each(|v| deque.push_front(v));
-            back.into_iter().for_each(|v| deque.push_back(v));
-        } else {
-            back.into_iter().for_each(|v| deque.push_back(v));
-            front.into_iter().for_each(|v| deque.push_front(v));
-        }
-        deque
-    }
-}
-
 #[cfg(test)]
 mod tests {
-
-    use quickcheck::quickcheck;
-
     use super::*;
+    use quickcheck::{quickcheck, Arbitrary, Gen};
+
+    impl Arbitrary for PackedDeque {
+        fn arbitrary<G: Gen>(g: &mut G) -> PackedDeque {
+            let front: Vec<u64> = Vec::arbitrary(g);
+            let back: Vec<u64> = Vec::arbitrary(g);
+            let front_first = bool::arbitrary(g);
+
+            let mut deque = PackedDeque::new();
+
+            if front_first {
+                front.into_iter().for_each(|v| deque.push_front(v));
+                back.into_iter().for_each(|v| deque.push_back(v));
+            } else {
+                back.into_iter().for_each(|v| deque.push_back(v));
+                front.into_iter().for_each(|v| deque.push_front(v));
+            }
+            deque
+        }
+    }
+
     quickcheck! {
         fn prop_deque_push_front(deque: PackedDeque, val: u64) -> bool {
             let mut deque = deque;

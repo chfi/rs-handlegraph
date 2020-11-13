@@ -4,8 +4,6 @@ use super::vector::PackedIntVec;
 
 use super::traits::*;
 
-use quickcheck::{Arbitrary, Gen};
-
 #[derive(Debug, Clone)]
 pub struct PagedIntVec {
     page_size: usize,
@@ -173,24 +171,23 @@ impl PackedCollection for PagedIntVec {
     }
 }
 
-impl Arbitrary for PagedIntVec {
-    fn arbitrary<G: Gen>(g: &mut G) -> PagedIntVec {
-        let mut paged = PagedIntVec::new(64);
-        let u64_vec: Vec<u64> = Vec::arbitrary(g);
-
-        for v in u64_vec {
-            paged.append(v);
-        }
-        paged
-    }
-}
-
 #[cfg(test)]
 mod tests {
 
-    use quickcheck::quickcheck;
-
     use super::*;
+    use quickcheck::{quickcheck, Arbitrary, Gen};
+
+    impl Arbitrary for PagedIntVec {
+        fn arbitrary<G: Gen>(g: &mut G) -> PagedIntVec {
+            let mut paged = PagedIntVec::new(64);
+            let u64_vec: Vec<u64> = Vec::arbitrary(g);
+
+            for v in u64_vec {
+                paged.append(v);
+            }
+            paged
+        }
+    }
 
     quickcheck! {
         fn prop_paged_append(paged: PagedIntVec, value: u64) -> bool {
