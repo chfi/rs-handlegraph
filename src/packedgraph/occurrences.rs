@@ -7,6 +7,8 @@ use super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH};
 
 use std::num::NonZeroUsize;
 
+use fnv::FnvHashMap;
+
 #[allow(unused_imports)]
 use super::{NodeRecordId, OneBasedIndex, PathStepIx, RecordIndex};
 
@@ -16,6 +18,9 @@ use super::list::{PackedList, PackedListMut};
 use crate::pathhandlegraph::*;
 
 use crate::packed::*;
+
+use super::defragment;
+use super::defragment::Defragment;
 
 /// The index for a node path occurrence record. Valid indices are
 /// natural numbers starting from 1, each denoting a *record*. A zero
@@ -38,7 +43,7 @@ pub struct NodeOccurrences {
     path_ids: PagedIntVec,
     node_occur_offsets: PagedIntVec,
     node_occur_next: PagedIntVec,
-    removed_records: Vec<OccurListIx>,
+    removed_records: usize,
 }
 
 crate::impl_space_usage!(
@@ -57,8 +62,62 @@ impl Default for NodeOccurrences {
             path_ids: PagedIntVec::new(WIDE_PAGE_WIDTH),
             node_occur_offsets: PagedIntVec::new(NARROW_PAGE_WIDTH),
             node_occur_next: PagedIntVec::new(NARROW_PAGE_WIDTH),
-            removed_records: Default::default(),
+            removed_records: 0,
         }
+    }
+}
+
+impl Defragment for NodeOccurrences {
+    type Updates = FnvHashMap<OccurListIx, OccurListIx>;
+
+    fn defragment(&mut self) -> Option<Self::Updates> {
+        if self.removed_records == 0 {
+            return None;
+        }
+
+        let total_len = self.path_ids.len();
+        let kept_len = self.path_ids.len() - self.removed_records;
+
+        let mut updates: Self::Updates = FnvHashMap::default();
+
+        let mut path_ids = PagedIntVec::new(WIDE_PAGE_WIDTH);
+        let mut node_occur_offsets = PagedIntVec::new(NARROW_PAGE_WIDTH);
+        let mut node_occur_next = PagedIntVec::new(NARROW_PAGE_WIDTH);
+        path_ids.reserve(kept_len);
+        node_occur_offsets.reserve(kept_len);
+        node_occur_next.reserve(kept_len);
+
+        let mut next_ix = 0usize;
+
+        for ix in 0..total_len {
+            let path_id: PathId = self.path_ids.get_unpack(ix);
+            let offset: PathStepIx = self.node_occur_offsets.get_unpack(ix);
+            let next: OccurListIx = self.node_occur_next.get_unpack(ix);
+
+            // TODO a record could still be valid even if all fields are
+            // zero... need to handle this in a better way
+            if !(path_id.0 == 0 && offset.is_null() && next.is_null()) {
+                let old_ix = OccurListIx::from_zero_based(ix);
+                let new_ix = OccurListIx::from_zero_based(next_ix);
+                updates.insert(old_ix, new_ix);
+
+                path_ids.append(path_id.pack());
+                node_occur_offsets.append(offset.pack());
+                node_occur_next.append(next.pack());
+
+                next_ix += 1;
+            }
+        }
+
+        for ix in 0..kept_len {
+            let old_next: OccurListIx = node_occur_next.get_unpack(ix);
+            if !old_next.is_null() {
+                let next = updates.get(&old_next).unwrap();
+                node_occur_next.set_pack(ix, *next);
+            }
+        }
+
+        Some(updates)
     }
 }
 
@@ -72,30 +131,6 @@ impl NodeOccurrences {
 
         node_rec_ix
     }
-
-    /*
-    pub(super) fn append_entries(
-        &mut self,
-        path: PathId,
-        offsets: &[PathStepIx],
-    ) -> OccurListIx {
-        let node_rec_ix =
-            OccurListIx::from_zero_based(self.path_ids.len());
-
-        let mut count = self.path_ids.len();
-        let mut next = node_rec_ix.pack();
-
-        for &offset in offsets.iter() {
-            self.path_ids.append(path.0 as u64);
-            self.node_occur_offsets.append(offset.pack());
-            self.node_occur_next.append(next);
-            count += 1;
-            next = self.path_ids.len();
-        }
-
-        OccurListIx::unpack(next)
-    }
-    */
 
     pub(super) fn append_entry(
         &mut self,
@@ -116,27 +151,6 @@ impl NodeOccurrences {
         let from_ix = from.to_zero_based().unwrap();
         self.node_occur_next.set_pack(from_ix, to);
     }
-
-    // pub(super) fn append_node(&mut self) {
-    //     self.node_id_occur_ix_map.append(0);
-    // }
-
-    // pub(super) fn set_node_head(
-    //     &mut self,
-    //     node: NodeRecordId,
-    //     head: OccurListIx,
-    // ) {
-    //     let ix = node.to_zero_based().unwrap();
-    //     self.node_id_occur_ix_map.set_pack(ix, head);
-    // }
-
-    // pub(super) fn get_node_head(
-    //     &self,
-    //     node: NodeRecordId,
-    // ) -> OccurListIx {
-    //     let ix = node.to_zero_based().unwrap();
-    //     self.node_id_occur_ix_map.get_unpack(ix)
-    // }
 
     pub(super) fn prepend_occurrence(
         &mut self,
@@ -247,7 +261,7 @@ impl PackedListMut for NodeOccurrences {
         self.node_occur_offsets.set(ix, 0);
         self.node_occur_next.set(ix, 0);
 
-        self.removed_records.push(ptr);
+        self.removed_records += 1;
 
         Some(next)
     }
