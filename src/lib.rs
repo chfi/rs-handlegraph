@@ -7,3 +7,4 @@ pub mod packed;
 pub mod packedgraph;
 pub mod pathgraph;
 pub mod pathhandlegraph;
+pub(crate) mod util;
