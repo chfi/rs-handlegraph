@@ -340,8 +340,12 @@ impl Defragment for PackedPath {
                 let new_ix = PathStepIx::from_zero_based(next_ix);
 
                 new_steps.append(handle);
-                new_links.append(0);
-                new_links.append(0);
+
+                let link_ix = ix * 2;
+                let prev: PathStepIx = self.links.get_unpack(link_ix);
+                let next: PathStepIx = self.links.get_unpack(link_ix + 1);
+                new_links.append(prev.pack());
+                new_links.append(next.pack());
 
                 step_ix_map.insert(step_ix, new_ix);
 
@@ -361,9 +365,13 @@ impl Defragment for PackedPath {
 
             if !old_next.is_null() {
                 let next = step_ix_map.get(&old_next).unwrap();
-                new_links.set_pack(link_ix, *next);
+                new_links.set_pack(link_ix + 1, *next);
             }
         }
+
+        self.steps = new_steps;
+        self.links = new_links;
+        self.removed_steps = 0;
 
         Some(step_ix_map)
     }
@@ -807,4 +815,163 @@ mod tests {
         }
     }
 
+    #[test]
+    fn generate_path() {
+        let len = 10usize;
+        let (path, _) = PackedPath::generate_from_length(len);
+        let head = PathStepIx::from_zero_based(0usize);
+        let tail = PathStepIx::from_zero_based(path.steps.len() - 1);
+
+        for (step_ix, step) in path.iter(head, tail) {
+            println!(
+                "{:?}\t{:?}\t{:?}\t{:?}",
+                step.handle, step.prev, step_ix, step.next
+            );
+        }
+    }
+
+    fn print_path(path: &PackedPath, head: PathStepIx, tail: PathStepIx) {
+        println!("  Head: {:?}\tTail: {:?}", head, tail);
+        println!("  {:5}  {:4}  {:4}  {:4}", "Index", "Node", "Prev", "Next");
+        for (step_ix, step) in path.iter(head, tail) {
+            println!(
+                "  {:>5}  {:>4}  {:>4}  {:>4}",
+                step_ix.pack(),
+                u64::from(step.handle.id()),
+                step.prev.pack(),
+                step.next.pack()
+            );
+        }
+        println!("  -----------");
+    }
+
+    fn print_path_vecs(path: &PackedPath) {
+        println!("{:5}  {:4}  {:4}  {:4}", "Index", "Node", "Prev", "Next");
+        for ix in 0..path.steps.len() {
+            let handle: Handle = path.steps.get_unpack(ix);
+
+            let l_ix = ix * 2;
+            let prev: PathStepIx = path.links.get_unpack(l_ix);
+            let next: PathStepIx = path.links.get_unpack(l_ix + 1);
+
+            let index = ix + 1;
+
+            println!(
+                "{:>5}  {:>4}  {:>4}  {:>4}",
+                index,
+                u64::from(handle.id()),
+                prev.pack(),
+                next.pack()
+            );
+        }
+    }
+
+    fn path_handles(
+        path: &PackedPath,
+        head: PathStepIx,
+        tail: PathStepIx,
+    ) -> Vec<Handle> {
+        path.iter(head, tail).map(|(_, step)| step.handle).collect()
+    }
+
+    fn path_vectors(path: &PackedPath) -> Vec<(usize, u64, u64, u64)> {
+        let mut results = Vec::new();
+
+        for ix in 0..path.steps.len() {
+            let handle: Handle = path.steps.get_unpack(ix);
+
+            let l_ix = ix * 2;
+            let prev: PathStepIx = path.links.get_unpack(l_ix);
+            let next: PathStepIx = path.links.get_unpack(l_ix + 1);
+
+            let index = ix + 1;
+
+            results.push((
+                index,
+                u64::from(handle.id()),
+                prev.pack(),
+                next.pack(),
+            ));
+        }
+
+        results
+    }
+
+    #[test]
+    fn defrag_path() {
+        let len = 4usize;
+        let (mut path, mut max_id) = PackedPath::generate_from_length(len);
+
+        let mut head = PathStepIx::from_zero_based(0usize);
+        let mut tail = PathStepIx::from_zero_based(path.steps.len() - 1);
+
+        // prepending two steps
+        path.add_gen_steps(&mut head, &mut tail, &mut max_id, true, 2);
+
+        // appending three steps
+        path.add_gen_steps(&mut head, &mut tail, &mut max_id, false, 3);
+
+        // remove three steps from start
+        path.remove_gen_steps(&mut head, &mut tail, true, 3);
+
+        // remove two steps from end
+        path.remove_gen_steps(&mut head, &mut tail, false, 2);
+
+        // insert into middle
+        path.insert_into_middle(&head, &tail, &mut max_id);
+
+        let new_steps = path_handles(&path, head, tail);
+
+        let expected_steps = [2, 3, 10, 4, 7]
+            .iter()
+            .map(|x| Handle::pack(*x, false))
+            .collect::<Vec<_>>();
+        assert_eq!(new_steps, expected_steps);
+
+        let path_vecs = path_vectors(&path);
+
+        let expected_pre_defrag = vec![
+            (1, 0, 0, 0),
+            (2, 2, 0, 3),
+            (3, 3, 2, 10),
+            (4, 4, 10, 7),
+            (5, 0, 0, 0),
+            (6, 0, 0, 0),
+            (7, 7, 4, 0),
+            (8, 0, 0, 0),
+            (9, 0, 0, 0),
+            (10, 10, 3, 4),
+        ];
+
+        assert_eq!(path.removed_steps, 5);
+        assert_eq!(path_vecs, expected_pre_defrag);
+
+        let updates = path.defragment().unwrap();
+
+        let head = *updates.get(&head).unwrap();
+        let tail = *updates.get(&tail).unwrap();
+
+        let mut updates = updates
+            .into_iter()
+            .map(|(k, v)| (k.pack(), v.pack()))
+            .collect::<Vec<_>>();
+
+        updates.sort();
+        assert_eq!(updates, vec![(2, 1), (3, 2), (4, 3), (7, 4), (10, 5)]);
+
+        let defrag_path_vecs = path_vectors(&path);
+        assert_eq!(
+            defrag_path_vecs,
+            vec![
+                (1, 2, 0, 2),
+                (2, 3, 1, 5),
+                (3, 4, 5, 4),
+                (4, 7, 3, 0),
+                (5, 10, 2, 3)
+            ]
+        );
+
+        let new_steps = path_handles(&path, head, tail);
+        assert_eq!(new_steps, expected_steps);
+    }
 }
