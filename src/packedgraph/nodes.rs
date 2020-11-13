@@ -193,7 +193,7 @@ impl Default for NodeRecords {
 }
 
 impl Defragment for NodeRecords {
-    type Updates = FnvHashMap<NodeRecordId, NodeRecordId>;
+    type Updates = ();
 
     fn defragment(&mut self) -> Option<Self::Updates> {
         if self.removed_nodes.is_empty() {
@@ -214,7 +214,6 @@ impl Defragment for NodeRecords {
             .into_iter()
             .collect::<FnvHashSet<_>>();
 
-        let mut updates: Self::Updates = FnvHashMap::default();
         let mut next_ix = 0usize;
 
         for ix in 0..total_len {
@@ -237,15 +236,13 @@ impl Defragment for NodeRecords {
                 records_vec.append(right_ix.pack());
                 node_occurrence_map.append(occur_ix.pack());
 
-                updates.insert(rec_id, new_rec_id);
-
                 next_ix += 1;
             }
         }
 
         self.sequences.defragment();
 
-        Some(updates)
+        Some(())
     }
 }
 
