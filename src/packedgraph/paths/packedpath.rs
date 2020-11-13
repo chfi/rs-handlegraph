@@ -90,16 +90,23 @@ impl PackedPath {
         Self::default()
     }
 
+    #[inline]
     pub(super) fn deleted(&self) -> bool {
         self.path_deleted
     }
 
+    #[inline]
     pub fn len(&self) -> usize {
         self.steps.len() - self.removed_steps
     }
 
+    #[inline]
+    pub(super) fn storage_len(&self) -> usize {
+        self.steps.len()
+    }
+
     pub(super) fn append_handle(&mut self, handle: Handle) -> PathStepIx {
-        let new_ix = PathStepIx::from_zero_based(self.len());
+        let new_ix = PathStepIx::from_zero_based(self.storage_len());
         self.steps.append(handle.pack());
         self.links.append(0);
         self.links.append(0);
@@ -152,7 +159,7 @@ impl PackedPath {
         ix: PathStepIx,
         handle: Handle,
     ) -> Option<PathStepIx> {
-        let new_ix = PathStepIx::from_zero_based(self.len());
+        let new_ix = PathStepIx::from_zero_based(self.steps.len());
         let link_ix = PathLinkRecordIx::from_one_based_ix(ix)?;
 
         self.steps.append(handle.as_integer());
@@ -178,7 +185,7 @@ impl PackedPath {
         ix: PathStepIx,
         handle: Handle,
     ) -> Option<PathStepIx> {
-        let new_ix = PathStepIx::from_zero_based(self.len());
+        let new_ix = PathStepIx::from_zero_based(self.storage_len());
         let link_ix = PathLinkRecordIx::from_one_based_ix(ix)?;
 
         self.steps.append(handle.pack());
@@ -312,7 +319,7 @@ impl Defragment for PackedPath {
             return None;
         }
 
-        let total_len = self.len() + self.removed_steps;
+        let total_len = self.storage_len();
         let new_length = self.len();
 
         let mut step_ix_map: FnvHashMap<PathStepIx, PathStepIx> =
