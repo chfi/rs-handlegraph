@@ -164,8 +164,12 @@ impl PackedPathNames {
             return None;
         }
 
-        let offset = self.offsets.get_unpack(vec_ix);
         let len = self.lengths.get_unpack(vec_ix);
+        if len == 0 {
+            return None;
+        }
+
+        let offset = self.offsets.get_unpack(vec_ix);
         let iter = self.names.iter_slice(offset, len).view();
 
         Some(iter)
@@ -964,5 +968,64 @@ mod tests {
         assert_eq!(get_steps(ref_1), to_insert_1);
         assert_eq!(get_steps(ref_2), to_insert_2);
         assert_eq!(get_steps(ref_3), to_insert_3);
+    }
+
+    #[test]
+    fn defrag_path_names() {
+        use bstr::{ByteSlice, B};
+
+        let mut packed_names = PackedPathNames::default();
+
+        let names = vec![
+            B("path1"),
+            B("another_path"),
+            B("third-path"),
+            B("path123"),
+            B("path9812983"),
+            B("AAAAAAAAAAA"),
+            B("BBBBBBBBBBB"),
+            B("CCCCCC"),
+            B("DDDDDDDDDDDDDDDDD"),
+            B("EEEE"),
+            B("FFFFFFFFFFFFFFFFFFFFF"),
+            B("GGGGGGGGGGGGG"),
+        ];
+
+        let ids = names
+            .iter()
+            .map(|n| packed_names.add_name(n))
+            .collect::<Vec<_>>();
+
+        packed_names.remove_id(PathId(3)).unwrap();
+        packed_names.remove_id(PathId(5)).unwrap();
+        packed_names.remove_id(PathId(6)).unwrap();
+        packed_names.remove_id(PathId(7)).unwrap();
+        packed_names.remove_id(PathId(8)).unwrap();
+
+        packed_names.defragment();
+
+        let new_path_ids =
+            (0..=6u64).into_iter().map(PathId).collect::<Vec<_>>();
+        let kept_names = new_path_ids
+            .iter()
+            .filter_map(|&i| {
+                let iter = packed_names.name_iter(i)?;
+                let bytes = iter.collect::<Vec<_>>();
+                let string = std::str::from_utf8(&bytes).unwrap();
+                Some(String::from(string))
+            })
+            .collect::<Vec<String>>();
+
+        let expected_names = vec![
+            String::from("path1"),
+            String::from("another_path"),
+            String::from("third-path"),
+            String::from("path9812983"),
+            String::from("EEEE"),
+            String::from("FFFFFFFFFFFFFFFFFFFFF"),
+            String::from("GGGGGGGGGGGGG"),
+        ];
+
+        assert_eq!(kept_names, expected_names);
     }
 }

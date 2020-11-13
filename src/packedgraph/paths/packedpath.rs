@@ -730,39 +730,25 @@ mod tests {
             max_id: &mut usize,
             prepend: bool,
             count: usize,
-        ) {
+        ) -> Vec<StepUpdate> {
+            let mut updates = Vec::new();
             if prepend {
                 for i in 0..count {
                     let handle = Handle::pack(*max_id + i + 1, false);
-                    *head = self.insert_before(*head, handle).unwrap();
+                    let step = self.insert_before(*head, handle).unwrap();
+                    *head = step;
+                    updates.push(StepUpdate::Insert { handle, step })
                 }
             } else {
                 for i in 0..count {
                     let handle = Handle::pack(*max_id + i + 1, false);
-                    *tail = self.insert_after(*tail, handle).unwrap();
+                    let step = self.insert_after(*tail, handle).unwrap();
+                    *tail = step;
+                    updates.push(StepUpdate::Insert { handle, step })
                 }
             }
             *max_id += count;
-        }
-
-        fn insert_gen_step<G: Gen>(
-            &mut self,
-            head: &PathStepIx,
-            tail: &PathStepIx,
-            max_id: &mut usize,
-            offset: usize,
-        ) {
-            let offset_step =
-                self.iter(*head, *tail).nth(offset).map(|(ix, _)| ix);
-            if let Some(step_ix) = offset_step {
-                if &step_ix == head || &step_ix == tail {
-                    return;
-                }
-                let handle = Handle::pack(*max_id + 1, false);
-
-                self.insert_after(step_ix, handle);
-                *max_id += 1;
-            }
+            updates
         }
 
         fn insert_into_middle(
@@ -770,7 +756,7 @@ mod tests {
             head: &PathStepIx,
             tail: &PathStepIx,
             max_id: &mut usize,
-        ) {
+        ) -> StepUpdate {
             let length = self.iter(*head, *tail).count();
             let middle = self
                 .iter(*head, *tail)
@@ -779,9 +765,11 @@ mod tests {
                 .unwrap();
             let handle = Handle::pack(*max_id + 1, false);
 
-            let _new_step = self.insert_after(middle, handle).unwrap();
+            let step = self.insert_after(middle, handle).unwrap();
 
             *max_id += 1;
+
+            StepUpdate::Insert { step, handle }
         }
 
         fn remove_gen_steps(
@@ -790,13 +778,19 @@ mod tests {
             tail: &mut PathStepIx,
             from_head: bool,
             count: usize,
-        ) {
+        ) -> Vec<StepUpdate> {
+            let mut updates = Vec::new();
             if from_head {
                 for _step in 0..count {
-                    *head = self
+                    let step = *head;
+                    let handle = self.step_record(step).unwrap();
+                    let new_head = self
                         .iter_mut(*head, PathStepIx::null())
                         .remove_record_with(|_, _| true)
                         .unwrap();
+
+                    *head = new_head;
+                    updates.push(StepUpdate::Remove { step, handle });
                 }
             } else {
                 let step_indices = self
@@ -807,11 +801,15 @@ mod tests {
                     .collect::<Vec<_>>();
                 let new_tail = *step_indices.last().unwrap();
                 for step in step_indices.into_iter().take(count) {
+                    let handle = self.step_record(step).unwrap();
                     self.iter_mut(*head, *tail)
                         .remove_record_with(|step_ix, _| step_ix == step);
+                    updates.push(StepUpdate::Remove { step, handle });
                 }
                 *tail = new_tail;
             }
+
+            updates
         }
     }
 
