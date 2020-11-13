@@ -530,4 +530,36 @@ impl NodeRecords {
             }
         }
     }
+
+    pub(crate) fn apply_edge_and_occur_updates(
+        &mut self,
+        edge_updates: &FnvHashMap<EdgeListIx, EdgeListIx>,
+        occur_updates: &FnvHashMap<OccurListIx, OccurListIx>,
+    ) {
+        let total_len = self.node_count() + self.removed_nodes.len();
+
+        for ix in 0..total_len {
+            let vec_ix = ix * 2;
+
+            let old_left: EdgeListIx = self.records_vec.get_unpack(vec_ix);
+            let old_right: EdgeListIx = self.records_vec.get_unpack(vec_ix + 1);
+
+            if !old_left.is_null() {
+                let left = edge_updates.get(&old_left).unwrap();
+                self.records_vec.set_pack(vec_ix, *left);
+            }
+
+            if !old_right.is_null() {
+                let right = edge_updates.get(&old_right).unwrap();
+                self.records_vec.set_pack(vec_ix, *right);
+            }
+
+            let old_head: OccurListIx = self.node_occurrence_map.get_unpack(ix);
+
+            if !old_head.is_null() {
+                let head = occur_updates.get(&old_head).unwrap();
+                self.node_occurrence_map.set_pack(ix, *head);
+            }
+        }
+    }
 }

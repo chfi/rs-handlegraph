@@ -10,6 +10,8 @@ pub(super) use super::{
 
 use fnv::{FnvHashMap, FnvHashSet};
 
+use super::defragment::Defragment;
+
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
 use crate::pathhandlegraph::PathId;
@@ -48,6 +50,46 @@ impl Default for PackedGraph {
             occurrences,
             paths,
         }
+    }
+}
+
+impl Defragment for PackedGraph {
+    type Updates = ();
+
+    fn defragment(&mut self) -> Option<()> {
+        // Defragment the paths
+        let paths_update = self.paths.defragment();
+
+        // Defragment the occurrences
+        let occurs_update = self.occurrences.defragment();
+        // Update the new occurrences using the paths update
+        if let Some(paths_update) = paths_update {
+            self.occurrences.apply_path_updates(&paths_update);
+        }
+
+        // Defragment the edges
+        let edges_update = self.edges.defragment();
+        // Defragment the nodes
+        let _nodes_update = self.nodes.defragment();
+
+        // Update the nodes using the occurrence and edge updates
+        match (occurs_update, edges_update) {
+            (None, None) => (),
+            (Some(occurs_update), None) => {
+                self.nodes.apply_node_occur_ix_updates(&occurs_update);
+            }
+            (None, Some(edges_update)) => {
+                self.nodes.apply_edge_lists_ix_updates(&edges_update);
+            }
+            (Some(occurs_update), Some(edges_update)) => {
+                self.nodes.apply_edge_and_occur_updates(
+                    &edges_update,
+                    &occurs_update,
+                );
+            }
+        }
+
+        Some(())
     }
 }
 
