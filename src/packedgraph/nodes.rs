@@ -5,6 +5,8 @@ use crate::{
 
 use crate::packed;
 
+use super::defragment::Defragment;
+
 use super::{
     edges::EdgeListIx,
     graph::NARROW_PAGE_WIDTH,
@@ -12,6 +14,8 @@ use super::{
     occurrences::OccurListIx,
     sequence::{SeqRecordIx, Sequences},
 };
+
+use fnv::{FnvHashMap, FnvHashSet};
 
 /// The index into the underlying packed vector that is used to
 /// represent the graph records that hold pointers to the two edge
@@ -159,7 +163,7 @@ pub struct NodeRecords {
     records_vec: PagedIntVec,
     id_index_map: NodeIdIndexMap,
     sequences: Sequences,
-    removed_nodes: Vec<NodeId>,
+    removed_nodes: Vec<NodeRecordId>,
     pub(super) node_occurrence_map: PagedIntVec,
 }
 
@@ -188,6 +192,63 @@ impl Default for NodeRecords {
     }
 }
 
+impl Defragment for NodeRecords {
+    type Updates = FnvHashMap<NodeRecordId, NodeRecordId>;
+
+    fn defragment(&mut self) -> Option<Self::Updates> {
+        if self.removed_nodes.is_empty() {
+            return None;
+        }
+
+        let total_len = self.node_count() - self.removed_nodes.len();
+        let kept_len = self.node_count();
+
+        let mut records_vec = PagedIntVec::new(NARROW_PAGE_WIDTH);
+        let mut node_occurrence_map =
+            PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH);
+
+        records_vec.reserve(kept_len * 2);
+        node_occurrence_map.reserve(kept_len);
+
+        let removed_nodes = std::mem::take(&mut self.removed_nodes)
+            .into_iter()
+            .collect::<FnvHashSet<_>>();
+
+        let mut updates: Self::Updates = FnvHashMap::default();
+        let mut next_ix = 0usize;
+
+        for ix in 0..total_len {
+            let rec_id = NodeRecordId::from_zero_based(ix);
+            if !removed_nodes.contains(&rec_id) {
+                let new_rec_id = NodeRecordId::from_zero_based(next_ix);
+
+                let rec_vec_ix = rec_id.to_record_start(2).unwrap();
+                let occur_vec_ix = rec_id.to_record_start(1).unwrap();
+
+                let left_ix: EdgeListIx =
+                    self.records_vec.get_unpack(rec_vec_ix);
+                let right_ix: EdgeListIx =
+                    self.records_vec.get_unpack(rec_vec_ix + 1);
+
+                let occur_ix: OccurListIx =
+                    self.node_occurrence_map.get_unpack(occur_vec_ix);
+
+                records_vec.append(left_ix.pack());
+                records_vec.append(right_ix.pack());
+                node_occurrence_map.append(occur_ix.pack());
+
+                updates.insert(rec_id, new_rec_id);
+
+                next_ix += 1;
+            }
+        }
+
+        self.sequences.defragment();
+
+        Some(updates)
+    }
+}
+
 impl NodeRecords {
     #[inline]
     pub fn min_id(&self) -> u64 {
@@ -210,7 +271,7 @@ impl NodeRecords {
 
     #[inline]
     pub fn node_count(&self) -> usize {
-        self.id_index_map.len()
+        (self.records_vec.len() / 2) - self.removed_nodes.len()
     }
 
     #[inline]
@@ -289,7 +350,7 @@ impl NodeRecords {
 
         self.id_index_map.clear_node_id(n_id);
 
-        self.removed_nodes.push(n_id);
+        self.removed_nodes.push(rec_id);
 
         Some(())
     }

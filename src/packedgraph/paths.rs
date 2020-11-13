@@ -198,7 +198,8 @@ impl Defragment for PackedGraphPaths {
     /// all of the contained `PackedPath`s. Defragmenting a
     /// `PackedPath` can update its step indices, which means the node
     /// occurrences must be updated accordingly.
-    type Updates = FnvHashMap<PathId, (PathId, FnvHashMap<PathStepIx, PathStepIx>)>;
+    type Updates =
+        FnvHashMap<PathId, (PathId, FnvHashMap<PathStepIx, PathStepIx>)>;
 
     fn defragment(&mut self) -> Option<Self::Updates> {
         if self.removed == 0 {

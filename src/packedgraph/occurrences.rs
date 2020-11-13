@@ -19,7 +19,6 @@ use crate::pathhandlegraph::*;
 
 use crate::packed::*;
 
-use super::defragment;
 use super::defragment::Defragment;
 
 /// The index for a node path occurrence record. Valid indices are
