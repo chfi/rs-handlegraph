@@ -124,13 +124,22 @@ impl Default for PathProperties {
 }
 
 impl PathProperties {
-    pub(super) fn append_record(&mut self) {
+    pub(super) fn append_empty(&mut self) {
         self.heads.append(0);
         self.tails.append(0);
         self.deleted.append(0);
         self.circular.append(0);
         self.deleted_steps.append(0);
     }
+
+    pub(super) fn append_record(&mut self, record: PathPropertyRecord) {
+        self.heads.append(record.head.pack());
+        self.tails.append(record.tail.pack());
+        self.deleted.append(record.deleted.pack());
+        self.circular.append(record.circular.pack());
+        self.deleted_steps.append(record.deleted_steps.pack());
+    }
+
 
     pub(super) fn len(&self) -> usize {
         self.heads.len()

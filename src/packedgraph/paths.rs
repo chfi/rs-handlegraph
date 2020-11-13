@@ -177,6 +177,7 @@ pub struct PackedGraphPaths {
     paths: Vec<PackedPath>,
     pub(super) path_props: PathProperties,
     pub(super) path_names: PackedPathNames,
+    removed: usize,
 }
 
 crate::impl_space_usage!(PackedGraphPaths, [paths, path_props, path_names]);
@@ -187,7 +188,59 @@ impl Default for PackedGraphPaths {
             paths: Vec::new(),
             path_props: Default::default(),
             path_names: Default::default(),
+            removed: 0,
         }
+    }
+}
+
+impl Defragment for PackedGraphPaths {
+    /// Defragmenting `PackedGraphPaths` implies also defragmenting
+    /// all of the contained `PackedPath`s. Defragmenting a
+    /// `PackedPath` can update its step indices, which means the node
+    /// occurrences must be updated accordingly.
+    type Updates = FnvHashMap<PathId, (PathId, FnvHashMap<PathStepIx, PathStepIx>)>;
+
+    fn defragment(&mut self) -> Option<Self::Updates> {
+        if self.removed == 0 {
+            return None;
+        }
+
+        let total_len = self.paths.len();
+
+        let mut new_props = PathProperties::default();
+        let mut new_paths = Vec::with_capacity(self.len());
+
+        let mut updates: Self::Updates = FnvHashMap::default();
+
+        let mut next_id = 0usize;
+
+        for ix in 0..total_len {
+            let path_id = PathId(ix as u64);
+            let path_deleted = self.paths[ix].path_deleted;
+
+            if !path_deleted {
+                let new_id = PathId(next_id as u64);
+
+                let mut path = std::mem::take(self.paths.get_mut(ix).unwrap());
+                let path_updates = path.defragment().unwrap_or_default();
+
+                let properties = self.path_props.get_record(path_id);
+                new_props.append_record(properties);
+
+                updates.insert(path_id, (new_id, path_updates));
+
+                new_paths.push(path);
+
+                next_id += 1;
+            }
+        }
+
+        self.paths = new_paths;
+        self.path_props = new_props;
+
+        self.path_names.defragment();
+
+        Some(updates)
     }
 }
 
@@ -287,7 +340,7 @@ impl PackedGraphPaths {
         let packed_path = PackedPath::new();
         self.paths.push(packed_path);
 
-        self.path_props.append_record();
+        self.path_props.append_empty();
         self.path_names.add_name(name);
 
         PathId(path_id)
@@ -318,6 +371,8 @@ impl PackedGraphPaths {
 
         self.path_props.clear_record(id);
 
+        self.removed += 1;
+
         // can't remove the path quite yet, as all the elements to the
         // right will be shifted back -- need to fix that somehow
         // self.paths.remove(ix);
@@ -325,7 +380,7 @@ impl PackedGraphPaths {
     }
 
     pub fn len(&self) -> usize {
-        self.paths.len()
+        self.paths.len() - self.removed
     }
 
     pub(super) fn path_ref<'a>(

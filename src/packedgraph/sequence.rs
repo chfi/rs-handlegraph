@@ -1,6 +1,5 @@
 use crate::packed::*;
 
-use super::defragment;
 use super::defragment::Defragment;
 
 use super::graph::{NodeRecordId, RecordIndex};

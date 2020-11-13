@@ -69,19 +69,29 @@ pub struct PackedPath {
     steps: RobustPagedIntVec,
     links: RobustPagedIntVec,
     removed_steps: usize,
-    path_deleted: bool,
+    pub(super) path_deleted: bool,
 }
 
 crate::impl_space_usage!(PackedPath, [steps, links]);
 
-impl PackedPath {
-    pub(super) fn new() -> Self {
+impl Default for PackedPath {
+    fn default() -> Self {
         Self {
             steps: RobustPagedIntVec::new(NARROW_PAGE_WIDTH),
             links: RobustPagedIntVec::new(NARROW_PAGE_WIDTH),
             removed_steps: 0,
             path_deleted: false,
         }
+    }
+}
+
+impl PackedPath {
+    pub(super) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(super) fn deleted(&self) -> bool {
+        self.path_deleted
     }
 
     pub fn len(&self) -> usize {
