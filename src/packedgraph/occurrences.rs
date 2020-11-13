@@ -202,6 +202,27 @@ impl NodeOccurrences {
     ) -> list::IterMut<'_, Self> {
         list::IterMut::new(self, head)
     }
+
+    pub(crate) fn apply_path_updates(
+        &mut self,
+        updates: &FnvHashMap<
+            PathId,
+            (PathId, FnvHashMap<PathStepIx, PathStepIx>),
+        >,
+    ) {
+        let total_len = self.path_ids.len();
+
+        for ix in 0..total_len {
+            let old_path_id: PathId = self.path_ids.get_unpack(ix);
+            let (new_path_id, offset_map) = updates.get(&old_path_id).unwrap();
+
+            let old_offset: PathStepIx = self.node_occur_offsets.get_unpack(ix);
+            let new_offset = offset_map.get(&old_offset).unwrap();
+
+            self.path_ids.set_pack(ix, *new_path_id);
+            self.node_occur_offsets.set_pack(ix, *new_offset);
+        }
+    }
 }
 
 impl PackedList for NodeOccurrences {
