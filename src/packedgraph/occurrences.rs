@@ -89,13 +89,12 @@ impl Defragment for NodeOccurrences {
         let mut next_ix = 0usize;
 
         for ix in 0..total_len {
-            let path_id: PathId = self.path_ids.get_unpack(ix);
             let offset: PathStepIx = self.node_occur_offsets.get_unpack(ix);
-            let next: OccurListIx = self.node_occur_next.get_unpack(ix);
 
-            // TODO a record could still be valid even if all fields are
-            // zero... need to handle this in a better way
-            if !(path_id.0 == 0 && offset.is_null() && next.is_null()) {
+            if !offset.is_null() {
+                let path_id: PathId = self.path_ids.get_unpack(ix);
+                let next: OccurListIx = self.node_occur_next.get_unpack(ix);
+
                 let old_ix = OccurListIx::from_zero_based(ix);
                 let new_ix = OccurListIx::from_zero_based(next_ix);
                 updates.insert(old_ix, new_ix);
