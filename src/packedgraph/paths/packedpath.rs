@@ -501,54 +501,6 @@ impl<'a> PackedPathRefMut<'a> {
         }
     }
 
-    /*
-    #[must_use]
-    pub(super) fn append_handles<I>(&mut self, iter: I) -> Vec<StepUpdate>
-    where
-        I: IntoIterator<Item = Handle>,
-    {
-        let mut tail = self.properties.tail;
-
-        let mut iter = iter.into_iter();
-
-        let first_step = if let Some(first) = iter.next() {
-            self.append_handle(first)
-        } else {
-            return Vec::new();
-        };
-
-        let mut new_steps = iter
-            .into_iter()
-            .map(|handle| {
-                let step = self.path.append_handle(handle);
-
-                // add back link from new step to old tail
-                let new_prev_ix = step.to_record_ix(2, 0).unwrap();
-                self.path.links.set_pack(new_prev_ix, tail);
-
-                // just in case the path was empty, set the head as well
-                if self.updates.head.is_null() {
-                    self.updates.head = step;
-                }
-
-                if let Some(tail_next_ix) = tail.to_record_ix(2, 1) {
-                    // add forward link from old tail to new step
-                    self.path.links.set_pack(tail_next_ix, step);
-                }
-                tail = step;
-
-                StepUpdate { handle, step }
-            })
-            .collect::<Vec<_>>();
-
-        self.updates.tail = tail;
-
-        new_steps.push(first_step);
-
-        new_steps
-    }
-    */
-
     #[must_use]
     pub(crate) fn append_handle(&mut self, handle: Handle) -> StepUpdate {
         let tail = self.properties.tail;
@@ -680,6 +632,19 @@ impl<'a> PathRefMut for PackedPathRefMut<'a> {
         self.prepend_handle(handle)
     }
 
+    fn insert_step_after(
+        &mut self,
+        ix: Self::StepIx,
+        handle: Handle,
+    ) -> StepUpdate {
+        if ix == self.properties.tail {
+            self.append_step(handle)
+        } else {
+            let step = self.path.insert_after(ix, handle).unwrap();
+            StepUpdate::Insert { handle, step }
+        }
+    }
+
     fn remove_step(&mut self, rem_step_ix: Self::StepIx) -> Option<StepUpdate> {
         self.remove_step_at_index(rem_step_ix)
     }
@@ -697,6 +662,17 @@ impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
     fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
         self.prepend_handle(handle)
     }
+
+    fn insert_step_after(
+        &mut self,
+        ix: Self::StepIx,
+        handle: Handle,
+    ) -> StepUpdate {
+        <PackedPathRefMut<'_> as PathRefMut>::insert_step_after(
+            self, ix, handle,
+        )
+    }
+
     fn remove_step(&mut self, step: Self::StepIx) -> Option<StepUpdate> {
         self.remove_step_at_index(step)
     }

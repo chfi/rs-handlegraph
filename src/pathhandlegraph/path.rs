@@ -110,6 +110,12 @@ pub trait PathRefMut: PathBase {
 
     fn prepend_step(&mut self, handle: Handle) -> StepUpdate<Self::StepIx>;
 
+    fn insert_step_after(
+        &mut self,
+        ix: Self::StepIx,
+        handle: Handle,
+    ) -> StepUpdate<Self::StepIx>;
+
     fn remove_step(
         &mut self,
         step: Self::StepIx,

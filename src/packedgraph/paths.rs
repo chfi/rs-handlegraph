@@ -293,6 +293,14 @@ impl<'a> PathRefMut for PathMutContext<'a> {
         self.path_ref_mut.prepend_handle(handle)
     }
 
+    fn insert_step_after(
+        &mut self,
+        ix: Self::StepIx,
+        handle: Handle,
+    ) -> StepUpdate {
+        self.path_ref_mut.insert_step_after(ix, handle)
+    }
+
     fn remove_step(&mut self, step: Self::StepIx) -> Option<StepUpdate> {
         self.path_ref_mut.remove_step(step)
     }
