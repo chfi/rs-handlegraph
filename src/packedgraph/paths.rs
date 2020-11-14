@@ -1031,6 +1031,7 @@ mod tests {
         assert_eq!(kept_names, expected_names);
     }
 
+    /// A little DSL for generating paths because why not~
     #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
     enum StepOp {
         Append(usize),
@@ -1114,8 +1115,6 @@ mod tests {
     fn defrag_graph_paths() {
         use bstr::{ByteSlice, ByteVec, B};
 
-        let hnd = |x: u64| Handle::pack(x, false);
-
         let mut paths = PackedGraphPaths::default();
 
         let names = [
@@ -1126,7 +1125,7 @@ mod tests {
             B("11233455"),
         ];
 
-        let path_ids = names
+        let _path_ids = names
             .iter()
             .map(|n| paths.create_path(n))
             .collect::<Vec<_>>();
@@ -1147,25 +1146,7 @@ mod tests {
             step_ops![A 12, RS 2, P 2, RE 8, A 2],
         ];
 
-        macro_rules! print_ops {
-            ($ops:ident) => {
-                print!(concat!(stringify!($ops), " - "));
-                for op in $ops.iter() {
-                    print!("{:5}, ", op);
-                }
-                println!();
-            };
-        };
-
-        macro_rules! apply_ops_to {
-            ($paths:ident, $id:literal, $ops:ident) => {
-                $paths.with_path_mut_ctx(PathId($id), |ref_mut| {
-                    apply_step_ops(ref_mut, &$ops)
-                })
-            };
-        }
-
-        let path_steps = path_ops
+        let _path_steps = path_ops
             .iter()
             .enumerate()
             .map(|(id, ops)| {
@@ -1174,18 +1155,6 @@ mod tests {
                 })
             })
             .collect::<Vec<_>>();
-
-        macro_rules! print_path {
-            ($paths:ident, $id:literal) => {
-                let path_ref = $paths.path_ref(PathId($id)).unwrap();
-                print!("{:7} {:2} - ", " - Path", $id);
-                for (_ix, step) in path_ref.steps() {
-                    let node = u64::from(step.handle.id());
-                    print!("{:>2} ", node);
-                }
-                println!();
-            };
-        }
 
         let handles_on = |paths: &PackedGraphPaths, id: u64| -> Vec<Handle> {
             let path_ref = paths.path_ref(PathId(id)).unwrap();
@@ -1204,48 +1173,16 @@ mod tests {
             packedpath::tests::path_vectors(path)
         };
 
-        let print_vectors = |paths: &PackedGraphPaths, id: u64| {
-            let path_ref = paths.path_ref(PathId(id)).unwrap();
-            let head = path_ref.properties.head;
-            let tail = path_ref.properties.tail;
-            println!(
-                "  Vectors for path {}\thead {:?}\ttail {:?}",
-                id, head, tail
-            );
-            let path = path_ref.path;
-            packedpath::tests::print_path_vecs(path);
-            println!();
-        };
-
-        print_path!(paths, 0);
-        print_path!(paths, 1);
-        print_path!(paths, 2);
-        print_path!(paths, 3);
-        print_path!(paths, 4);
-        println!(" ~~~~~~~~~~~~~~");
-
-        print_vectors(&paths, 0);
-        print_vectors(&paths, 1);
-        print_vectors(&paths, 2);
-        print_vectors(&paths, 3);
-        print_vectors(&paths, 4);
-
         let pre_defrag_steps = (0..=4u64)
             .into_iter()
             .map(|id| handles_on(&paths, id))
             .collect::<Vec<_>>();
 
-        println!("  ~~~~~~~~~~~~~~~~~  ");
-        println!(" Defragmenting paths ");
-        println!("  ~~~~~~~~~~~~~~~~~  \n");
+        // Several of the paths had some steps removed during their
+        // construction, defragmenting will delete those records while
+        // leaving the steps (as a series of handles) untouched
 
-        let updates = paths.defragment();
-
-        print_vectors(&paths, 0);
-        print_vectors(&paths, 1);
-        print_vectors(&paths, 2);
-        print_vectors(&paths, 3);
-        print_vectors(&paths, 4);
+        let _updates = paths.defragment();
 
         let post_defrag_steps = (0..=4u64)
             .into_iter()
@@ -1254,29 +1191,74 @@ mod tests {
 
         assert_eq!(pre_defrag_steps, post_defrag_steps);
 
-        println!("  ~~~~~~~~~~~~~~~~~~~~  ");
-        println!(" Removing paths 1 and 3 ");
-        println!("  ~~~~~~~~~~~~~~~~~~~~  \n");
+        // Remove paths 1 and 3
 
         let _step_updates = paths.remove_path(PathId(1)).unwrap();
         let _step_updates = paths.remove_path(PathId(3)).unwrap();
 
-        print_vectors(&paths, 0);
-        print_vectors(&paths, 1);
-        print_vectors(&paths, 2);
-        print_vectors(&paths, 3);
-        print_vectors(&paths, 4);
+        let post_removal_steps = (0..=4u64)
+            .into_iter()
+            .map(|id| handles_on(&paths, id))
+            .collect::<Vec<_>>();
 
-        println!("  ~~~~~~~~~~~~~~~~~  ");
-        println!(" Defragmenting paths ");
-        println!("  ~~~~~~~~~~~~~~~~~  \n");
+        // The only change is that paths 1 and 3 are empty
+        assert_eq!(post_removal_steps[0], pre_defrag_steps[0]);
+        assert_eq!(post_removal_steps[2], pre_defrag_steps[2]);
+        assert_eq!(post_removal_steps[4], pre_defrag_steps[4]);
 
-        let updates = paths.defragment();
+        assert!(post_removal_steps[1].iter().all(|h| u64::from(h.id()) == 0));
+        assert!(post_removal_steps[3].iter().all(|h| u64::from(h.id()) == 0));
 
-        print_vectors(&paths, 0);
-        print_vectors(&paths, 1);
-        print_vectors(&paths, 2);
-        // print_vectors(&paths, 3);
-        // print_vectors(&paths, 4);
+        // Defragmenting paths, which will remove paths 1 and 3 and
+        // shift the others into the IDs 0, 1, 2
+
+        let _updates = paths.defragment();
+
+        let post_defrag_steps = (0..=2u64)
+            .into_iter()
+            .map(|id| handles_on(&paths, id))
+            .collect::<Vec<_>>();
+
+        // Besides the change in PathId, the remaining paths are
+        // unchanged
+        assert_eq!(post_defrag_steps[0], pre_defrag_steps[0]);
+        assert_eq!(post_defrag_steps[1], pre_defrag_steps[2]);
+        assert_eq!(post_defrag_steps[2], pre_defrag_steps[4]);
+
+        assert_eq!(
+            vectors_for(&paths, 0),
+            vec![
+                (1, 1, 0, 2),
+                (2, 2, 1, 3),
+                (3, 3, 2, 4),
+                (4, 4, 3, 5),
+                (5, 5, 4, 6),
+                (6, 6, 5, 0)
+            ]
+        );
+        assert_eq!(
+            vectors_for(&paths, 1),
+            vec![
+                (1, 1, 0, 2),
+                (2, 2, 1, 3),
+                (3, 3, 2, 4),
+                (4, 4, 3, 5),
+                (5, 5, 4, 6),
+                (6, 6, 5, 7),
+                (7, 9, 6, 8),
+                (8, 10, 7, 0)
+            ]
+        );
+        assert_eq!(
+            vectors_for(&paths, 2),
+            vec![
+                (1, 3, 3, 2),
+                (2, 4, 1, 5),
+                (3, 14, 4, 1),
+                (4, 13, 0, 3),
+                (5, 15, 2, 6),
+                (6, 16, 5, 0)
+            ]
+        );
     }
 }
