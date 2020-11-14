@@ -277,8 +277,7 @@ impl NodeRecords {
     /// that's inserted into the graph.
     fn next_graph_ix(&self) -> NodeRecordId {
         let rec_count = self.records_vec.len();
-        let rec_id = NodeRecordId::from_record_start(rec_count, 2);
-        rec_id
+        NodeRecordId::from_record_start(rec_count, 2)
     }
 
     pub(super) fn sequences(&self) -> &Sequences {

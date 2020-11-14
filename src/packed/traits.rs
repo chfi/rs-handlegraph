@@ -63,7 +63,7 @@ impl PackedElement for u8 {
 /// representation automatically, using the `PackedCollection` trait.
 pub trait Viewable: PackedCollection + Sized {
     /// Get a `ViewRef` for at the provided index on this collection.
-    fn view<'a, T>(&'a self, index: usize) -> ViewRef<'a, Self, T>
+    fn view<T>(&self, index: usize) -> ViewRef<'_, Self, T>
     where
         T: PackedElement;
 
@@ -82,7 +82,7 @@ where
     V: PackedCollection + Sized,
 {
     #[inline]
-    fn view<'a, T>(&'a self, index: usize) -> ViewRef<'a, Self, T>
+    fn view<T>(&self, index: usize) -> ViewRef<'_, Self, T>
     where
         T: PackedElement,
     {
@@ -99,7 +99,7 @@ where
 /// representations automatically, using the `PackedCollection` trait.
 pub trait MutViewable: PackedCollection + Sized {
     /// Get a `ViewMut` for at the provided index on this collection.
-    fn view_mut<'a, T>(&'a mut self, index: usize) -> ViewMut<'a, Self, T>
+    fn view_mut<T>(&mut self, index: usize) -> ViewMut<'_, Self, T>
     where
         T: PackedElement;
 
@@ -118,7 +118,7 @@ where
     V: PackedCollection + Sized,
 {
     #[inline]
-    fn view_mut<'a, T>(&'a mut self, index: usize) -> ViewMut<'a, Self, T>
+    fn view_mut<T>(&mut self, index: usize) -> ViewMut<'_, Self, T>
     where
         T: PackedElement,
     {

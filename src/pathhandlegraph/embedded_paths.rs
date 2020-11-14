@@ -49,6 +49,7 @@ pub trait AllPathRefsMut {
 pub trait WithPathRefsMut: Sized {
     type MutCtx: PathRefMut;
 
+    #[allow(clippy::type_complexity)]
     fn with_path_mut<F>(
         self,
         id: PathId,
@@ -60,6 +61,7 @@ pub trait WithPathRefsMut: Sized {
         )
             -> Vec<StepUpdate<<Self::MutCtx as PathBase>::StepIx>>;
 
+    #[allow(clippy::type_complexity)]
     fn with_paths_mut<F>(
         self,
         f: F,

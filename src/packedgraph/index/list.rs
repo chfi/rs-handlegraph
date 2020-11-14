@@ -67,8 +67,8 @@ pub struct IterMut<'a, T: PackedList> {
     finished: bool,
 }
 
-fn find_record_with_prev_ix<'a, 'b, T, P>(
-    iter: &'a mut IterMut<'b, T>,
+fn find_record_with_prev_ix<T, P>(
+    iter: &mut IterMut<'_, T>,
     p: P,
 ) -> Option<(T::ListPtr, T::ListPtr)>
 where

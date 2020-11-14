@@ -279,7 +279,6 @@ impl Defragment for EdgeLists {
         new_record_vec.reserve(self.len() * EdgeVecIx::RECORD_WIDTH);
 
         (0..total_records)
-            .into_iter()
             .filter_map(|ix| {
                 let old_ix = EdgeListIx::from_zero_based(ix);
                 let old_vec_ix = old_ix.to_record_ix(2, 0)?;

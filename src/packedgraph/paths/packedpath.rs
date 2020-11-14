@@ -101,6 +101,11 @@ impl PackedPath {
     }
 
     #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    #[inline]
     pub(super) fn storage_len(&self) -> usize {
         self.steps.len()
     }
@@ -400,7 +405,7 @@ impl<'a> PackedPathRef<'a> {
         }
     }
 
-    pub(super) fn properties<'b>(&'b self) -> &'b PathPropertyRecord {
+    pub(super) fn properties(&self) -> &PathPropertyRecord {
         &self.properties
     }
 }
@@ -493,7 +498,7 @@ impl<'a> PackedPathRefMut<'a> {
         }
     }
 
-    pub(crate) fn as_path_ref<'b>(&'b self) -> PackedPathRef<'b> {
+    pub(crate) fn as_path_ref(&self) -> PackedPathRef<'_> {
         let path_id = self.path_id;
         let path = &self.path;
         let properties = self.properties;
@@ -525,9 +530,7 @@ impl<'a> PackedPathRefMut<'a> {
         // set the new tail
         self.properties.tail = step;
 
-        let update = StepUpdate::Insert { handle, step };
-
-        update
+        StepUpdate::Insert { handle, step }
     }
 
     #[must_use]
@@ -551,9 +554,7 @@ impl<'a> PackedPathRefMut<'a> {
         // set the new head
         self.properties.head = step;
 
-        let update = StepUpdate::Insert { handle, step };
-
-        update
+        StepUpdate::Insert { handle, step }
     }
 
     fn remove_step_at_index(
