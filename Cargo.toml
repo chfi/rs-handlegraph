@@ -15,7 +15,6 @@ categories = ["science"]
 [dependencies]
 gfa = "0.8"
 bstr = "0.2"
-bio = "0.32"
 fnv = "1.0"
 succinct = "0.5"
 rayon = "1.5"

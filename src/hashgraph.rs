@@ -1,4 +1,3 @@
-use bio::alphabets::dna;
 use bstr::BString;
 
 use rayon::prelude::*;
@@ -8,6 +7,7 @@ use crate::{
     handlegraph::*,
     mutablehandlegraph::*,
     pathgraph::PathHandleGraph,
+    util::dna,
 };
 
 pub mod graph;
@@ -104,7 +104,7 @@ impl<'a> HandleSequences for &'a HashGraph {
         let seq: &[u8] =
             &self.get_node_unchecked(&handle.id()).sequence.as_ref();
         if handle.is_reverse() {
-            dna::revcomp(seq)
+            dna::rev_comp(seq)
         } else {
             seq.into()
         }
@@ -299,7 +299,7 @@ impl MutableHandleGraph for HashGraph {
         }
 
         let node = self.get_node_mut(&handle.id()).unwrap();
-        node.sequence = dna::revcomp(node.sequence.as_slice()).into();
+        node.sequence = dna::rev_comp(node.sequence.as_slice()).into();
 
         let edges = {
             let node = self.get_node(&handle.id()).unwrap();

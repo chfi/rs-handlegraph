@@ -1,4 +1,4 @@
-pub(crate) mod dna {
+pub mod dna {
 
     include!(concat!(env!("OUT_DIR"), "/comp_table.rs"));
 
@@ -6,18 +6,17 @@ pub(crate) mod dna {
     /// time by the build.rs script in the project root, and placed in
     /// the compilation out-dir under the name "comp_table.rs".
     #[inline]
-    pub(crate) const fn comp_base(base: u8) -> u8 {
+    pub const fn comp_base(base: u8) -> u8 {
         DNA_COMP_TABLE[base as usize]
     }
 
     #[inline]
-    pub(crate) fn rev_comp<I, B>(seq: I) -> Vec<u8>
+    pub fn rev_comp<I, B>(seq: I) -> Vec<u8>
     where
         B: std::borrow::Borrow<u8>,
-        I: IntoIterator<Item = u8>,
+        I: IntoIterator<Item = B>,
         I::IntoIter: DoubleEndedIterator,
     {
-        use std::borrow::Borrow;
         seq.into_iter()
             .rev()
             .map(|b| comp_base(*b.borrow()))
@@ -25,12 +24,13 @@ pub(crate) mod dna {
     }
 
     #[inline]
-    pub(crate) fn rev_comp_iter<I>(seq: I) -> impl Iterator<Item = u8>
+    pub fn rev_comp_iter<I, B>(seq: I) -> impl Iterator<Item = u8>
     where
-        I: IntoIterator<Item = u8>,
+        B: std::borrow::Borrow<u8>,
+        I: IntoIterator<Item = B>,
         I::IntoIter: DoubleEndedIterator,
     {
-        seq.into_iter().rev().map(comp_base)
+        seq.into_iter().rev().map(|b| comp_base(*b.borrow()))
     }
 
     #[cfg(tests)]
@@ -77,31 +77,27 @@ pub(crate) mod dna {
             }
         }
 
-        fn comp_same_as_bio(b: Base) -> bool {
+        fn is_comp_isomorphic(b: Base) -> bool {
             let base = b.0;
-            let bio_comp = dna::complement(base);
-            let comp = comp_base(base);
-            bio_comp == comp
+            comp_base(comp_base(base)) == base
+        }
+
+        fn is_rev_comp_isomorphic(seq: Vec<Base>) -> bool {
+            rev_comp(rev_comp(seq)) == seq
         }
 
         #[test]
-        fn comp_base_vs_bio() {
+        fn comp_isomorphic() {
             QuickCheck::new()
                 .tests(10000)
-                .quickcheck(comp_same_as_bio as fn(Base) -> bool);
-        }
-
-        fn rev_comp_same_as_bio(seq: Vec<Base>) -> bool {
-            let bio_rev_comp = dna::revcomp(seq);
-            let my_rev_comp = rev_comp(seq).collect::<Vec<_>>();
-            bio_rev_comp == my_rev_comp
+                .quickcheck(is_comp_isomorphic as fn(Base) -> bool);
         }
 
         #[test]
-        fn rev_comp_vs_bio() {
+        fn rev_comp_isomorphic() {
             QuickCheck::new()
                 .tests(10000)
-                .quickcheck(rev_comp_same_as_bio as fn(Vec<Base>) -> bool);
+                .quickcheck(is_rev_comp_isomorphic as fn(Vec<Base>) -> bool);
         }
     }
 }
