@@ -159,6 +159,31 @@ impl NodeIdIndexMap {
 
         Some(rec_id)
     }
+
+    pub(super) fn update_record_indices(
+        &mut self,
+        record_map: &FnvHashMap<NodeRecordId, NodeRecordId>,
+    ) {
+        for id in self.min_id..=self.max_id {
+            let index = (id - self.min_id) as usize;
+            let rec_id: NodeRecordId = self.deque.get_unpack(index);
+            if !rec_id.is_null() {
+                let new_id = record_map.get(&rec_id).unwrap();
+                self.deque.set_pack(index, *new_id);
+            }
+        }
+    }
+
+    pub(super) fn set_index(
+        &mut self,
+        id: NodeId,
+        new_ix: NodeRecordId,
+    ) -> Option<()> {
+        let old_ix = self.get_index(id)?;
+        let deque_index = u64::from(id) - self.min_id;
+        self.deque.set_pack(deque_index as usize, new_ix);
+        Some(())
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -203,7 +228,7 @@ impl Defragment for NodeRecords {
             return None;
         }
 
-        let total_len = self.node_count() - self.removed_nodes.len();
+        let total_len = self.node_count() + self.removed_nodes.len();
         let kept_len = self.node_count();
 
         let mut records_vec = PagedIntVec::new(NARROW_PAGE_WIDTH);
@@ -213,13 +238,22 @@ impl Defragment for NodeRecords {
         records_vec.reserve(kept_len * 2);
         node_occurrence_map.reserve(kept_len);
 
+        let mut updates: FnvHashMap<NodeRecordId, NodeRecordId> =
+            FnvHashMap::default();
+
         let removed_nodes = std::mem::take(&mut self.removed_nodes)
             .into_iter()
             .collect::<FnvHashSet<_>>();
 
+        let mut next_ix = 0usize;
+
         for ix in 0..total_len {
             let rec_id = NodeRecordId::from_zero_based(ix);
             if !removed_nodes.contains(&rec_id) {
+                let new_rec_id = NodeRecordId::from_zero_based(next_ix);
+
+                updates.insert(rec_id, new_rec_id);
+
                 let rec_vec_ix = rec_id.to_record_start(2).unwrap();
                 let occur_vec_ix = rec_id.to_record_start(1).unwrap();
 
@@ -234,11 +268,17 @@ impl Defragment for NodeRecords {
                 records_vec.append(left_ix.pack());
                 records_vec.append(right_ix.pack());
                 node_occurrence_map.append(occur_ix.pack());
+
+                next_ix += 1;
             }
         }
+        self.id_index_map.update_record_indices(&updates);
 
+        self.records_vec = records_vec;
+        self.node_occurrence_map = node_occurrence_map;
         self.sequences.defragment();
 
+        // Some(updates)
         Some(())
     }
 }
@@ -496,6 +536,7 @@ impl NodeRecords {
         let total_len = self.node_count() + self.removed_nodes.len();
 
         for ix in 0..total_len {
+            let rec_id = NodeRecordId::from_zero_based(ix);
             let vec_ix = ix * 2;
 
             let old_left: EdgeListIx = self.records_vec.get_unpack(vec_ix);
@@ -508,7 +549,7 @@ impl NodeRecords {
 
             if !old_right.is_null() {
                 let right = updates.get(&old_right).unwrap();
-                self.records_vec.set_pack(vec_ix, *right);
+                self.records_vec.set_pack(vec_ix + 1, *right);
             }
         }
     }
@@ -549,7 +590,7 @@ impl NodeRecords {
 
             if !old_right.is_null() {
                 let right = edge_updates.get(&old_right).unwrap();
-                self.records_vec.set_pack(vec_ix, *right);
+                self.records_vec.set_pack(vec_ix + 1, *right);
             }
 
             let old_head: OccurListIx = self.node_occurrence_map.get_unpack(ix);

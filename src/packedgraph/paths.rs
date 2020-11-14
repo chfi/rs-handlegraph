@@ -130,7 +130,7 @@ impl Defragment for PackedPathNames {
 }
 
 impl PackedPathNames {
-    pub(super) fn add_name(&mut self, name: &[u8]) -> PathId {
+    pub(crate) fn add_name(&mut self, name: &[u8]) -> PathId {
         let path_id = PathId(self.lengths.len() as u64);
 
         self.name_id_map.insert(name.into(), path_id);
@@ -182,8 +182,8 @@ impl PackedPathNames {
 #[derive(Debug, Clone)]
 pub struct PackedGraphPaths {
     paths: Vec<PackedPath>,
-    pub(super) path_props: PathProperties,
-    pub(super) path_names: PackedPathNames,
+    pub(crate) path_props: PathProperties,
+    pub(crate) path_names: PackedPathNames,
     removed: usize,
 }
 
