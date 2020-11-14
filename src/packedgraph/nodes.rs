@@ -269,6 +269,11 @@ impl NodeRecords {
     }
 
     #[inline]
+    pub(crate) fn record_count(&self) -> usize {
+        self.records_vec.len() / 2
+    }
+
+    #[inline]
     pub fn total_length(&self) -> usize {
         self.sequences.total_length()
     }

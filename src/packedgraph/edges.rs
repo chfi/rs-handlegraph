@@ -149,9 +149,14 @@ impl EdgeLists {
     /// Returns the number of edge records, i.e. the total number of
     /// edges. Subtracts the number of removed records.
     #[inline]
-    pub(super) fn len(&self) -> usize {
+    pub(crate) fn len(&self) -> usize {
         let num_records = self.record_vec.len() / EdgeVecIx::RECORD_WIDTH;
         num_records - self.removed_records.len()
+    }
+
+    #[inline]
+    pub(crate) fn record_count(&self) -> usize {
+        self.record_vec.len() / EdgeVecIx::RECORD_WIDTH
     }
 
     /// Get the handle for the record at the index, if the index is
@@ -303,7 +308,7 @@ impl Defragment for EdgeLists {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     #[test]
@@ -347,7 +352,7 @@ mod tests {
         assert_eq!(vec![hnd(6)], l_5);
     }
 
-    fn vec_edge_list(
+    pub(crate) fn vec_edge_list(
         edges: &EdgeLists,
         head: EdgeListIx,
     ) -> Vec<(u64, u64, u64)> {
@@ -360,6 +365,20 @@ mod tests {
                 (edge, handle, next)
             })
             .collect::<Vec<_>>()
+    }
+
+    pub(crate) fn vec_edge_list_records(
+        edges: &EdgeLists,
+    ) -> Vec<(u64, u64, u64)> {
+        let mut results = Vec::new();
+
+        for ix in 0..edges.record_count() {
+            let edge_ix = EdgeListIx::from_zero_based(ix);
+            let (handle, ptr) = edges.get_record(edge_ix).unwrap();
+            results.push((edge_ix.pack(), u64::from(handle.id()), ptr.pack()));
+        }
+
+        results
     }
 
     #[test]

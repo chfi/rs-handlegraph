@@ -947,6 +947,18 @@ mod tests {
         let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
         let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
 
+        let get_neighbors = |graph: &PackedGraph, x: u64| {
+            let left = graph
+                .neighbors(hnd(x), Direction::Left)
+                .map(|h| u64::from(h.id()))
+                .collect::<Vec<_>>();
+            let right = graph
+                .neighbors(hnd(x), Direction::Right)
+                .map(|h| u64::from(h.id()))
+                .collect::<Vec<_>>();
+            (left, right)
+        };
+
         let mut graph = PackedGraph::new();
 
         let path_names = [B("path0"), B("path1"), B("path2"), B("path3")];
@@ -1102,12 +1114,14 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
+        /*
         for n in 1..=9 {
             let occ = get_occurs(&graph, n);
             println!("{:2}", n);
             println!("  - {:?}", occ);
             println!();
         }
+        */
 
         /* Occurrences at this point
         1 - [(2, 1), (0, 1)]
@@ -1120,6 +1134,80 @@ mod tests {
         8 - [(2, 8), (1, 8)]
         9 - [(3, 4), (1, 9)]
                */
+
+        // let print_neighbors =
+        //     |graph: &PackedGraph, nodes: std::ops::RangeInclusive<u64>| {
+        //         println!("Node neighbors");
+        //         for n in nodes {
+        //             let occ = get_neighbors(&graph, n);
+        //             print!("{:2}", n);
+        //             println!("  - {:?}", occ);
+        //         }
+        //         println!();
+        //     };
+
+        let print_node_records = |graph: &PackedGraph| {
+            let nodes = graph.nodes.record_count() as u64;
+            println!("Node records");
+            println!(
+                "{:5}  {:5}  {:5}  {:5}",
+                "Node", "Index", "Left", "Right"
+            );
+
+            for n in 1..=nodes {
+                let rec = graph.nodes.handle_record(hnd(n)).unwrap();
+                let left_head = graph.nodes.get_edge_list(rec, Direction::Left);
+                let right_head =
+                    graph.nodes.get_edge_list(rec, Direction::Right);
+
+                println!(
+                    "{:5}  {:5}  {:5}  {:5}",
+                    n,
+                    rec.pack(),
+                    left_head.pack(),
+                    right_head.pack(),
+                );
+            }
+            println!();
+        };
+
+        let print_edge_lists = |graph: &PackedGraph| {
+            let edges_vec = edges::tests::vec_edge_list_records(&graph.edges);
+            println!("Edge lists storage");
+            println!("{:5}  {:4}  {:4}", "Index", "Node", "Next");
+            for (edge_ix, node, next) in edges_vec {
+                println!("{:5}  {:4}  {:4}", edge_ix, node, next);
+            }
+            println!();
+        };
+
+        let print_neighbors = |graph: &PackedGraph| {
+            let nodes = graph.nodes.record_count() as u64;
+            println!("Node neighbors");
+            for n in 1..=nodes {
+                let rec = graph.nodes.handle_record(hnd(n)).unwrap();
+                // let left_head = graph.nodes.get_edge_list(rec, Direction::Left);
+                // let right_head =
+                //     graph.nodes.get_edge_list(rec, Direction::Right);
+                let (left, right) = get_neighbors(&graph, n);
+
+                let left_head = left.first();
+                let right_head = right.first();
+                // graph.nodes.get_edge_list(rec, Direction::Right);
+
+                println!("{:2} - {:?}\t{:?}", n, left_head, right_head);
+                let left_str = format!("{:?}", left);
+                let right_str = format!("{:?}", right);
+                println!("    {:>10} - {:<10}", left_str, right_str);
+            }
+            println!();
+        };
+
+        print_node_records(&graph);
+
+        print_edge_lists(&graph);
+
+        print_neighbors(&graph);
 
         graph.defragment();
 
@@ -1143,25 +1231,35 @@ mod tests {
         print_path_debug(&graph, 3);
         println!();
 
-        for n in 1..=9 {
-            let occ = get_occurs(&graph, n);
-            println!("{:2}", n);
-            println!("  - {:?}", occ);
-            println!();
-        }
+        let post_defrag_occurrences =
+            (1..=9).map(|n| get_occurs(&graph, n)).collect::<Vec<_>>();
 
         /* After defragmenting, all nodes should have the same
          * occurrences, only with shifted step offsets
-         1 - [(2, 1), (0, 1)]
-         2 - [(1, 1), (0, 2)]
-         3 - [(3, 3), (0, 3)]
-         4 - [(2, 3), (1, 2)]
-         5 - [(3, 1), (1, 3)]
-         6 - [(3, 5), (2, 4), (1, 6), (0, 4)]
-         7 - [(3, 2), (0, 5)]
-         8 - [(2, 2), (1, 4)]
-         9 - [(3, 4), (1, 5)]
-        */
+         */
+
+        assert_eq!(
+            post_defrag_occurrences,
+            vec![
+                vec![(2, 1), (0, 1)],
+                vec![(1, 1), (0, 2)],
+                vec![(3, 3), (0, 3)],
+                vec![(2, 3), (1, 2)],
+                vec![(3, 1), (1, 3)],
+                vec![(3, 5), (2, 4), (1, 6), (0, 4)],
+                vec![(3, 2), (0, 5)],
+                vec![(2, 2), (1, 4)],
+                vec![(3, 4), (1, 5)]
+            ]
+        );
+
+        // for n in 1..=9 {
+        //     let occ = get_neighbors(&graph, n);
+        //     println!("{:2}", n);
+        //     println!("  - {:?}", occ);
+        //     println!();
+        // }
+        // print_neighbors(&graph, 1..=9);
 
         // TODO make sure this will actually change some edge list heads!
         // remove edges (2, 7), (8, 3), (4, 6)
