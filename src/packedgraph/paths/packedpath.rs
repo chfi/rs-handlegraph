@@ -581,7 +581,7 @@ impl<'a> PackedPathRefMut<'a> {
     }
 }
 
-impl<'a> PathRef for PackedPathRefMut<'a> {
+impl<'a> PathRef for &'a PackedPathRefMut<'a> {
     type Steps = list::Iter<'a, PackedPath>;
 
     fn steps(self) -> Self::Steps {
@@ -683,15 +683,127 @@ impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::*;
 
     use quickcheck::{Arbitrary, Gen};
 
+    impl<'a> PackedPathRefMut<'a> {
+        pub(crate) fn add_some_steps(
+            &mut self,
+            max_id: &mut usize,
+            count: usize,
+            prepend: bool,
+        ) -> Vec<StepUpdate> {
+            let mut updates = Vec::new();
+
+            if prepend {
+                let mut ids = (0..count)
+                    .into_iter()
+                    .map(|i| *max_id + i + 1)
+                    .collect::<Vec<_>>();
+
+                ids.reverse();
+                for id in ids.into_iter() {
+                    let handle = Handle::pack(id, false);
+                    updates.push(self.prepend_step(handle));
+                }
+            } else {
+                for i in 0..count {
+                    let id = *max_id + i + 1;
+                    let handle = Handle::pack(id, false);
+                    updates.push(self.append_step(handle));
+                }
+            }
+
+            *max_id += count;
+            updates
+        }
+
+        pub(crate) fn remove_some_steps(
+            &mut self,
+            count: usize,
+            from_head: bool,
+        ) -> Vec<StepUpdate> {
+            let mut updates = Vec::new();
+
+            if from_head {
+                for _step in 0..count {
+                    let step = self.properties.head;
+                    let update = self.remove_step_at_index(step).unwrap();
+
+                    updates.push(update);
+                }
+            } else {
+                let step_indices = self
+                    .steps()
+                    .rev()
+                    .take(count + 1)
+                    .map(|(ix, _)| ix)
+                    .collect::<Vec<_>>();
+
+                for step in step_indices.into_iter().take(count) {
+                    let update = self.remove_step_at_index(step).unwrap();
+                    updates.push(update);
+                }
+            }
+
+            updates
+        }
+
+        pub(crate) fn insert_many_into_middle(
+            &mut self,
+            max_id: &mut usize,
+            count: usize,
+        ) -> Vec<StepUpdate> {
+            let mut updates = Vec::new();
+            let length = self.len();
+
+            let middle = self
+                .steps()
+                .map(|(ix, _)| ix)
+                .nth((length / 2) - 1)
+                .unwrap();
+
+            let mut last = middle;
+
+            for i in 0..count {
+                let id = *max_id + i + 1;
+                let handle = Handle::pack(id, false);
+                let update = self.insert_step_after(last, handle);
+                if let StepUpdate::Insert { step, .. } = update {
+                    last = step;
+                }
+                updates.push(update);
+            }
+
+            *max_id += count;
+
+            updates
+        }
+
+        pub(crate) fn insert_into_middle(
+            &mut self,
+            max_id: &mut usize,
+        ) -> StepUpdate {
+            let length = self.len();
+            let middle = self
+                .steps()
+                .map(|(ix, _)| ix)
+                .nth((length / 2) - 1)
+                .unwrap();
+
+            let handle = Handle::pack(*max_id + 1, false);
+            *max_id += 1;
+
+            self.insert_step_after(middle, handle)
+        }
+    }
+
     impl PackedPath {
         fn generate_from_length(length: usize) -> (PackedPath, usize) {
             let mut path = PackedPath::default();
-            let mut head = path.append_handle(Handle::pack(1, false));
+            let mut head = path.append_handle_record(Handle::pack(1, false));
             for id in 2..=length {
                 let handle = Handle::pack(id, false);
                 head = path.insert_after(head, handle).unwrap();
