@@ -210,7 +210,6 @@ impl Defragment for PackedGraphPaths {
 
     fn defragment(&mut self) -> Option<Self::Updates> {
         let total_len = self.paths.len();
-        let new_len = self.len();
 
         let mut new_props = PathProperties::default();
         let mut new_paths = Vec::with_capacity(self.len());
@@ -374,11 +373,11 @@ impl PackedGraphPaths {
     ) -> Option<Vec<StepUpdate>> {
         let ix = id.0;
 
-        let mut steps = {
+        let steps = {
             let path = self.path_ref(id)?;
 
             path.steps()
-                .map(|(step_ix, step)| step_ix)
+                .map(|(step_ix, _step)| step_ix)
                 .collect::<Vec<_>>()
         };
 
@@ -819,10 +818,6 @@ mod tests {
             }
         };
 
-        let print_header = || {
-            println!("{:4}  {:4}", "head", "tail");
-        };
-
         let print_path = |paths: &PackedGraphPaths, id: PathId| {
             let path_ref = paths.path_ref(id).unwrap();
             let head = path_ref.properties.head.pack();
@@ -993,7 +988,7 @@ mod tests {
             B("GGGGGGGGGGGGG"),
         ];
 
-        let ids = names
+        let _ids = names
             .iter()
             .map(|n| packed_names.add_name(n))
             .collect::<Vec<_>>();

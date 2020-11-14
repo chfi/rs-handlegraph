@@ -1,7 +1,3 @@
-use std::num::NonZeroUsize;
-
-use crate::packed::traits::PackedElement;
-
 use super::OneBasedIndex;
 
 /// A collection of linked lists implemented using one or more

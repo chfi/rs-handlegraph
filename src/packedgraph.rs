@@ -6,6 +6,7 @@ use crate::{
     },
 };
 
+#[allow(unused_imports)]
 use crate::pathhandlegraph::{
     AllPathIds, AllPathRefs, AllPathRefsMut, EmbeddedPaths, HandleOccurrences,
     MutEmbeddedPaths, MutHandleOccurrences, OccurBase, PathId, PathNames,
@@ -40,7 +41,6 @@ pub use self::{
 use self::graph::SeqRecordIx;
 
 use crate::packed;
-use crate::packed::PackedElement;
 
 impl<'a> AllHandles for &'a PackedGraph {
     type Handles = PackedHandlesIter<packed::deque::Iter<'a>>;
@@ -404,7 +404,7 @@ impl MutableHandleGraph for PackedGraph {
 }
 
 impl MutEmbeddedPaths for PackedGraph {
-    fn create_path(&mut self, name: &[u8], circular: bool) -> PathId {
+    fn create_path(&mut self, name: &[u8], _circular: bool) -> PathId {
         self.paths.create_path(name)
     }
 
@@ -416,6 +416,8 @@ impl MutEmbeddedPaths for PackedGraph {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::packed::PackedElement;
 
     fn hnd(x: u64) -> Handle {
         Handle::pack(x, false)
@@ -436,7 +438,7 @@ mod tests {
         let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
         let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
 
-        use bstr::{BString, B};
+        use bstr::B;
 
         let mut graph = PackedGraph::new();
 
@@ -460,7 +462,7 @@ mod tests {
         5 ----- 7 --- 3 --- 9
         */
 
-        let handles = seqs
+        let _handles = seqs
             .iter()
             .map(|seq| graph.append_handle(seq))
             .collect::<Vec<_>>();
@@ -505,23 +507,23 @@ mod tests {
                 (path, hnds)
             };
 
-        let (path_1, p_1_steps) =
+        let (_path_1, p_1_steps) =
             prep_path(&mut graph, b"path1", vec![1, 8, 4, 6]);
 
-        let (path_2, p_2_steps) =
+        let (_path_2, p_2_steps) =
             prep_path(&mut graph, b"path2", vec![5, 2, 8, 4, 6]);
 
-        let (path_3, p_3_steps) =
+        let (_path_3, p_3_steps) =
             prep_path(&mut graph, b"path3", vec![1, 2, 8, 4, 9, 6]);
 
-        let (path_4, p_4_steps) =
+        let (_path_4, p_4_steps) =
             prep_path(&mut graph, b"path4", vec![5, 7, 3, 9, 6]);
 
         let steps_vecs = vec![p_1_steps, p_2_steps, p_3_steps, p_4_steps];
 
         graph.zip_all_paths_mut_ctx(
             steps_vecs.into_iter(),
-            |steps, path_id, path| {
+            |steps, _path_id, path| {
                 steps
                     .into_iter()
                     .map(|h| path.append_handle(h))
@@ -581,7 +583,7 @@ mod tests {
             Direction::Right,
         );
 
-        let path_ids =
+        let _path_ids =
             graph.paths.path_names.all_path_ids().collect::<Vec<_>>();
 
         let path_1 = graph.paths.path_names.get_path_id(b"path1").unwrap();
@@ -672,11 +674,9 @@ mod tests {
 
     #[test]
     fn add_remove_paths() {
-        let hnd = |x: u64| Handle::pack(x, false);
-
         let mut graph = test_graph_with_paths();
 
-        let node_7_occ = get_occurs(&graph, 7);
+        let _node_7_occ = get_occurs(&graph, 7);
         let node_8_occ = get_occurs(&graph, 8);
 
         let path_3 = graph.paths.path_names.get_path_id(b"path3").unwrap();
@@ -703,24 +703,7 @@ mod tests {
         let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
         let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
 
-        let print_path = |paths: &PackedGraphPaths, id: PathId| {
-            let path_ref = paths.path_ref(id).unwrap();
-            print!("{:2}   nodes: ", id.0);
-            for (step_ix, step) in path_ref.steps() {
-                let h = u64::from(step.handle.id());
-                print!("  {:2}", h);
-            }
-            println!();
-            print!("   step ix:  ");
-            for (step_ix, step) in path_ref.steps() {
-                let s_ix = step_ix.pack();
-                print!("  {:2}", s_ix);
-            }
-            println!();
-            println!();
-        };
-
-        use bstr::{BString, B};
+        use bstr::B;
 
         let mut graph = PackedGraph::new();
 
@@ -744,7 +727,7 @@ mod tests {
         5 ----- 7 --- 3 --- 9
         */
 
-        let handles = seqs
+        let _handles = seqs
             .iter()
             .map(|seq| graph.append_handle(seq))
             .collect::<Vec<_>>();
@@ -805,20 +788,13 @@ mod tests {
 
         graph.zip_all_paths_mut_ctx(
             steps_vecs.into_iter(),
-            |steps, path_id, path| {
+            |steps, _path_id, path| {
                 steps
                     .into_iter()
                     .map(|h| path.append_handle(h))
                     .collect::<Vec<_>>()
             },
         );
-
-        /*
-        print_path(&graph.paths, path_1);
-        print_path(&graph.paths, path_2);
-        print_path(&graph.paths, path_3);
-        print_path(&graph.paths, path_4);
-        */
 
         let get_occurs = |graph: &PackedGraph, id: u64| {
             let oc_ix = graph.nodes.handle_occur_record(hnd(id)).unwrap();
@@ -830,14 +806,14 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
-        let occ_1 = get_occurs(&graph, 1);
-        let occ_2 = get_occurs(&graph, 2);
+        // let occ_1 = get_occurs(&graph, 1);
+        // let occ_2 = get_occurs(&graph, 2);
 
-        let occ_3 = get_occurs(&graph, 3);
-        let occ_6 = get_occurs(&graph, 6);
+        // let occ_3 = get_occurs(&graph, 3);
+        // let occ_6 = get_occurs(&graph, 6);
 
-        let occ_7 = get_occurs(&graph, 7);
-        let occ_8 = get_occurs(&graph, 8);
+        // let occ_7 = get_occurs(&graph, 7);
+        // let occ_8 = get_occurs(&graph, 8);
 
         // remove node 7 from path 4
         graph.with_path_mut_ctx(path_4, |path| {
@@ -864,8 +840,6 @@ mod tests {
                 })
                 .collect()
         });
-
-        // print_path(&graph.paths, path_3);
 
         let occ_1_new = get_occurs(&graph, 1);
         let occ_2_new = get_occurs(&graph, 2);

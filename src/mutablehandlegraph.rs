@@ -1,5 +1,5 @@
 use crate::handle::{Edge, Handle, NodeId};
-use crate::handlegraph::{HandleGraph, HandleGraphRef};
+use crate::handlegraph::HandleGraph;
 
 pub trait SubtractiveHandleGraph {
     fn remove_handle(&mut self, handle: Handle) -> bool;

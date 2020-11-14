@@ -1,11 +1,5 @@
 use std::num::NonZeroUsize;
 
-use num_traits::{
-    identities,
-    identities::{One, Zero},
-    Num, NumAssign, PrimInt, ToPrimitive,
-};
-
 use fnv::FnvHashMap;
 
 pub mod list;
@@ -86,18 +80,6 @@ impl<T: OneBasedIndex> PackedElement for T {
     }
 }
 
-/// The identifier and index for all node-related records in the
-/// PackedGraph.
-///
-/// This is used whenever we have some type of record, in one or more
-/// packed collections, such that each node in the graph has exactly
-/// one such record.
-///
-/// This index is 1-based, with 0 denoting missing data, the empty
-/// record, or the empty list, depending on the context.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct NodeRecordId(Option<NonZeroUsize>);
-
 /// A 0-based index into a collection that nominally uses 1-based
 /// indexing, with a zero denoting a missing record.
 pub trait RecordIndex: Copy {
@@ -117,49 +99,17 @@ pub trait RecordIndex: Copy {
     }
 }
 
-/// Given a sorted slice of elements to be removed, where the elements
-/// are numbers from a tightly packed sequence of indices, returns a
-/// hashmap that maps kept indices in the old sequence, into tightly
-/// packed indices in the new sequence that excludes the removed
-/// elements.
-pub(crate) fn removed_id_map<T>(removed: &[T], max_ix: T) -> FnvHashMap<T, T>
-where
-    T: PrimInt + NumAssign + ToPrimitive + std::hash::Hash,
-{
-    let mut result = FnvHashMap::default();
-
-    let mut iter = removed.iter().copied();
-    let mut next_ix = if let Some(ix) = iter.next() {
-        ix
-    } else {
-        return result;
-    };
-    let first_ix = next_ix;
-    let mut previous = next_ix;
-
-    let mut insert_next = |start: T, end: T| {
-        for ix in num_iter::range(start + T::one(), end) {
-            result.insert(ix, next_ix);
-            next_ix += T::one();
-        }
-    };
-
-    for old_ix in iter {
-        if old_ix - previous > T::one() {
-            insert_next(previous, old_ix);
-        }
-
-        previous = old_ix;
-    }
-
-    insert_next(previous, max_ix + T::one());
-
-    for ix in num_iter::range(T::one(), first_ix) {
-        result.insert(ix, ix);
-    }
-
-    result
-}
+/// The identifier and index for all node-related records in the
+/// PackedGraph.
+///
+/// This is used whenever we have some type of record, in one or more
+/// packed collections, such that each node in the graph has exactly
+/// one such record.
+///
+/// This index is 1-based, with 0 denoting missing data, the empty
+/// record, or the empty list, depending on the context.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct NodeRecordId(Option<NonZeroUsize>);
 
 /// Given a sorted slice of elements to be removed, where the elements
 /// are values that can be packed into u64s using PackedElement, and
@@ -300,35 +250,14 @@ macro_rules! impl_space_usage_stack_newtype {
 
 impl_one_based_index!(NodeRecordId);
 impl_space_usage_stack_newtype!(NodeRecordId);
-// impl_one_based_index_default!(NodeRecordId);
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn removal_id_map() {
-        let indices: Vec<usize> = (1..=20).into_iter().collect();
-
-        let to_remove: Vec<usize> = vec![4, 5, 6, 10, 11, 13, 15, 18];
-
-        let id_map = removed_id_map(&to_remove, 20);
-
-        let mut id_map_vec: Vec<(usize, usize)> =
-            id_map.iter().map(|(&k, &v)| (k, v)).collect::<Vec<_>>();
-        id_map_vec.sort();
-
-        let expected = vec![1, 2, 3, 7, 8, 9, 12, 14, 16, 17, 19, 20]
-            .into_iter()
-            .zip(1..)
-            .collect::<Vec<_>>();
-
-        assert_eq!(id_map_vec, expected);
-    }
-
-    #[test]
     fn removal_id_map_node_record_id() {
-        let indices: Vec<NodeRecordId> = (1..=20)
+        let _indices: Vec<NodeRecordId> = (1..=20)
             .into_iter()
             .map(|x| NodeRecordId::from_one_based(x as usize))
             .collect();

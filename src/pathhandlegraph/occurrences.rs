@@ -1,4 +1,4 @@
-use super::path::{PathBase, PathId, PathStep};
+use super::path::PathId;
 
 use super::StepUpdate;
 

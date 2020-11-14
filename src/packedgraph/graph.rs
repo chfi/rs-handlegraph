@@ -8,10 +8,11 @@ pub(super) use super::{
     sequence::{PackedSeqIter, SeqRecordIx, Sequences},
 };
 
-use fnv::{FnvHashMap, FnvHashSet};
+use fnv::FnvHashSet;
 
 use super::defragment::Defragment;
 
+#[allow(unused_imports)]
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
 use crate::pathhandlegraph::PathId;
@@ -20,8 +21,8 @@ use crate::handlegraph::HandleNeighbors;
 
 use crate::packed::traits::*;
 
-use super::list;
-use super::list::{PackedList, PackedListMut};
+// use super::list;
+// use super::list::{PackedList, PackedListMut};
 
 use super::paths;
 
@@ -304,6 +305,7 @@ impl PackedGraph {
             .for_each(|s| self.apply_node_occurrence(path_id, s))
     }
 
+    #[allow(dead_code)]
     pub(super) fn with_path_mut_ctx<'a, F>(&'a mut self, path_id: PathId, f: F)
     where
         for<'b> F:
@@ -315,6 +317,7 @@ impl PackedGraph {
         }
     }
 
+    #[allow(dead_code)]
     pub(super) fn zip_all_paths_mut_ctx<'a, T, I, F>(
         &'a mut self,
         iter: I,
@@ -333,6 +336,7 @@ impl PackedGraph {
         }
     }
 
+    #[allow(dead_code)]
     pub(super) fn with_all_paths_mut_ctx<'a, F>(&'a mut self, f: F)
     where
         for<'b> F: Fn(
@@ -347,6 +351,7 @@ impl PackedGraph {
         }
     }
 
+    #[allow(dead_code)]
     pub(super) fn with_all_paths_mut_ctx_<F>(&mut self, f: F)
     where
         for<'b> F: Fn(
@@ -357,14 +362,13 @@ impl PackedGraph {
     {
         use rayon::prelude::*;
         use std::sync::mpsc;
-        use std::thread;
 
         let (sender, receiver) =
             mpsc::channel::<(PathId, Vec<paths::StepUpdate>)>();
 
-        let mut paths = &mut self.paths;
-        let mut nodes = &mut self.nodes;
-        let mut occurrences = &mut self.occurrences;
+        let paths = &mut self.paths;
+        let nodes = &mut self.nodes;
+        let occurrences = &mut self.occurrences;
 
         let mut mut_ctx = paths.get_multipath_mut_ctx();
         let refs_mut = mut_ctx.ref_muts_par();

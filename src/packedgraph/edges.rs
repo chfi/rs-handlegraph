@@ -216,22 +216,6 @@ impl EdgeLists {
         Some(())
     }
 
-    fn set_next(&mut self, ix: EdgeListIx, next: EdgeListIx) -> Option<()> {
-        let n_ix = ix.to_record_ix(2, 1)?;
-        self.record_vec.set_pack(n_ix, next);
-        Some(())
-    }
-
-    fn clear_record(&mut self, ix: EdgeListIx) -> Option<()> {
-        let h_ix = ix.to_record_ix(2, 0)?;
-        let n_ix = h_ix + 1;
-
-        self.record_vec.set(h_ix, 0);
-        self.record_vec.set(n_ix, 0);
-
-        Some(())
-    }
-
     /// Follow the linked list pointer in the given record to the next
     /// entry, if it exists.
     fn next(&self, record: EdgeRecord) -> Option<EdgeRecord> {
@@ -383,10 +367,6 @@ mod tests {
     fn remove_edge_list_record_iter_mut() {
         let hnd = |x: u64| Handle::pack(x, false);
 
-        let edgevec = |es: &EdgeLists, ix: EdgeListIx| {
-            es.iter(ix).map(|(_, (h, _))| h).collect::<Vec<_>>()
-        };
-
         let mut edges = EdgeLists::default();
 
         let handles =
@@ -410,14 +390,10 @@ mod tests {
         assert_eq!(head.to_vector_value(), 5);
         assert_eq!(tail.to_vector_value(), 1);
 
-        let orig_edge_vec = vec_edge_list(&edges, head);
-
         // Remove the first edge with an even node ID
-        let new_head =
-            edges.iter_mut(head).remove_record_with(|ix, (h, next)| {
-                let id = u64::from(h.id());
-                u64::from(h.id()) % 2 == 0
-            });
+        let new_head = edges
+            .iter_mut(head)
+            .remove_record_with(|_ix, (h, _next)| u64::from(h.id()) % 2 == 0);
 
         assert_eq!(Some(head), new_head);
         let new_edge_vec = vec_edge_list(&edges, head);
@@ -430,7 +406,7 @@ mod tests {
         // Remove the last record of the list
         let new_head = edges
             .iter_mut(head)
-            .remove_record_with(|ix, (h, next)| next.is_null());
+            .remove_record_with(|_ix, (_h, next)| next.is_null());
 
         assert_eq!(Some(head), new_head);
 
@@ -438,9 +414,8 @@ mod tests {
         assert_eq!(new_edge_vec, vec![(5, 10, 3), (3, 6, 2), (2, 4, 0)]);
 
         // Remove the head of the list
-        let new_head = edges
-            .iter_mut(head)
-            .remove_record_with(|ix, (h, next)| ix == head);
+        let new_head =
+            edges.iter_mut(head).remove_record_with(|ix, _| ix == head);
 
         let new_edge_vec = vec_edge_list(&edges, head);
         assert_eq!(new_edge_vec, vec![(5, 0, 0)]);
@@ -476,10 +451,6 @@ mod tests {
     fn remove_many_edge_records() {
         let hnd = |x: u64| Handle::pack(x, false);
 
-        let edgevec = |es: &EdgeLists, ix: EdgeListIx| {
-            es.iter(ix).map(|(_, (h, _))| h).collect::<Vec<_>>()
-        };
-
         let mut edges = EdgeLists::default();
 
         let handles =
@@ -502,8 +473,6 @@ mod tests {
 
         assert_eq!(head.to_vector_value(), 5);
         assert_eq!(tail.to_vector_value(), 1);
-
-        let orig_edge_vec = vec_edge_list(&edges, head);
 
         // Remove all odd nodes
         let new_head = edges
@@ -552,11 +521,11 @@ mod tests {
                 .collect::<Vec<_>>()
         };
 
-        let list_1 =
+        let _list_1 =
             append_slice(&mut edges, &vec_hnd(vec![100, 101, 102, 103]));
-        let list_2 =
+        let _list_2 =
             append_slice(&mut edges, &vec_hnd(vec![200, 201, 202, 203]));
-        let list_3 =
+        let _list_3 =
             append_slice(&mut edges, &vec_hnd(vec![300, 301, 302, 303]));
 
         let edge_ix = |x: usize| EdgeListIx::from_one_based(x);

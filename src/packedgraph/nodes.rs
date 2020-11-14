@@ -82,9 +82,12 @@ impl NodeIdIndexMap {
         self.deque.iter()
     }
 
+    /*
+    #[allow(dead_code)]
     pub(super) fn len(&self) -> usize {
         self.deque.len()
     }
+    */
 
     fn clear_node_id(&mut self, id: NodeId) {
         let ix = u64::from(id) - self.min_id;
@@ -214,13 +217,9 @@ impl Defragment for NodeRecords {
             .into_iter()
             .collect::<FnvHashSet<_>>();
 
-        let mut next_ix = 0usize;
-
         for ix in 0..total_len {
             let rec_id = NodeRecordId::from_zero_based(ix);
             if !removed_nodes.contains(&rec_id) {
-                let new_rec_id = NodeRecordId::from_zero_based(next_ix);
-
                 let rec_vec_ix = rec_id.to_record_start(2).unwrap();
                 let occur_vec_ix = rec_id.to_record_start(1).unwrap();
 
@@ -235,8 +234,6 @@ impl Defragment for NodeRecords {
                 records_vec.append(left_ix.pack());
                 records_vec.append(right_ix.pack());
                 node_occurrence_map.append(occur_ix.pack());
-
-                next_ix += 1;
             }
         }
 

@@ -1,5 +1,3 @@
-use succinct::SpaceUsage;
-
 use super::vector::PackedIntVec;
 
 use super::traits::*;

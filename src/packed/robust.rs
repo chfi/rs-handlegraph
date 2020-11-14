@@ -154,7 +154,6 @@ mod tests {
             let ix = ix % paged.len();
 
             let len_before = paged.len();
-            let first_len_before = paged.first_page.len();
             paged.set(ix, value);
 
             let set_correct = paged.get(ix) == value;
