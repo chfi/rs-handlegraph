@@ -387,9 +387,9 @@ impl Defragment for PackedPath {
 
 #[derive(Clone, Copy)]
 pub struct PackedPathRef<'a> {
-    pub(super) path_id: PathId,
-    pub(super) path: &'a PackedPath,
-    pub(super) properties: PathPropertyRecord,
+    pub(crate) path_id: PathId,
+    pub(crate) path: &'a PackedPath,
+    pub(crate) properties: PathPropertyRecord,
 }
 
 impl<'a> PackedPathRef<'a> {
@@ -405,7 +405,7 @@ impl<'a> PackedPathRef<'a> {
         }
     }
 
-    pub(super) fn properties(&self) -> &PathPropertyRecord {
+    pub(crate) fn properties(&self) -> &PathPropertyRecord {
         &self.properties
     }
 }
@@ -420,9 +420,9 @@ impl<'a> PackedPathRef<'a> {
 pub type StepUpdate = crate::pathhandlegraph::StepUpdate<PathStepIx>;
 
 pub struct PackedPathRefMut<'a> {
-    pub path_id: PathId,
-    pub path: &'a mut PackedPath,
-    pub properties: PathPropertyRecord,
+    pub(crate) path_id: PathId,
+    pub(crate) path: &'a mut PackedPath,
+    pub(crate) properties: PathPropertyRecord,
 }
 
 impl PathStep for (PathStepIx, PackedStep) {
@@ -687,7 +687,7 @@ impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
 }
 
 #[cfg(test)]
-pub(super) mod tests {
+pub(crate) mod tests {
     use super::*;
 
     use quickcheck::{Arbitrary, Gen};

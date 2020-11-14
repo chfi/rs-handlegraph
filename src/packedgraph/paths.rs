@@ -22,8 +22,8 @@ use crate::pathhandlegraph::*;
 use crate::packed;
 use crate::packed::*;
 
-mod packedpath;
-mod properties;
+pub(crate) mod packedpath;
+pub(crate) mod properties;
 
 pub use self::packedpath::*;
 pub use self::properties::*;
@@ -618,8 +618,90 @@ impl<'a> WithPathRefsMut for &'a mut PackedGraphPaths {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
+
+    /// A little DSL for generating paths because why not~
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    pub(crate) enum StepOp {
+        Append(usize),
+        Prepend(usize),
+        InsertMiddle(usize),
+        RemoveFromStart(usize),
+        RemoveFromEnd(usize),
+    }
+
+    impl std::fmt::Display for StepOp {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                StepOp::Append(x) => write!(f, "A  {:>2}", x),
+                StepOp::Prepend(x) => write!(f, "P  {:>2}", x),
+                StepOp::InsertMiddle(x) => write!(f, "M  {:>2}", x),
+                StepOp::RemoveFromStart(x) => write!(f, "RS {:>2}", x),
+                StepOp::RemoveFromEnd(x) => write!(f, "RE {:>2}", x),
+            }
+        }
+    }
+
+    #[macro_export]
+    macro_rules! step_op {
+        () => {};
+        (A $count:literal) => {
+            StepOp::Append($count)
+        };
+        (P $count:literal) => {
+            StepOp::Prepend($count)
+        };
+        (M $count:literal) => {
+            StepOp::InsertMiddle($count)
+        };
+        (RS $count:literal) => {
+            StepOp::RemoveFromStart($count)
+        };
+        (RE $count:literal) => {
+            StepOp::RemoveFromEnd($count)
+        };
+    }
+
+    #[macro_export]
+    macro_rules! step_ops {
+        () => {};
+        ($($op:tt $count:literal),*) => {
+            vec![$(crate::step_op!($op $count),)*]
+        };
+    }
+
+    pub(crate) fn apply_step_ops(
+        path: &mut PackedPathRefMut<'_>,
+        ops: &[StepOp],
+    ) -> Vec<StepUpdate> {
+        let mut updates = Vec::new();
+
+        let mut max_id = 0usize;
+
+        for &op in ops.iter() {
+            match op {
+                StepOp::Append(x) => {
+                    updates.extend(path.add_some_steps(&mut max_id, x, false));
+                }
+                StepOp::Prepend(x) => {
+                    updates.extend(path.add_some_steps(&mut max_id, x, true));
+                }
+                StepOp::InsertMiddle(x) => {
+                    updates
+                        .extend(path.insert_many_into_middle(&mut max_id, x));
+                }
+                StepOp::RemoveFromStart(x) => {
+                    updates.extend(path.remove_some_steps(x, true));
+                }
+                StepOp::RemoveFromEnd(x) => {
+                    updates.extend(path.remove_some_steps(x, false));
+                }
+            }
+        }
+
+        updates
+    }
 
     #[test]
     fn packedpathpaths_new_path() {
@@ -1013,86 +1095,6 @@ mod tests {
         ];
 
         assert_eq!(kept_names, expected_names);
-    }
-
-    /// A little DSL for generating paths because why not~
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-    enum StepOp {
-        Append(usize),
-        Prepend(usize),
-        InsertMiddle(usize),
-        RemoveFromStart(usize),
-        RemoveFromEnd(usize),
-    }
-
-    impl std::fmt::Display for StepOp {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            match self {
-                StepOp::Append(x) => write!(f, "A  {:>2}", x),
-                StepOp::Prepend(x) => write!(f, "P  {:>2}", x),
-                StepOp::InsertMiddle(x) => write!(f, "M  {:>2}", x),
-                StepOp::RemoveFromStart(x) => write!(f, "RS {:>2}", x),
-                StepOp::RemoveFromEnd(x) => write!(f, "RE {:>2}", x),
-            }
-        }
-    }
-
-    macro_rules! step_op {
-        () => {};
-        (A $count:literal) => {
-            StepOp::Append($count)
-        };
-        (P $count:literal) => {
-            StepOp::Prepend($count)
-        };
-        (M $count:literal) => {
-            StepOp::InsertMiddle($count)
-        };
-        (RS $count:literal) => {
-            StepOp::RemoveFromStart($count)
-        };
-        (RE $count:literal) => {
-            StepOp::RemoveFromEnd($count)
-        };
-    }
-
-    macro_rules! step_ops {
-        () => {};
-        ($($op:tt $count:literal),*) => {
-            vec![$(step_op!($op $count),)*]
-        };
-    }
-
-    fn apply_step_ops(
-        path: &mut PackedPathRefMut<'_>,
-        ops: &[StepOp],
-    ) -> Vec<StepUpdate> {
-        let mut updates = Vec::new();
-
-        let mut max_id = 0usize;
-
-        for &op in ops.iter() {
-            match op {
-                StepOp::Append(x) => {
-                    updates.extend(path.add_some_steps(&mut max_id, x, false));
-                }
-                StepOp::Prepend(x) => {
-                    updates.extend(path.add_some_steps(&mut max_id, x, true));
-                }
-                StepOp::InsertMiddle(x) => {
-                    updates
-                        .extend(path.insert_many_into_middle(&mut max_id, x));
-                }
-                StepOp::RemoveFromStart(x) => {
-                    updates.extend(path.remove_some_steps(x, true));
-                }
-                StepOp::RemoveFromEnd(x) => {
-                    updates.extend(path.remove_some_steps(x, false));
-                }
-            }
-        }
-
-        updates
     }
 
     #[test]

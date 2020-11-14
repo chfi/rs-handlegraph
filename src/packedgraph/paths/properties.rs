@@ -90,20 +90,20 @@ impl<'a> PathPropertyMut<'a> {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PathPropertyRecord {
-    pub(super) head: PathStepIx,
-    pub(super) tail: PathStepIx,
-    pub(super) deleted: bool,
-    pub(super) circular: bool,
-    pub(super) deleted_steps: usize,
+    pub(crate) head: PathStepIx,
+    pub(crate) tail: PathStepIx,
+    pub(crate) deleted: bool,
+    pub(crate) circular: bool,
+    pub(crate) deleted_steps: usize,
 }
 
 #[derive(Debug, Clone)]
 pub struct PathProperties {
-    pub(super) heads: PagedIntVec,
-    pub(super) tails: PagedIntVec,
-    pub(super) deleted: PackedIntVec,
-    pub(super) circular: PackedIntVec,
-    pub(super) deleted_steps: PackedIntVec,
+    pub(crate) heads: PagedIntVec,
+    pub(crate) tails: PagedIntVec,
+    pub(crate) deleted: PackedIntVec,
+    pub(crate) circular: PackedIntVec,
+    pub(crate) deleted_steps: PackedIntVec,
 }
 
 crate::impl_space_usage!(
@@ -139,7 +139,6 @@ impl PathProperties {
         self.circular.append(record.circular.pack());
         self.deleted_steps.append(record.deleted_steps.pack());
     }
-
 
     pub(super) fn len(&self) -> usize {
         self.heads.len()

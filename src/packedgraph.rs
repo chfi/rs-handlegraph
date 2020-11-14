@@ -23,6 +23,7 @@ pub mod paths;
 pub mod sequence;
 
 mod defragment;
+use defragment::Defragment;
 
 pub use self::{
     edges::{EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx},
@@ -934,5 +935,258 @@ mod tests {
                 edge(7, 8)
             ]
         );
+    }
+
+    #[test]
+    fn defrag_packed_graph() {
+        use bstr::B;
+
+        use paths::tests::{apply_step_ops, StepOp};
+
+        let hnd = |x: u64| Handle::pack(x, false);
+        let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
+        let edge = |l: u64, r: u64| Edge(hnd(l), hnd(r));
+
+        let mut graph = PackedGraph::new();
+
+        let path_names = [B("path0"), B("path1"), B("path2"), B("path3")];
+
+        let _path_ids = path_names
+            .iter()
+            .map(|n| graph.paths.create_path(n))
+            .collect::<Vec<_>>();
+
+        let seqs = vec![
+            //                  Node
+            B("GTCA"),       //  1
+            B("AAGTGCTAGT"), //  2
+            B("ATAGCT"),     //  3
+            B("AGTTTTA"),    //  4
+            B("GTAATCCA"),   //  5
+            B("GGGTGGT"),    //  6
+            B("AGCTACT"),    //  7
+            B("AACAAAAT"),   //  8
+            B("AGCC"),       //  9
+        ];
+        /*
+        1 ----- 8 --- 4 -----
+          \   /   \ /   \     \
+            2      \     \---- 6
+          /   \   / \   / \   /
+        5 ----- 7 --- 3 --- 9
+        */
+
+        let _handles = seqs
+            .iter()
+            .map(|seq| graph.append_handle(seq))
+            .collect::<Vec<_>>();
+
+        macro_rules! insert_edges {
+            ($graph:ident, [$(($from:literal, $to:literal)),*]) => {
+                $(
+                    $graph.create_edge(edge($from, $to));
+                )*
+            };
+        }
+
+        insert_edges!(
+            graph,
+            [
+                (1, 2),
+                (1, 8),
+                (5, 2),
+                (5, 7),
+                (2, 8),
+                (2, 7),
+                (7, 3),
+                (7, 4),
+                (8, 3),
+                (8, 4),
+                (3, 6),
+                (3, 9),
+                (4, 9),
+                (4, 6),
+                (9, 6)
+            ]
+        );
+
+        /* Paths
+              path0 - 1  2  7  3  6
+              path1 - 5  2  8  4  9  6
+              path2 - 1  8  4  6
+              path3 - 5  7  3  9  6
+
+
+        */
+
+        let path_names = [B("path0"), B("path1"), B("path2"), B("path3")];
+
+        let handles_on = |paths: &PackedGraphPaths, id: u64| -> Vec<Handle> {
+            let path_ref = paths.path_ref(PathId(id)).unwrap();
+            let head = path_ref.properties.head;
+            let tail = path_ref.properties.tail;
+            let path = path_ref.path;
+            paths::packedpath::tests::path_handles(path, head, tail)
+        };
+
+        let vectors_for = |paths: &PackedGraphPaths,
+                           id: u64|
+        // (step_ix, node, prev, next)
+         -> Vec<(usize, u64, u64, u64)> {
+            let path_ref = paths.path_ref(PathId(id)).unwrap();
+            let path = path_ref.path;
+            paths::packedpath::tests::path_vectors(path)
+        };
+
+        let ops_0 = crate::step_ops![A 5, RE 2, A 1, M 1];
+        let ops_1 = crate::step_ops![A 3, RE 1, A 1, RS 1, P 1, A 2, RE 1, M 1, RE 1, A 1];
+        let ops_2 = crate::step_ops![A 7, RE 6, A 1];
+
+        graph.with_path_mut_ctx(PathId(0), |ref_mut| {
+            apply_step_ops(ref_mut, &ops_0)
+        });
+
+        graph.with_path_mut_ctx(PathId(1), |ref_mut| {
+            let mut updates = apply_step_ops(ref_mut, &ops_1);
+            updates.push(ref_mut.append_handle(hnd(6)));
+            updates
+        });
+
+        graph.with_path_mut_ctx(PathId(2), |ref_mut| {
+            let mut updates = apply_step_ops(ref_mut, &ops_2);
+            for h in vec_hnd(vec![4, 6]) {
+                updates.push(ref_mut.append_handle(h));
+            }
+            updates
+        });
+
+        graph.with_path_mut_ctx(PathId(3), |ref_mut| {
+            let mut updates = Vec::new();
+            for h in vec_hnd(vec![5, 7, 3, 9, 6]) {
+                updates.push(ref_mut.append_handle(h));
+            }
+            updates
+        });
+
+        let print_path_debug = |graph: &PackedGraph, id: u64| {
+            let path_ref = graph.paths.path_ref(PathId(id)).unwrap();
+            let head = path_ref.properties.head;
+            let tail = path_ref.properties.tail;
+            paths::packedpath::tests::print_path(&path_ref.path, head, tail);
+            paths::packedpath::tests::print_path_vecs(&path_ref.path);
+        };
+
+        println!("path0");
+        print_path_debug(&graph, 0);
+        println!();
+
+        println!("path1");
+        print_path_debug(&graph, 1);
+        println!();
+
+        println!("path2");
+        print_path_debug(&graph, 2);
+        println!();
+
+        println!("path3");
+        print_path_debug(&graph, 3);
+        println!();
+
+        let get_occurs = |graph: &PackedGraph, id: u64| {
+            let oc_ix = graph.nodes.handle_occur_record(hnd(id)).unwrap();
+            let oc_iter = graph.occurrences.iter(oc_ix);
+            oc_iter
+                .map(|(_occ_ix, record)| {
+                    (record.path_id.0, record.offset.pack())
+                })
+                .collect::<Vec<_>>()
+        };
+
+        for n in 1..=9 {
+            let occ = get_occurs(&graph, n);
+            println!("{:2}", n);
+            println!("  - {:?}", occ);
+            println!();
+        }
+
+        /* Occurrences at this point
+        1 - [(2, 1), (0, 1)]
+        2 - [(1, 2), (0, 2)]
+        3 - [(3, 3), (0, 3)]
+        4 - [(2, 9), (1, 4)]
+        5 - [(3, 1), (1, 5)]
+        6 - [(3, 5), (2, 10), (1, 10), (0, 6)]
+        7 - [(3, 2), (0, 7)]
+        8 - [(2, 8), (1, 8)]
+        9 - [(3, 4), (1, 9)]
+               */
+
+        graph.defragment();
+
+        println!("---------------------");
+        println!(" Defragmenting graph ");
+        println!("---------------------");
+
+        println!("path0");
+        print_path_debug(&graph, 0);
+        println!();
+
+        println!("path1");
+        print_path_debug(&graph, 1);
+        println!();
+
+        println!("path2");
+        print_path_debug(&graph, 2);
+        println!();
+
+        println!("path3");
+        print_path_debug(&graph, 3);
+        println!();
+
+        for n in 1..=9 {
+            let occ = get_occurs(&graph, n);
+            println!("{:2}", n);
+            println!("  - {:?}", occ);
+            println!();
+        }
+
+        /* After defragmenting, all nodes should have the same
+         * occurrences, only with shifted step offsets
+         1 - [(2, 1), (0, 1)]
+         2 - [(1, 1), (0, 2)]
+         3 - [(3, 3), (0, 3)]
+         4 - [(2, 3), (1, 2)]
+         5 - [(3, 1), (1, 3)]
+         6 - [(3, 5), (2, 4), (1, 6), (0, 4)]
+         7 - [(3, 2), (0, 5)]
+         8 - [(2, 2), (1, 4)]
+         9 - [(3, 4), (1, 5)]
+        */
+
+        // TODO make sure this will actually change some edge list heads!
+        // remove edges (2, 7), (8, 3), (4, 6)
+        graph.remove_edge(edge(2, 7));
+        graph.remove_edge(edge(8, 3));
+        graph.remove_edge(edge(4, 6));
+
+        // Check new edge lists
+
+        // Defragment
+
+        // Compare post-defrag edge lists against pre-defrag
+
+        // Remove nodes 8, 4, 9
+
+        // Check new edge lists
+        // Check new node occurrences
+        // Check paths
+
+        // Defragment
+
+        // Check new edge lists
+        // Check new node occurrences
+        // Check paths
+
+        // Check
     }
 }

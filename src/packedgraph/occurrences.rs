@@ -39,9 +39,9 @@ pub struct OccurRecord {
 
 #[derive(Debug, Clone)]
 pub struct NodeOccurrences {
-    path_ids: PagedIntVec,
-    node_occur_offsets: PagedIntVec,
-    node_occur_next: PagedIntVec,
+    pub(super) path_ids: PagedIntVec,
+    pub(super) node_occur_offsets: PagedIntVec,
+    pub(super) node_occur_next: PagedIntVec,
     removed_records: usize,
 }
 
@@ -114,6 +114,11 @@ impl Defragment for NodeOccurrences {
                 node_occur_next.set_pack(ix, *next);
             }
         }
+
+        self.path_ids = path_ids;
+        self.node_occur_offsets = node_occur_offsets;
+        self.node_occur_next = node_occur_next;
+        self.removed_records = 0;
 
         Some(updates)
     }
@@ -216,10 +221,11 @@ impl NodeOccurrences {
             let (new_path_id, offset_map) = updates.get(&old_path_id).unwrap();
 
             let old_offset: PathStepIx = self.node_occur_offsets.get_unpack(ix);
-            let new_offset = offset_map.get(&old_offset).unwrap();
+            if let Some(new_offset) = offset_map.get(&old_offset) {
+                self.node_occur_offsets.set_pack(ix, *new_offset);
+            }
 
             self.path_ids.set_pack(ix, *new_path_id);
-            self.node_occur_offsets.set_pack(ix, *new_offset);
         }
     }
 }
