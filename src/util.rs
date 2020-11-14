@@ -1,20 +1,31 @@
 pub(crate) mod dna {
+
+    include!(concat!(env!("OUT_DIR"), "/comp_table.rs"));
+
+    /// A lookup-table for the DNA complements is generated at compile
+    /// time by the build.rs script in the project root, and placed in
+    /// the compilation out-dir under the name "comp_table.rs".
     #[inline]
     pub(crate) const fn comp_base(base: u8) -> u8 {
-        match base {
-            b'A' => b'T',
-            b'G' => b'C',
-            b'C' => b'G',
-            b'T' => b'A',
-            b'a' => b't',
-            b'g' => b'c',
-            b'c' => b'g',
-            b't' => b'a',
-            _ => b'N',
-        }
+        DNA_COMP_TABLE[base as usize]
     }
+
     #[inline]
-    pub(crate) fn rev_comp<I>(seq: I) -> impl Iterator<Item = u8>
+    pub(crate) fn rev_comp<I, B>(seq: I) -> Vec<u8>
+    where
+        B: std::borrow::Borrow<u8>,
+        I: IntoIterator<Item = u8>,
+        I::IntoIter: DoubleEndedIterator,
+    {
+        use std::borrow::Borrow;
+        seq.into_iter()
+            .rev()
+            .map(|b| comp_base(*b.borrow()))
+            .collect()
+    }
+
+    #[inline]
+    pub(crate) fn rev_comp_iter<I>(seq: I) -> impl Iterator<Item = u8>
     where
         I: IntoIterator<Item = u8>,
         I::IntoIter: DoubleEndedIterator,
