@@ -80,6 +80,9 @@ impl Defragment for PackedPathNames {
     type Updates = ();
 
     fn defragment(&mut self) -> Option<()> {
+        if self.removed == 0 {
+            return None;
+        }
         let total_len = self.offsets.len();
 
         let mut next_offset = 0;
@@ -206,11 +209,8 @@ impl Defragment for PackedGraphPaths {
         FnvHashMap<PathId, (PathId, FnvHashMap<PathStepIx, PathStepIx>)>;
 
     fn defragment(&mut self) -> Option<Self::Updates> {
-        if self.removed == 0 {
-            return None;
-        }
-
         let total_len = self.paths.len();
+        let new_len = self.len();
 
         let mut new_props = PathProperties::default();
         let mut new_paths = Vec::with_capacity(self.len());
@@ -229,7 +229,14 @@ impl Defragment for PackedGraphPaths {
                 let mut path = std::mem::take(self.paths.get_mut(ix).unwrap());
                 let path_updates = path.defragment().unwrap_or_default();
 
-                let properties = self.path_props.get_record(path_id);
+                let mut properties = self.path_props.get_record(path_id);
+                if let Some(new_head) = path_updates.get(&properties.head) {
+                    properties.head = *new_head;
+                }
+                if let Some(new_tail) = path_updates.get(&properties.tail) {
+                    properties.tail = *new_tail;
+                }
+
                 new_props.append_record(properties);
 
                 updates.insert(path_id, (new_id, path_updates));
@@ -244,6 +251,8 @@ impl Defragment for PackedGraphPaths {
         self.path_props = new_props;
 
         self.path_names.defragment();
+
+        self.removed = 0;
 
         Some(updates)
     }
@@ -379,6 +388,8 @@ impl PackedGraphPaths {
                 .filter_map(|step| path_ref.remove_step(step))
                 .collect()
         })?;
+
+        self.paths[ix as usize].path_deleted = true;
 
         self.path_names.remove_id(id)?;
 
@@ -1097,5 +1108,175 @@ mod tests {
         }
 
         updates
+    }
+
+    #[test]
+    fn defrag_graph_paths() {
+        use bstr::{ByteSlice, ByteVec, B};
+
+        let hnd = |x: u64| Handle::pack(x, false);
+
+        let mut paths = PackedGraphPaths::default();
+
+        let names = [
+            B("path1"),
+            B("pathAAAAAAAAA"),
+            B("p3"),
+            B("paaaaath8"),
+            B("11233455"),
+        ];
+
+        let path_ids = names
+            .iter()
+            .map(|n| paths.create_path(n))
+            .collect::<Vec<_>>();
+
+        /*
+          Path 0 -  1  2  3  4  5  6
+          Path 1 -  7  8  2  3  4  5  6
+          Path 2 -  1  2  3  4  5  6  9 10
+          Path 3 -  1  2 11 12  3  5  6
+          Path 4 - 13 14  3  4 15 16
+        */
+
+        let path_ops = vec![
+            step_ops![A 6],
+            step_ops![A 6, RS 1, P 2],
+            step_ops![A 6, A 2, RE 2, A 2],
+            step_ops![A 4, RE 1, A 2, A 4, RE 4, M 2],
+            step_ops![A 12, RS 2, P 2, RE 8, A 2],
+        ];
+
+        macro_rules! print_ops {
+            ($ops:ident) => {
+                print!(concat!(stringify!($ops), " - "));
+                for op in $ops.iter() {
+                    print!("{:5}, ", op);
+                }
+                println!();
+            };
+        };
+
+        macro_rules! apply_ops_to {
+            ($paths:ident, $id:literal, $ops:ident) => {
+                $paths.with_path_mut_ctx(PathId($id), |ref_mut| {
+                    apply_step_ops(ref_mut, &$ops)
+                })
+            };
+        }
+
+        let path_steps = path_ops
+            .iter()
+            .enumerate()
+            .map(|(id, ops)| {
+                paths.with_path_mut_ctx(PathId(id as u64), |ref_mut| {
+                    apply_step_ops(ref_mut, &ops)
+                })
+            })
+            .collect::<Vec<_>>();
+
+        macro_rules! print_path {
+            ($paths:ident, $id:literal) => {
+                let path_ref = $paths.path_ref(PathId($id)).unwrap();
+                print!("{:7} {:2} - ", " - Path", $id);
+                for (_ix, step) in path_ref.steps() {
+                    let node = u64::from(step.handle.id());
+                    print!("{:>2} ", node);
+                }
+                println!();
+            };
+        }
+
+        let handles_on = |paths: &PackedGraphPaths, id: u64| -> Vec<Handle> {
+            let path_ref = paths.path_ref(PathId(id)).unwrap();
+            let head = path_ref.properties.head;
+            let tail = path_ref.properties.tail;
+            let path = path_ref.path;
+            packedpath::tests::path_handles(path, head, tail)
+        };
+
+        let vectors_for = |paths: &PackedGraphPaths,
+                           id: u64|
+        // (step_ix, node, prev, next)
+         -> Vec<(usize, u64, u64, u64)> {
+            let path_ref = paths.path_ref(PathId(id)).unwrap();
+            let path = path_ref.path;
+            packedpath::tests::path_vectors(path)
+        };
+
+        let print_vectors = |paths: &PackedGraphPaths, id: u64| {
+            let path_ref = paths.path_ref(PathId(id)).unwrap();
+            let head = path_ref.properties.head;
+            let tail = path_ref.properties.tail;
+            println!(
+                "  Vectors for path {}\thead {:?}\ttail {:?}",
+                id, head, tail
+            );
+            let path = path_ref.path;
+            packedpath::tests::print_path_vecs(path);
+            println!();
+        };
+
+        print_path!(paths, 0);
+        print_path!(paths, 1);
+        print_path!(paths, 2);
+        print_path!(paths, 3);
+        print_path!(paths, 4);
+        println!(" ~~~~~~~~~~~~~~");
+
+        print_vectors(&paths, 0);
+        print_vectors(&paths, 1);
+        print_vectors(&paths, 2);
+        print_vectors(&paths, 3);
+        print_vectors(&paths, 4);
+
+        let pre_defrag_steps = (0..=4u64)
+            .into_iter()
+            .map(|id| handles_on(&paths, id))
+            .collect::<Vec<_>>();
+
+        println!("  ~~~~~~~~~~~~~~~~~  ");
+        println!(" Defragmenting paths ");
+        println!("  ~~~~~~~~~~~~~~~~~  \n");
+
+        let updates = paths.defragment();
+
+        print_vectors(&paths, 0);
+        print_vectors(&paths, 1);
+        print_vectors(&paths, 2);
+        print_vectors(&paths, 3);
+        print_vectors(&paths, 4);
+
+        let post_defrag_steps = (0..=4u64)
+            .into_iter()
+            .map(|id| handles_on(&paths, id))
+            .collect::<Vec<_>>();
+
+        assert_eq!(pre_defrag_steps, post_defrag_steps);
+
+        println!("  ~~~~~~~~~~~~~~~~~~~~  ");
+        println!(" Removing paths 1 and 3 ");
+        println!("  ~~~~~~~~~~~~~~~~~~~~  \n");
+
+        let _step_updates = paths.remove_path(PathId(1)).unwrap();
+        let _step_updates = paths.remove_path(PathId(3)).unwrap();
+
+        print_vectors(&paths, 0);
+        print_vectors(&paths, 1);
+        print_vectors(&paths, 2);
+        print_vectors(&paths, 3);
+        print_vectors(&paths, 4);
+
+        println!("  ~~~~~~~~~~~~~~~~~  ");
+        println!(" Defragmenting paths ");
+        println!("  ~~~~~~~~~~~~~~~~~  \n");
+
+        let updates = paths.defragment();
+
+        print_vectors(&paths, 0);
+        print_vectors(&paths, 1);
+        print_vectors(&paths, 2);
+        // print_vectors(&paths, 3);
+        // print_vectors(&paths, 4);
     }
 }
