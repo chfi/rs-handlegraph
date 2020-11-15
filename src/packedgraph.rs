@@ -354,7 +354,17 @@ impl MutableHandleGraph for PackedGraph {
             }
         }
 
-        // TODO update paths and occurrences once they're implmented
+        let occurrences = self.handle_occurrences(handle).collect::<Vec<_>>();
+        for (path_id, step_ix) in occurrences {
+            self.with_path_mut_ctx(path_id, |path_mut| {
+                let mut last_step = step_ix;
+                result
+                    .iter()
+                    .skip(1)
+                    .map(|&h| path_mut.insert_step_after(last_step, h))
+                    .collect()
+            });
+        }
 
         result
     }
@@ -398,7 +408,16 @@ impl MutableHandleGraph for PackedGraph {
             .update_node_edge_lists(g_ix, |l, r| (r, l))
             .unwrap();
 
-        // TODO update paths and occurrences once they're implmented
+        let occurrences = self.handle_occurrences(handle).collect::<Vec<_>>();
+        for (path_id, step_ix) in occurrences {
+            self.with_path_mut_ctx(path_id, |path_mut| {
+                path_mut
+                    .flip_step(step_ix)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect()
+            });
+        }
 
         handle.flip()
     }
