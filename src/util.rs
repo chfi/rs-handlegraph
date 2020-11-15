@@ -1,15 +1,44 @@
 pub mod dna {
 
-    include!(concat!(env!("OUT_DIR"), "/comp_table.rs"));
+    const fn comp_base_impl(base: u8) -> u8 {
+        match base {
+            b'A' => b'T',
+            b'G' => b'C',
+            b'C' => b'G',
+            b'T' => b'A',
+            b'a' => b't',
+            b'g' => b'c',
+            b'c' => b'g',
+            b't' => b'a',
+            _ => b'N',
+        }
+    }
 
-    /// A lookup-table for the DNA complements is generated at compile
-    /// time by the build.rs script in the project root, and placed in
-    /// the compilation out-dir under the name "comp_table.rs".
+    // loops can be used in const fns since Rust 1.46, meaning we can
+    // build a lookup table at compile time
+    const fn comp_base_table() -> [u8; 256] {
+        let mut i = 0;
+        let mut table: [u8; 256] = [0; 256];
+        while i <= 255 {
+            table[i] = comp_base_impl(i as u8);
+            i += 1;
+        }
+        table
+    }
+
+    const DNA_COMP_TABLE: [u8; 256] = comp_base_table();
+
+    /// Retrieves the DNA complement for the provided base using a
+    /// lookup-table built at compile time using the `const fn`
+    /// `comp_base_table()`.
     #[inline]
     pub const fn comp_base(base: u8) -> u8 {
         DNA_COMP_TABLE[base as usize]
     }
 
+    /// Calculates the reverse complement for a sequence provided as a
+    /// double-ended iterator. Collects into a `Vec<u8>` for
+    /// convenience.
     #[inline]
     pub fn rev_comp<I, B>(seq: I) -> Vec<u8>
     where
@@ -23,6 +52,9 @@ pub mod dna {
             .collect()
     }
 
+    /// Given a sequence provided as a double-ended iterator over
+    /// nucleotides, returns an iterator over the reverse complement
+    /// of the sequence.
     #[inline]
     pub fn rev_comp_iter<I, B>(seq: I) -> impl Iterator<Item = u8>
     where
