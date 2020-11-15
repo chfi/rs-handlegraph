@@ -8,37 +8,6 @@ use super::index::OneBasedIndex;
 
 use crate::packed;
 
-#[inline]
-const fn encode_dna_base(base: u8) -> u64 {
-    match base {
-        b'a' | b'A' => 0,
-        b'c' | b'C' => 1,
-        b'g' | b'G' => 2,
-        b't' | b'T' => 3,
-        _ => 4,
-    }
-}
-
-#[inline]
-const fn encoded_complement(val: u64) -> u64 {
-    if val == 4 {
-        4
-    } else {
-        3 - val
-    }
-}
-
-#[inline]
-const fn decode_dna_base(byte: u64) -> u8 {
-    match byte {
-        0 => b'A',
-        1 => b'C',
-        2 => b'G',
-        3 => b'T',
-        _ => b'N',
-    }
-}
-
 // An index into both the offset record and the length record for some
 // sequence. It's a simple index into a packed vector, but the order
 // must be the same as the node records vector in the graph.
@@ -348,6 +317,74 @@ impl<'a> std::iter::ExactSizeIterator for PackedSeqIter<'a> {
     #[inline]
     fn len(&self) -> usize {
         self.length
+    }
+}
+
+const fn dna_encoding_table() -> [u64; 256] {
+    let mut table: [u64; 256] = [4; 256];
+
+    let pairs: [(u8, u64); 8] = [
+        (b'a', 0),
+        (b'A', 0),
+        (b'c', 1),
+        (b'C', 1),
+        (b'g', 2),
+        (b'G', 2),
+        (b't', 3),
+        (b'T', 3),
+    ];
+
+    let mut i = 0;
+
+    while i < 8 {
+        let (base, value) = pairs[i];
+        table[base as usize] = value;
+        i += 1;
+    }
+
+    table
+}
+
+const fn encoded_complement_table() -> [u64; 5] {
+    let mut table: [u64; 5] = [0; 5];
+    let mut i = 0;
+
+    while i < 5 {
+        if i == 4 {
+            table[i] = 4;
+        } else {
+            table[i] = 3 - (i as u64);
+        }
+        i += 1;
+    }
+    table
+}
+
+const DNA_ENCODING_TABLE: [u64; 256] = dna_encoding_table();
+const ENCODED_COMPLEMENT_TABLE: [u64; 5] = encoded_complement_table();
+const DNA_DECODING_TABLE: [u8; 5] = [b'A', b'C', b'G', b'T', b'N'];
+
+#[inline]
+const fn encode_dna_base(base: u8) -> u64 {
+    DNA_ENCODING_TABLE[base as usize]
+}
+
+#[inline]
+const fn encoded_complement(val: u64) -> u64 {
+    if val > 3 {
+        ENCODED_COMPLEMENT_TABLE[4]
+    } else {
+        let v = val as u8;
+        ENCODED_COMPLEMENT_TABLE[v as usize]
+    }
+}
+
+#[inline]
+const fn decode_dna_base(val: u64) -> u8 {
+    if val > 3 {
+        DNA_DECODING_TABLE[4]
+    } else {
+        DNA_DECODING_TABLE[val as usize]
     }
 }
 
