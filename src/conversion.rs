@@ -11,7 +11,7 @@ use gfa::{
     parser::GFAResult,
 };
 
-use bstr::BString;
+use bstr::{BString, ByteVec};
 
 pub fn from_gfa<G, T>(gfa: &GFA<usize, T>) -> G
 where
@@ -85,7 +85,7 @@ where
 
     for handle in graph.all_handles() {
         let name = usize::from(handle.id());
-        let sequence: BString = graph.sequence_iter(handle.forward()).collect();
+        let sequence: Vec<_> = graph.sequence_iter(handle.forward()).collect();
 
         let segment = Segment {
             name,
@@ -109,7 +109,7 @@ where
         let from_orient = orient(left.is_reverse());
         let to_segment: usize = usize::from(right.id());
         let to_orient = orient(right.is_reverse());
-        let overlap = BString::from("0M");
+        let overlap = Vec::from_slice(b"0M");
 
         let link = Link {
             from_segment,
@@ -124,7 +124,7 @@ where
     }
 
     for path_id in graph.paths_iter() {
-        let path_name: BString = graph.path_handle_to_name(path_id).into();
+        let path_name: Vec<_> = graph.path_handle_to_name(path_id).into();
         let overlaps = Vec::new();
         let mut segment_names: Vec<Vec<u8>> = Vec::new();
         for step in graph.steps_iter(path_id) {
@@ -135,7 +135,7 @@ where
             segment_names.push(orientation.to_string().into());
             segment_names.push(",".into());
         }
-        let segment_names: BString =
+        let segment_names: Vec<u8> =
             segment_names.into_iter().flatten().collect();
 
         let path: Path<usize, ()> =

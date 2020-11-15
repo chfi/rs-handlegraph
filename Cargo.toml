@@ -13,7 +13,8 @@ categories = ["science"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-gfa = "0.8"
+# gfa = "0.8"
+gfa = { path = "../rs-gfa" }
 bstr = "0.2"
 fnv = "1.0"
 succinct = "0.5"

@@ -85,22 +85,14 @@ pub trait PathRef: PathBase {
     fn contains(self, handle: Handle) -> bool {
         self.steps().any(|s| s.handle() == handle)
     }
+}
 
-    /*
-    fn handle_at(self, step: Self::Step) -> Option<Handle>;
-    */
-
-    /*
-    fn before_step(self) -> StepHandle;
-
-    fn after_step(self) -> StepHandle;
-    */
-
-    /*
+pub trait PositionPathRef: PathRef {
     fn bases_len(self) -> usize;
 
-    fn step_at_base(self, pos: usize) -> Option<StepHandle>;
-    */
+    fn step_at_base(self, pos: usize) -> Option<Self::Step>;
+
+    fn step_base_offset(self, step: Self::StepIx) -> Option<usize>;
 }
 
 /// An embedded path that can also be mutated by appending or
