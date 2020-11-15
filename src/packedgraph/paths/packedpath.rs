@@ -323,7 +323,7 @@ impl Defragment for PackedPath {
     type Updates = FnvHashMap<PathStepIx, PathStepIx>;
 
     fn defragment(&mut self) -> Option<Self::Updates> {
-        if self.removed_steps == 0 {
+        if self.removed_steps == 0 || self.path_deleted {
             return None;
         }
 
@@ -557,7 +557,7 @@ impl<'a> PackedPathRefMut<'a> {
         StepUpdate::Insert { handle, step }
     }
 
-    fn remove_step_at_index(
+    pub(crate) fn remove_step_at_index(
         &mut self,
         rem_step_ix: PathStepIx,
     ) -> Option<StepUpdate> {
@@ -582,6 +582,22 @@ impl<'a> PackedPathRefMut<'a> {
             handle,
             step: rem_step_ix,
         })
+    }
+
+    pub(crate) fn flip_step_orientation(
+        &mut self,
+        step: PathStepIx,
+    ) -> Option<Vec<StepUpdate>> {
+        let step_rec_ix = step.to_record_start(1)?;
+        let handle: Handle = self.path.steps.get_unpack(step_rec_ix);
+        self.path.steps.set_pack(step_rec_ix, handle.flip());
+        Some(vec![
+            StepUpdate::Remove { handle, step },
+            StepUpdate::Insert {
+                handle: handle.flip(),
+                step,
+            },
+        ])
     }
 }
 
@@ -653,6 +669,10 @@ impl<'a> PathRefMut for PackedPathRefMut<'a> {
         self.remove_step_at_index(rem_step_ix)
     }
 
+    fn flip_step(&mut self, step: Self::StepIx) -> Option<Vec<StepUpdate>> {
+        self.flip_step_orientation(step)
+    }
+
     fn set_circularity(&mut self, circular: bool) {
         self.properties.circular = circular;
     }
@@ -679,6 +699,10 @@ impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
 
     fn remove_step(&mut self, step: Self::StepIx) -> Option<StepUpdate> {
         self.remove_step_at_index(step)
+    }
+
+    fn flip_step(&mut self, step: Self::StepIx) -> Option<Vec<StepUpdate>> {
+        self.flip_step_orientation(step)
     }
 
     fn set_circularity(&mut self, circular: bool) {

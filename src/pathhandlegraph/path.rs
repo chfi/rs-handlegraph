@@ -121,6 +121,11 @@ pub trait PathRefMut: PathBase {
         step: Self::StepIx,
     ) -> Option<StepUpdate<Self::StepIx>>;
 
+    fn flip_step(
+        &mut self,
+        step: Self::StepIx,
+    ) -> Option<Vec<StepUpdate<Self::StepIx>>>;
+
     // fn rewrite_segment(
     //     self,
     //     from: PathStep,

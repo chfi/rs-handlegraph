@@ -313,6 +313,10 @@ impl<'a> PathRefMut for PathMutContext<'a> {
         self.path_ref_mut.remove_step(step)
     }
 
+    fn flip_step(&mut self, step: Self::StepIx) -> Option<Vec<StepUpdate>> {
+        self.path_ref_mut.flip_step_orientation(step)
+    }
+
     fn set_circularity(&mut self, circular: bool) {
         self.path_ref_mut.properties.circular = circular;
     }
