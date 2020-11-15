@@ -6,10 +6,16 @@ pub mod dna {
             b'G' => b'C',
             b'C' => b'G',
             b'T' => b'A',
-            b'a' => b't',
-            b'g' => b'c',
-            b'c' => b'g',
-            b't' => b'a',
+            b'Y' => b'R',
+            b'R' => b'Y',
+            b'W' => b'W',
+            b'S' => b'S',
+            b'K' => b'M',
+            b'M' => b'K',
+            b'D' => b'H',
+            b'V' => b'B',
+            b'H' => b'D',
+            b'B' => b'V',
             _ => b'N',
         }
     }
@@ -20,7 +26,15 @@ pub mod dna {
         let mut i = 0;
         let mut table: [u8; 256] = [0; 256];
         while i <= 255 {
-            table[i] = comp_base_impl(i as u8);
+            let offset = 32 * ((i as u8).is_ascii_lowercase() as u8);
+            let comp = comp_base_impl((i as u8) - offset);
+
+            if comp == b'N' {
+                table[i] = i as u8;
+            } else {
+                table[i] = comp + offset;
+            }
+
             i += 1;
         }
         table
@@ -65,13 +79,13 @@ pub mod dna {
         seq.into_iter().rev().map(|b| comp_base(*b.borrow()))
     }
 
-    #[cfg(tests)]
+    #[cfg(test)]
     mod tests {
         use super::*;
 
-        use bio::alphabets::dna;
-        use quickcheck::{Arbitrary, Gen};
+        use quickcheck::{Arbitrary, Gen, QuickCheck};
 
+        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
         struct Base(u8);
 
         impl Base {
@@ -104,7 +118,7 @@ pub mod dna {
 
         impl Arbitrary for Base {
             fn arbitrary<G: Gen>(g: &mut G) -> Base {
-                let n = u8::arbitrary() % 8;
+                let n = u8::arbitrary(g) % 8;
                 Base::from_num(n)
             }
         }
@@ -114,8 +128,21 @@ pub mod dna {
             comp_base(comp_base(base)) == base
         }
 
-        fn is_rev_comp_isomorphic(seq: Vec<Base>) -> bool {
-            rev_comp(rev_comp(seq)) == seq
+        #[test]
+        fn comp_isomorphic_check() {
+            for x in 0..10 {
+                let i = x as u8;
+                let base = Base::from_num(i);
+                let comp = comp_base(base.0);
+                let back = comp_base(comp);
+                println!(
+                    "{:2} -> {} -> {} -> {}",
+                    i,
+                    char::from(base.0),
+                    char::from(comp),
+                    char::from(back),
+                );
+            }
         }
 
         #[test]
@@ -125,11 +152,43 @@ pub mod dna {
                 .quickcheck(is_comp_isomorphic as fn(Base) -> bool);
         }
 
+        fn is_rev_comp_isomorphic(seq: Vec<Base>) -> bool {
+            let seq = seq.into_iter().map(|b| b.0).collect::<Vec<_>>();
+            rev_comp(rev_comp(seq.clone())) == seq
+        }
+
         #[test]
         fn rev_comp_isomorphic() {
             QuickCheck::new()
                 .tests(10000)
                 .quickcheck(is_rev_comp_isomorphic as fn(Vec<Base>) -> bool);
         }
+
+        fn arbitrary_bytes_iso(base: u8) -> bool {
+            if comp_base_impl(base) != b'N' {
+                comp_base(comp_base(base)) == base
+            } else {
+                comp_base(comp_base(base)) == b'N'
+            }
+        }
+
+        // #[test]
+        // fn arbitrary_comp_isomorphic() {
+        //     QuickCheck::new()
+        //         .tests(10000)
+        //         .quickcheck(arbitrary_bytes_iso as fn(u8) -> bool);
+        // }
+
+        #[test]
+        fn print_table() {
+            for x in 0..256 {
+                let val = DNA_COMP_TABLE[x];
+                println!("{:3} -> {:3}", x, val);
+            }
+        }
+
+        // fn arbitrary_rev_comp_iso(seq: Vec<Base>) -> bool {
+
+        // }
     }
 }
