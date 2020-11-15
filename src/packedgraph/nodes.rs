@@ -284,6 +284,26 @@ impl Defragment for NodeRecords {
 }
 
 impl NodeRecords {
+    pub(super) fn transform_node_ids<F>(&mut self, new_id_fn: F)
+    where
+        F: Fn(NodeId) -> NodeId,
+    {
+        let mut new_index_map = NodeIdIndexMap::default();
+        new_index_map.deque.reserve(self.node_count());
+
+        let min_id = self.min_id();
+        for i in 0..new_index_map.deque.len() {
+            let i = i as u64;
+            let old_id = NodeId::from((i as u64) + min_id);
+            if let Some(rec_id) = self.id_index_map.get_index(old_id) {
+                let new_id = new_id_fn(old_id);
+                new_index_map.append_node_id(new_id, rec_id);
+            }
+        }
+
+        self.id_index_map = new_index_map;
+    }
+
     #[inline]
     pub fn min_id(&self) -> u64 {
         self.id_index_map.min_id

@@ -17,7 +17,7 @@ impl PackedDeque {
         Default::default()
     }
 
-    pub(super) fn reserve(&mut self, capacity: usize) {
+    pub fn reserve(&mut self, capacity: usize) {
         if capacity > self.vector.len() {
             let mut vector = PackedIntVec::new();
             vector.resize(capacity);
