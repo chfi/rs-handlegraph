@@ -5,7 +5,7 @@ use super::super::defragment::Defragment;
 
 use fnv::FnvHashMap;
 
-use crate::handle::Handle;
+use crate::handle::{Handle, NodeId};
 
 use std::num::NonZeroUsize;
 
@@ -228,6 +228,33 @@ impl PackedPath {
         tail: PathStepIx,
     ) -> list::IterMut<'_, PackedPath> {
         list::IterMut::new_double(self, head, tail)
+    }
+
+    pub(crate) fn transform_steps<F>(&mut self, transform: F) -> Vec<StepUpdate>
+    where
+        F: Fn(NodeId) -> NodeId,
+    {
+        let length = self.storage_len();
+
+        let mut updates = Vec::new();
+
+        for ix in 0..length {
+            let handle: Handle = self.steps.get_unpack(ix);
+            let n_id = handle.id();
+            if !n_id.is_zero() {
+                let step = PathStepIx::from_zero_based(ix);
+                let new_handle =
+                    Handle::pack(transform(n_id), handle.is_reverse());
+                self.steps.set_pack(ix, new_handle);
+                updates.push(StepUpdate::Remove { handle, step });
+                updates.push(StepUpdate::Insert {
+                    handle: new_handle,
+                    step,
+                });
+            }
+        }
+
+        updates
     }
 }
 

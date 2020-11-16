@@ -1,4 +1,7 @@
-use crate::{handle::Handle, packed::*};
+use crate::{
+    handle::{Handle, NodeId},
+    packed::*,
+};
 
 use fnv::FnvHashMap;
 
@@ -260,6 +263,23 @@ impl EdgeLists {
             true
         } else {
             false
+        }
+    }
+
+    pub(super) fn transform_targets<F>(&mut self, transform: F)
+    where
+        F: Fn(NodeId) -> NodeId,
+    {
+        let length = self.record_count();
+
+        for ix in 0..length {
+            let tgt_ix = 2 * ix;
+            let handle: Handle = self.record_vec.get_unpack(tgt_ix);
+            let n_id = handle.id();
+            if !n_id.is_zero() {
+                self.record_vec
+                    .set_pack(tgt_ix, Handle::from(transform(n_id)));
+            }
         }
     }
 }
