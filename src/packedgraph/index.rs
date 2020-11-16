@@ -136,7 +136,7 @@ where
     let mut previous = next_ix;
 
     let mut insert_next = |start: u64, end: u64| {
-        for ix in num_iter::range(start + 1, end) {
+        for ix in (start + 1)..end {
             result.insert(T::unpack(ix), T::unpack(next_ix));
             next_ix += 1;
         }

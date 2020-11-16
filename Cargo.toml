@@ -19,8 +19,6 @@ bstr = "0.2"
 fnv = "1.0"
 succinct = "0.5"
 rayon = "1.5"
-num-traits = "0.2"
-num-iter = "0.1"
 
 [dev-dependencies]
 quickcheck = "0.9"
