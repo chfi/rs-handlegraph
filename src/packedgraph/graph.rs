@@ -99,6 +99,22 @@ impl PackedGraph {
         Default::default()
     }
 
+    pub(super) fn transform_node_ids<F>(&mut self, transform: F)
+    where
+        F: Fn(NodeId) -> NodeId + Copy + Send + Sync,
+    {
+        // Update the targets of all edges
+        self.edges.transform_targets(transform);
+
+        // Update the steps of all paths
+        self.with_all_paths_mut_ctx(|_, path_ref| {
+            path_ref.path.transform_steps(transform)
+        });
+
+        // Create a new NodeIdIndexMap
+        self.nodes.transform_node_ids(transform);
+    }
+
     pub(super) fn remove_edge_impl(&mut self, edge: Edge) -> Option<()> {
         let Edge(left, right) = edge;
 
