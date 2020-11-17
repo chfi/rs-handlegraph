@@ -82,12 +82,19 @@ impl NodeIdIndexMap {
         self.deque.iter()
     }
 
-    /*
-    #[allow(dead_code)]
-    pub(super) fn len(&self) -> usize {
-        self.deque.len()
+    pub(crate) fn debug_print(&self) {
+        println!("  NodeIdIndexMap storage");
+        println!("    min id {}\tmax id {}", self.min_id, self.max_id);
+        println!("{:6}  {:6}  {:6}", "Index", "Node", "Record");
+        for ix in self.min_id..self.max_id {
+            let node = ix + self.min_id;
+            let record = self.deque.get((ix - self.min_id) as usize);
+            if record != 0 {
+                println!("{:6}  {:6}  {:6}", ix, node, record);
+            }
+        }
+        println!();
     }
-    */
 
     fn clear_node_id(&mut self, id: NodeId) {
         let ix = u64::from(id) - self.min_id;
@@ -120,6 +127,7 @@ impl NodeIdIndexMap {
 
             if id > self.max_id {
                 let ix = (id - self.min_id) as usize;
+
                 if let Some(to_append) = ix.checked_sub(self.deque.len()) {
                     for _ in 0..=to_append {
                         self.deque.push_back(0);
@@ -189,7 +197,7 @@ impl NodeIdIndexMap {
 #[derive(Debug, Clone)]
 pub struct NodeRecords {
     records_vec: PagedIntVec,
-    id_index_map: NodeIdIndexMap,
+    pub(super) id_index_map: NodeIdIndexMap,
     sequences: Sequences,
     removed_nodes: Vec<NodeRecordId>,
     pub(super) node_occurrence_map: PagedIntVec,
@@ -292,7 +300,7 @@ impl NodeRecords {
         new_index_map.deque.reserve(self.node_count());
 
         let min_id = self.min_id();
-        for i in 0..new_index_map.deque.len() {
+        for i in 0..self.id_index_map.deque.len() {
             let i = i as u64;
             let old_id = NodeId::from((i as u64) + min_id);
             if let Some(rec_id) = self.id_index_map.get_index(old_id) {

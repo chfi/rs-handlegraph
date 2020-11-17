@@ -103,16 +103,17 @@ impl PackedGraph {
     where
         F: Fn(NodeId) -> NodeId + Copy + Send + Sync,
     {
+        // Create a new NodeIdIndexMap
+        self.nodes.transform_node_ids(transform);
+
         // Update the targets of all edges
         self.edges.transform_targets(transform);
 
         // Update the steps of all paths
         self.with_all_paths_mut_ctx(|_, path_ref| {
-            path_ref.path.transform_steps(transform)
+            path_ref.path.transform_steps(transform);
+            Vec::new()
         });
-
-        // Create a new NodeIdIndexMap
-        self.nodes.transform_node_ids(transform);
     }
 
     pub(super) fn remove_edge_impl(&mut self, edge: Edge) -> Option<()> {

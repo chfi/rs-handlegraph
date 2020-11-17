@@ -230,13 +230,11 @@ impl PackedPath {
         list::IterMut::new_double(self, head, tail)
     }
 
-    pub(crate) fn transform_steps<F>(&mut self, transform: F) -> Vec<StepUpdate>
+    pub(crate) fn transform_steps<F>(&mut self, transform: F)
     where
         F: Fn(NodeId) -> NodeId,
     {
         let length = self.storage_len();
-
-        let mut updates = Vec::new();
 
         for ix in 0..length {
             let handle: Handle = self.steps.get_unpack(ix);
@@ -246,15 +244,8 @@ impl PackedPath {
                 let new_handle =
                     Handle::pack(transform(n_id), handle.is_reverse());
                 self.steps.set_pack(ix, new_handle);
-                updates.push(StepUpdate::Remove { handle, step });
-                updates.push(StepUpdate::Insert {
-                    handle: new_handle,
-                    step,
-                });
             }
         }
-
-        updates
     }
 }
 
