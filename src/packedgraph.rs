@@ -467,12 +467,50 @@ mod tests {
             .collect::<Vec<_>>()
     }
 
+    #[allow(dead_code)]
     fn print_path_debug(graph: &PackedGraph, id: u64) {
         let path_ref = graph.paths.path_ref(PathId(id)).unwrap();
         let head = path_ref.properties.head;
         let tail = path_ref.properties.tail;
         paths::packedpath::tests::print_path(&path_ref.path, head, tail);
         paths::packedpath::tests::print_path_vecs(&path_ref.path);
+    }
+
+    #[allow(dead_code)]
+    fn print_node_records(graph: &PackedGraph, ids: &[u64]) {
+        println!("{:4}  {:6}  {:5}  {:5}", "Node", "Record", "Left", "Right");
+        for &id in ids.iter() {
+            let (record, left, right) =
+                if let Some(rec_id) = graph.nodes.handle_record(hnd(id)) {
+                    let rec = rec_id.pack().to_string();
+                    let (left, right) =
+                        graph.nodes.get_node_edge_lists(rec_id).unwrap();
+                    (rec, left.pack().to_string(), right.pack().to_string())
+                } else {
+                    (0u64.to_string(), "-".to_string(), "-".to_string())
+                };
+
+            println!("{:4}  {:6}  {:5}  {:5}", id, record, left, right);
+        }
+        println!();
+    }
+
+    #[allow(dead_code)]
+    fn print_edge_records(graph: &PackedGraph) {
+        println!("{:6}  {:6}  {:6}", "EdgeIx", "Target", "Next");
+
+        for ix in 0..graph.edges.record_count() {
+            let edge_ix = EdgeListIx::from_zero_based(ix);
+            let (target, next) =
+                if let Some(record) = graph.edges.get_record(edge_ix) {
+                    (record.0.pack().to_string(), record.1.pack().to_string())
+                } else {
+                    ("-".to_string(), "-".to_string())
+                };
+            println!("{:6}  {:6}  {:6}", edge_ix.pack(), target, next,);
+        }
+
+        println!();
     }
 
     // returns the occurrence list for the provided node as a vector
@@ -482,6 +520,27 @@ mod tests {
         let oc_iter = graph.occurrences.iter(oc_ix);
         oc_iter
             .map(|(_occ_ix, record)| (record.path_id.0, record.offset.pack()))
+            .collect::<Vec<_>>()
+    }
+
+    fn get_all_neighbors(
+        graph: &PackedGraph,
+        handles: &[Handle],
+        dir: Direction,
+    ) -> Vec<(u64, Vec<u64>)> {
+        handles
+            .iter()
+            .copied()
+            .map(|h| {
+                let id = u64::from(h.id());
+                (
+                    id,
+                    graph
+                        .neighbors(h, dir)
+                        .map(|h| u64::from(h.id()))
+                        .collect::<Vec<_>>(),
+                )
+            })
             .collect::<Vec<_>>()
     }
 
@@ -589,24 +648,6 @@ mod tests {
     }
     #[test]
     fn removing_nodes() {
-        let get_all_neighbors =
-            |graph: &PackedGraph, handles: &[Handle], dir: Direction| {
-                handles
-                    .iter()
-                    .copied()
-                    .map(|h| {
-                        let id = u64::from(h.id());
-                        (
-                            id,
-                            graph
-                                .neighbors(h, dir)
-                                .map(|h| u64::from(h.id()))
-                                .collect::<Vec<_>>(),
-                        )
-                    })
-                    .collect::<Vec<_>>()
-            };
-
         let mut graph = test_graph_with_paths();
 
         // removing node 2 should affect the edges of nodes 1, 5, 8, 7,
@@ -1066,5 +1107,89 @@ mod tests {
             .for_each(|(name, expected)| {
                 assert_eq!(graph.paths.path_names.get_path_id(name), expected);
             });
+    }
+
+    #[test]
+    fn reassign_node_ids() {
+        let mut graph = test_graph_with_paths();
+
+        use fnv::FnvHashMap;
+
+        let slice_hnd =
+            |slice: &[u64]| slice.iter().map(|n| hnd(*n)).collect::<Vec<_>>();
+
+        let node_ids: Vec<u64> = (1u64..=9).collect();
+
+        let transformed_ids: Vec<u64> =
+            vec![43, 132, 5, 872, 273, 111, 987, 8, 9839];
+
+        let id_map = node_ids
+            .iter()
+            .copied()
+            .zip(transformed_ids.iter().copied())
+            .collect::<FnvHashMap<u64, u64>>();
+
+        let transform = |n: NodeId| -> NodeId {
+            NodeId::from(id_map.get(&u64::from(n)).copied().unwrap_or(0))
+        };
+
+        let get_neighbors = |graph: &PackedGraph, ids: &[u64]| {
+            let handles = slice_hnd(ids);
+            let left = get_all_neighbors(&graph, &handles, Direction::Left);
+            let right = get_all_neighbors(&graph, &handles, Direction::Right);
+            left.into_iter()
+                .zip(right.into_iter())
+                .map(|((n, left), (_n, right))| (left, n, right))
+                .collect::<Vec<_>>()
+        };
+
+        let pre_transform_neighbors = get_neighbors(&graph, &node_ids);
+
+        let pre_occurs = node_ids
+            .iter()
+            .map(|id| get_occurs(&graph, *id))
+            .collect::<Vec<_>>();
+
+        graph.transform_node_ids(transform);
+
+        // Node neighbors, and thus the edge lists, are transformed correctly
+        let post_transform_neighbors = get_neighbors(&graph, &transformed_ids);
+        assert_eq!(
+            post_transform_neighbors,
+            vec![
+                (vec![], 43, vec![8, 132]),
+                (vec![273, 43], 132, vec![987, 8]),
+                (vec![8, 987], 5, vec![9839]),
+                (vec![8], 872, vec![111, 9839]),
+                (vec![], 273, vec![987, 132]),
+                (vec![9839, 872], 111, vec![]),
+                (vec![132, 273], 987, vec![5]),
+                (vec![132, 43], 8, vec![872, 5]),
+                (vec![872, 5], 9839, vec![111])
+            ]
+        );
+
+        // The steps on the paths are the same modulo the ID transformation
+        let post_steps = (0..=3)
+            .map(|id| path_steps(&graph, PathId(id)))
+            .collect::<Vec<_>>();
+
+        assert_eq!(
+            post_steps,
+            vec![
+                vec![43, 8, 872, 111],
+                vec![273, 132, 8, 872, 111],
+                vec![43, 132, 8, 872, 9839, 111],
+                vec![273, 987, 5, 9839, 111]
+            ]
+        );
+
+        // The node occurrences are identical as the paths have not changed
+        let post_occurs = transformed_ids
+            .iter()
+            .map(|id| get_occurs(&graph, *id))
+            .collect::<Vec<_>>();
+
+        assert_eq!(pre_occurs, post_occurs);
     }
 }
