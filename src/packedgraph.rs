@@ -3,6 +3,7 @@ use crate::{
     handlegraph::*,
     mutablehandlegraph::{
         AdditiveHandleGraph, MutableHandleGraph, SubtractiveHandleGraph,
+        TransformNodeIds,
     },
 };
 
@@ -237,7 +238,7 @@ impl SubtractiveHandleGraph for PackedGraph {
     }
 
     fn clear_graph(&mut self) {
-        unimplemented!();
+        std::mem::swap(self, &mut PackedGraph::default());
     }
 }
 
@@ -420,6 +421,24 @@ impl MutableHandleGraph for PackedGraph {
         }
 
         handle.flip()
+    }
+}
+
+impl TransformNodeIds for PackedGraph {
+    fn transform_node_ids<F>(&mut self, transform: F)
+    where
+        F: Fn(NodeId) -> NodeId + Copy + Send + Sync,
+    {
+        PackedGraph::transform_node_ids(self, transform);
+    }
+
+    fn apply_ordering(&mut self, order: &[Handle]) {
+        assert!(order.len() == self.node_count());
+        PackedGraph::transform_node_ids(self, |node| {
+            let ix = u64::from(node);
+            let handle = order[ix as usize];
+            handle.id()
+        });
     }
 }
 
