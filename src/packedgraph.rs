@@ -32,8 +32,8 @@ pub use self::{
         list, NodeRecordId, OneBasedIndex, PackedDoubleList, PackedList,
         PackedListMut, RecordIndex,
     },
-    iter::{EdgeListHandleIter, PackedHandlesIter},
-    nodes::{GraphVecIx, NodeIdIndexMap, NodeRecords},
+    iter::EdgeListHandleIter,
+    nodes::{GraphVecIx, IndexMapIter, NodeIdIndexMap, NodeRecords},
     occurrences::{NodeOccurrences, OccurListIx, OccurRecord, OccurrencesIter},
     paths::*,
     sequence::{PackedSeqIter, Sequences},
@@ -44,12 +44,12 @@ use self::graph::SeqRecordIx;
 use crate::packed;
 
 impl<'a> AllHandles for &'a PackedGraph {
-    type Handles = PackedHandlesIter<packed::deque::Iter<'a>>;
+    type Handles = NodeIdHandles<IndexMapIter<'a>>;
 
     #[inline]
     fn all_handles(self) -> Self::Handles {
-        let iter = self.nodes.nodes_iter();
-        PackedHandlesIter::new(iter, usize::from(self.min_node_id()))
+        let iter = self.nodes.node_ids_iter();
+        NodeIdHandles::new(iter)
     }
 
     #[inline]

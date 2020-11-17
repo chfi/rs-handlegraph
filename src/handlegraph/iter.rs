@@ -34,6 +34,38 @@ where
     }
 }
 
+/// Iterator adapter to create an Iterator over `Handle`s from an
+/// iterator over `NodeId`s, in a way that can be used as the `Handles`
+/// type in an `AllHandles` implementation.
+pub struct NodeIdHandles<I>
+where
+    I: Iterator<Item = NodeId>,
+{
+    iter: I,
+}
+
+impl<I> NodeIdHandles<I>
+where
+    I: Iterator<Item = NodeId>,
+{
+    pub fn new(iter: I) -> Self {
+        Self { iter }
+    }
+}
+
+impl<I> Iterator for NodeIdHandles<I>
+where
+    I: Iterator<Item = NodeId>,
+{
+    type Item = Handle;
+
+    #[inline]
+    fn next(&mut self) -> Option<Handle> {
+        let id = self.iter.next()?.to_owned();
+        Some(Handle::pack(id, false))
+    }
+}
+
 /// Utility struct for iterating through the edges of a single handle,
 /// for use with EdgesIter
 struct HandleEdgesIter<I>

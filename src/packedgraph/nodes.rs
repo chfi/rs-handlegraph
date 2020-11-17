@@ -78,10 +78,6 @@ impl Default for NodeIdIndexMap {
 }
 
 impl NodeIdIndexMap {
-    pub(super) fn iter(&self) -> packed::deque::Iter<'_> {
-        self.deque.iter()
-    }
-
     pub(crate) fn debug_print(&self) {
         println!("  NodeIdIndexMap storage");
         println!("    min id {}\tmax id {}", self.min_id, self.max_id);
@@ -191,6 +187,28 @@ impl NodeIdIndexMap {
         let deque_index = u64::from(id) - self.min_id;
         self.deque.set_pack(deque_index as usize, new_ix);
         Some(())
+    }
+
+    pub(super) fn iter(&self) -> IndexMapIter<'_> {
+        IndexMapIter {
+            iter: self.deque.iter(),
+            index: 0,
+        }
+    }
+}
+
+pub struct IndexMapIter<'a> {
+    iter: packed::deque::Iter<'a>,
+    index: usize,
+}
+
+impl<'a> Iterator for IndexMapIter<'a> {
+    type Item = NodeId;
+
+    #[inline]
+    fn next(&mut self) -> Option<NodeId> {
+        let next_non_zero = self.iter.find(|&x| x != 0)?;
+        Some(NodeId::from(next_non_zero))
     }
 }
 
@@ -322,7 +340,7 @@ impl NodeRecords {
         self.id_index_map.max_id
     }
 
-    pub fn nodes_iter(&self) -> packed::deque::Iter<'_> {
+    pub(super) fn node_ids_iter(&self) -> IndexMapIter<'_> {
         self.id_index_map.iter()
     }
 
