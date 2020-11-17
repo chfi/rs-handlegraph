@@ -1,3 +1,31 @@
+//! Traits for immutable access to a HandleGraph, including its
+//! nodes/handles, edges, and the sequences of nodes.
+//!
+//! With the exception of `HandleGraph` and `HandleGraphRef`, each of
+//! these traits are centered on providing iterators to one specific
+//! part of a graph. For instance, `HandleNeighbors` gives access to
+//! the neighbors of a handle, using the associated type `Neighbors:
+//! Iterator<Item = Handle>`.
+//!
+//! Most of the methods that define the immutable part of the
+//! handlegraph behavior have default implementations in terms of
+//! these iterators, though it may be desirable to provide specific
+//! implementations in some cases.
+//!
+//! The methods on the iterator traits often take `self`, rather than
+//! `&self`, because the iterators are expected to borrow (part of)
+//! the graph, which means the associated types in the concrete
+//! implementations will include lifetimes, and at this time the only
+//! way to do that is by using a lifetime that's part of the trait's
+//! implementing type.
+//!
+//! For this reason, you won't actually implement `AllHandles` for
+//! `PackedGraph`, but rather for `&'a PackedGraph`.
+//!
+//! The `HandleGraphRef` trait is provided to make it more convenient
+//! to write generic functions using any subset of the handlegraph
+//! behaviors.
+
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
 use rayon::prelude::*;
@@ -6,10 +34,12 @@ pub mod iter;
 
 pub use self::iter::*;
 
-/// Access all the handles in the graph as an iterator, and related
-/// methods.
+
+/// Access all the handles in the graph as an iterator, and querying
+/// the graph for number of nodes, and presence of a node by ID.
 pub trait AllHandles: Sized {
     type Handles: Iterator<Item = Handle>;
+
     fn all_handles(self) -> Self::Handles;
 
     #[inline]
@@ -24,14 +54,15 @@ pub trait AllHandles: Sized {
     }
 }
 
+/// Parallel access to all the handles in the graph.
 pub trait AllHandlesPar {
     type HandlesPar: ParallelIterator<Item = Handle>;
 
     fn all_handles_par(self) -> Self::HandlesPar;
 }
 
-/// Access all the edges in the graph as an iterator, and related
-/// methods.
+/// Access all the edges in the graph as an iterator, and related and
+/// querying the graph for number of edges.
 pub trait AllEdges: Sized {
     type Edges: Iterator<Item = Edge>;
 
@@ -43,9 +74,11 @@ pub trait AllEdges: Sized {
     }
 }
 
-/// Access to the neighbors of any handle in the given direction, and related methods.
+/// Access to the neighbors of handles in the graph, and querying the
+/// graph for a node's degree.
 ///
-/// Implementors should make sure that handles are flipped correctly depending on direction, e.g. using NeighborIter
+/// Implementors should make sure that handles are flipped correctly
+/// depending on direction, e.g. using NeighborIter
 pub trait HandleNeighbors: Sized {
     type Neighbors: Iterator<Item = Handle>;
 
@@ -95,11 +128,6 @@ pub trait HandleSequences: Sized {
 /// Trait denoting that implementors have access to all the immutable
 /// parts of the HandleGraph interface, and that implementors are
 /// copyable references (i.e. immutable, shared references).
-
-/// Collects all the HandleGraph iterator traits in a single bound.
-/// The `impl` on `&T`, which has the additional bound that `T:
-/// HandleGraph`, makes it possible to use this as the only bound in
-/// functions that are generic over `HandleGraph` implementations.
 pub trait HandleGraphRef:
     AllEdges + AllHandles + HandleNeighbors + HandleSequences + Copy
 {
@@ -111,7 +139,8 @@ pub trait HandleGraphRef:
 /// Trait denoting that shared references of an implementor has access
 /// to all the HandleGraph methods.
 ///
-/// Also contains some methods that don't fit into any of the other traits.
+/// Also contains some methods that don't fit into any of the other
+/// traits.
 pub trait HandleGraph {
     fn min_node_id(&self) -> NodeId;
 
