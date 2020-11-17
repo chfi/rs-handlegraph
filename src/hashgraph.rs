@@ -190,7 +190,7 @@ impl AdditiveHandleGraph for HashGraph {
     }
 }
 
-impl MutableHandleGraph for HashGraph {
+impl MutableHandles for HashGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,

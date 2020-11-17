@@ -2,8 +2,8 @@ use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
     mutablehandlegraph::{
-        AdditiveHandleGraph, MutableHandleGraph, SubtractiveHandleGraph,
-        TransformNodeIds,
+        AdditiveHandleGraph, MutableHandleGraph, MutableHandles,
+        SubtractiveHandleGraph, TransformNodeIds,
     },
 };
 
@@ -242,7 +242,7 @@ impl SubtractiveHandleGraph for PackedGraph {
     }
 }
 
-impl MutableHandleGraph for PackedGraph {
+impl MutableHandles for PackedGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,
@@ -436,7 +436,7 @@ impl TransformNodeIds for PackedGraph {
         assert!(order.len() == self.node_count());
         PackedGraph::transform_node_ids(self, |node| {
             let ix = u64::from(node);
-            let handle = order[ix as usize];
+            let handle = order[(ix + 1) as usize];
             handle.id()
         });
     }
