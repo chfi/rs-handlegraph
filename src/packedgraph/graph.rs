@@ -322,8 +322,7 @@ impl PackedGraph {
             .for_each(|s| self.apply_node_occurrence(path_id, s))
     }
 
-    #[allow(dead_code)]
-    pub(super) fn with_path_mut_ctx<F>(&mut self, path_id: PathId, f: F)
+    pub fn with_path_mut_ctx<F>(&mut self, path_id: PathId, f: F)
     where
         for<'b> F:
             Fn(&mut paths::PackedPathRefMut<'b>) -> Vec<paths::StepUpdate>,
@@ -334,8 +333,7 @@ impl PackedGraph {
         }
     }
 
-    #[allow(dead_code)]
-    pub(super) fn zip_all_paths_mut_ctx<T, I, F>(&mut self, iter: I, f: F)
+    pub fn zip_all_paths_mut_ctx<T, I, F>(&mut self, iter: I, f: F)
     where
         I: Iterator<Item = T>,
         for<'b> F: Fn(
@@ -350,8 +348,7 @@ impl PackedGraph {
         }
     }
 
-    #[allow(dead_code)]
-    pub(super) fn with_all_paths_mut_ctx<F>(&mut self, f: F)
+    pub fn with_all_paths_mut_ctx<F>(&mut self, f: F)
     where
         for<'b> F: Fn(
                 PathId,
@@ -365,8 +362,7 @@ impl PackedGraph {
         }
     }
 
-    #[allow(dead_code)]
-    pub(super) fn with_all_paths_mut_ctx_<F>(&mut self, f: F)
+    pub fn with_all_paths_mut_ctx_chn<F>(&mut self, f: F)
     where
         for<'b> F: Fn(
                 PathId,
