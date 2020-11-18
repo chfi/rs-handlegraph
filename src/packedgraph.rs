@@ -211,8 +211,6 @@ impl AdditiveHandleGraph for PackedGraph {
         // the left handle
         self.nodes
             .set_edge_list(left_gix, left_edge_dir, left_to_right);
-        // self.records_vec
-        //     .set(left_edge_ix, left_to_right.as_vec_value());
 
         let right_edge_list =
             self.nodes.get_edge_list(right_gix, right_edge_dir);
@@ -222,7 +220,6 @@ impl AdditiveHandleGraph for PackedGraph {
 
         // set the `next` pointer of the new record to the old head of
         // the right handle
-
         self.nodes
             .set_edge_list(right_gix, right_edge_dir, right_to_left);
     }
@@ -296,7 +293,6 @@ impl MutableHandles for PackedGraph {
         let new_seq_ixs = new_seq_ixs.unwrap();
 
         // Add new nodes and graph records for the new sequence records
-
         for _s_ix in new_seq_ixs.iter() {
             let n_id = self.nodes.append_empty_node();
             let h = Handle::pack(n_id, false);
@@ -443,12 +439,48 @@ impl TransformNodeIds for PackedGraph {
 }
 
 impl MutEmbeddedPaths for PackedGraph {
+    type StepIx = PathStepIx;
+
     fn create_path(&mut self, name: &[u8], _circular: bool) -> PathId {
         self.paths.create_path(name)
     }
 
     fn remove_path(&mut self, id: PathId) {
         self.remove_path_impl(id);
+    }
+    fn append_step_on(
+        &mut self,
+        id: PathId,
+        handle: Handle,
+    ) -> Option<Self::StepIx> {
+        let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
+            vec![path_mut.append_step(handle)]
+        })?;
+        let step_ix = steps.first()?.step();
+        self.apply_node_occurrences_iter(id, steps);
+        Some(step_ix)
+    }
+
+    fn prepend_step_on(
+        &mut self,
+        id: PathId,
+        handle: Handle,
+    ) -> Option<Self::StepIx> {
+        let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
+            vec![path_mut.prepend_step(handle)]
+        })?;
+        let step_ix = steps.first()?.step();
+        self.apply_node_occurrences_iter(id, steps);
+        Some(step_ix)
+    }
+
+    fn rewrite_segment_on(
+        &mut self,
+        id: PathId,
+        begin: Self::StepIx,
+        end: Self::StepIx,
+    ) -> Option<(Self::StepIx, Self::StepIx)> {
+        unimplemented!();
     }
 }
 

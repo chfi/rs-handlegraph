@@ -29,6 +29,22 @@ pub enum StepUpdate<StepIx: Sized + Copy + Eq> {
     // },
 }
 
+impl<StepIx: Sized + Copy + Eq> StepUpdate<StepIx> {
+    pub(crate) fn handle(&self) -> Handle {
+        match self {
+            StepUpdate::Insert { handle, .. } => *handle,
+            StepUpdate::Remove { handle, .. } => *handle,
+        }
+    }
+
+    pub(crate) fn step(&self) -> StepIx {
+        match self {
+            StepUpdate::Insert { step, .. } => *step,
+            StepUpdate::Remove { step, .. } => *step,
+        }
+    }
+}
+
 pub trait PathStep: Sized + Copy + Eq {
     fn handle(&self) -> Handle;
 }
