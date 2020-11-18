@@ -86,15 +86,6 @@ impl Default for PackedPath {
 }
 
 impl PackedPath {
-    pub(super) fn new() -> Self {
-        Self::default()
-    }
-
-    #[inline]
-    pub(super) fn deleted(&self) -> bool {
-        self.path_deleted
-    }
-
     #[inline]
     pub fn len(&self) -> usize {
         self.steps.len() - self.removed_steps
@@ -140,16 +131,6 @@ impl PackedPath {
         PackedStep { handle, prev, next }
     }
 
-    fn set_link(&mut self, from: PathStepIx, to: PathStepIx) -> Option<()> {
-        let from_next_ix = from.to_record_ix(2, 1)?;
-        let to_prev_ix = to.to_record_ix(2, 0)?;
-
-        self.links.set_pack(from_next_ix, to);
-        self.links.set_pack(to_prev_ix, from);
-
-        Some(())
-    }
-
     pub(super) fn prev_step(&self, ix: PathStepIx) -> Option<PathStepIx> {
         let link_ix = ix.to_record_ix(2, 0)?;
         let link = self.links.get_unpack(link_ix);
@@ -188,6 +169,7 @@ impl PackedPath {
         Some(new_ix)
     }
 
+    #[allow(dead_code)]
     pub(super) fn insert_before(
         &mut self,
         ix: PathStepIx,
@@ -240,7 +222,6 @@ impl PackedPath {
             let handle: Handle = self.steps.get_unpack(ix);
             let n_id = handle.id();
             if !n_id.is_zero() {
-                let step = PathStepIx::from_zero_based(ix);
                 let new_handle =
                     Handle::pack(transform(n_id), handle.is_reverse());
                 self.steps.set_pack(ix, new_handle);
@@ -405,7 +386,7 @@ impl Defragment for PackedPath {
 
 #[derive(Clone, Copy)]
 pub struct PackedPathRef<'a> {
-    pub(crate) path_id: PathId,
+    pub path_id: PathId,
     pub(crate) path: &'a PackedPath,
     pub(crate) properties: PathPropertyRecord,
 }
@@ -421,10 +402,6 @@ impl<'a> PackedPathRef<'a> {
             path,
             properties,
         }
-    }
-
-    pub(crate) fn properties(&self) -> &PathPropertyRecord {
-        &self.properties
     }
 }
 
@@ -510,17 +487,6 @@ impl<'a> PackedPathRefMut<'a> {
         properties: PathPropertyRecord,
     ) -> Self {
         PackedPathRefMut {
-            path_id,
-            path,
-            properties,
-        }
-    }
-
-    pub(crate) fn as_path_ref(&self) -> PackedPathRef<'_> {
-        let path_id = self.path_id;
-        let path = &self.path;
-        let properties = self.properties;
-        PackedPathRef {
             path_id,
             path,
             properties,

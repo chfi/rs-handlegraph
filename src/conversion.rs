@@ -11,7 +11,7 @@ use gfa::{
     parser::GFAResult,
 };
 
-use bstr::{BString, ByteVec};
+use bstr::ByteVec;
 
 pub fn from_gfa<G, T>(gfa: &GFA<usize, T>) -> G
 where

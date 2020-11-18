@@ -1,5 +1,4 @@
 use crate::handle::{Edge, Handle, NodeId};
-use crate::handlegraph::HandleGraph;
 
 /// Encapsulates adding handles and edges to a handlegraph.
 pub trait AdditiveHandleGraph {

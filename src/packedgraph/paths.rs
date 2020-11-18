@@ -257,71 +257,6 @@ impl Defragment for PackedGraphPaths {
     }
 }
 
-pub struct PathMutContext<'a> {
-    path_ref_mut: PackedPathRefMut<'a>,
-    path_properties: &'a mut PathProperties,
-}
-
-impl<'a> PathMutContext<'a> {
-    pub(super) fn get_ref_mut<'b>(
-        &'b mut self,
-    ) -> &'b mut PackedPathRefMut<'a> {
-        &mut self.path_ref_mut
-    }
-}
-
-impl<'a> Drop for PathMutContext<'a> {
-    fn drop(&mut self) {
-        let path_id = self.path_ref_mut.path_id;
-        let ix = path_id.0 as usize;
-        let new_props = &self.path_ref_mut.properties;
-        self.path_properties.heads.set_pack(ix, new_props.head);
-        self.path_properties.tails.set_pack(ix, new_props.tail);
-        self.path_properties
-            .circular
-            .set_pack(ix, new_props.circular);
-        self.path_properties
-            .deleted_steps
-            .set_pack(ix, new_props.deleted_steps);
-    }
-}
-
-impl<'a> PathBase for PathMutContext<'a> {
-    type Step = (PathStepIx, PackedStep);
-
-    type StepIx = PathStepIx;
-}
-
-impl<'a> PathRefMut for PathMutContext<'a> {
-    fn append_step(&mut self, handle: Handle) -> StepUpdate {
-        self.path_ref_mut.append_handle(handle)
-    }
-
-    fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
-        self.path_ref_mut.prepend_handle(handle)
-    }
-
-    fn insert_step_after(
-        &mut self,
-        ix: Self::StepIx,
-        handle: Handle,
-    ) -> StepUpdate {
-        self.path_ref_mut.insert_step_after(ix, handle)
-    }
-
-    fn remove_step(&mut self, step: Self::StepIx) -> Option<StepUpdate> {
-        self.path_ref_mut.remove_step(step)
-    }
-
-    fn flip_step(&mut self, step: Self::StepIx) -> Option<Vec<StepUpdate>> {
-        self.path_ref_mut.flip_step_orientation(step)
-    }
-
-    fn set_circularity(&mut self, circular: bool) {
-        self.path_ref_mut.properties.circular = circular;
-    }
-}
-
 pub struct MultiPathMutContext<'a> {
     paths: Vec<PackedPathRefMut<'a>>,
     path_properties: &'a mut PathProperties,
@@ -362,7 +297,7 @@ impl<'a> Drop for MultiPathMutContext<'a> {
 impl PackedGraphPaths {
     pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
         let path_id = self.paths.len() as u64;
-        let packed_path = PackedPath::new();
+        let packed_path = PackedPath::default();
         self.paths.push(packed_path);
 
         self.path_props.append_empty();
@@ -400,9 +335,6 @@ impl PackedGraphPaths {
 
         self.removed += 1;
 
-        // can't remove the path quite yet, as all the elements to the
-        // right will be shifted back -- need to fix that somehow
-        // self.paths.remove(ix);
         Some(step_updates)
     }
 
@@ -415,13 +347,6 @@ impl PackedGraphPaths {
         let path = self.paths.get(id.0 as usize)?;
         let properties = self.path_props.get_record(id);
         Some(PackedPathRef::new(path_id, path, properties))
-    }
-
-    pub(super) fn path_properties_mut(
-        &mut self,
-        id: PathId,
-    ) -> PathPropertyMut<'_> {
-        self.path_props.record_mut(id)
     }
 
     pub(super) fn get_path_mut_ctx(

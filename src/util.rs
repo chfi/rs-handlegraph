@@ -163,32 +163,5 @@ pub mod dna {
                 .tests(10000)
                 .quickcheck(is_rev_comp_isomorphic as fn(Vec<Base>) -> bool);
         }
-
-        fn arbitrary_bytes_iso(base: u8) -> bool {
-            if comp_base_impl(base) != b'N' {
-                comp_base(comp_base(base)) == base
-            } else {
-                comp_base(comp_base(base)) == b'N'
-            }
-        }
-
-        // #[test]
-        // fn arbitrary_comp_isomorphic() {
-        //     QuickCheck::new()
-        //         .tests(10000)
-        //         .quickcheck(arbitrary_bytes_iso as fn(u8) -> bool);
-        // }
-
-        #[test]
-        fn print_table() {
-            for x in 0..256 {
-                let val = DNA_COMP_TABLE[x];
-                println!("{:3} -> {:3}", x, val);
-            }
-        }
-
-        // fn arbitrary_rev_comp_iso(seq: Vec<Base>) -> bool {
-
-        // }
     }
 }
