@@ -125,16 +125,6 @@ impl Defragment for NodeOccurrences {
 }
 
 impl NodeOccurrences {
-    pub(super) fn append_record(&mut self) -> OccurListIx {
-        let node_rec_ix = OccurListIx::from_zero_based(self.path_ids.len());
-
-        self.path_ids.append(0);
-        self.node_occur_offsets.append(0);
-        self.node_occur_next.append(0);
-
-        node_rec_ix
-    }
-
     pub(super) fn append_entry(
         &mut self,
         path: PathId,
@@ -148,52 +138,6 @@ impl NodeOccurrences {
         self.node_occur_next.append(next.pack());
 
         node_rec_ix
-    }
-
-    pub(super) fn add_link(&mut self, from: OccurListIx, to: OccurListIx) {
-        let from_ix = from.to_zero_based().unwrap();
-        self.node_occur_next.set_pack(from_ix, to);
-    }
-
-    pub(super) fn prepend_occurrence(
-        &mut self,
-        ix: OccurListIx,
-        path_id: PathId,
-        offset: PathStepIx,
-    ) {
-        let ix = ix.to_zero_based().unwrap();
-
-        let rec_ix = self.append_record();
-
-        let next: OccurListIx = self.node_occur_next.get_unpack(ix);
-
-        let rec_ix = rec_ix.to_zero_based().unwrap();
-
-        self.path_ids.set_pack(rec_ix, path_id.0);
-        self.node_occur_offsets.set_pack(rec_ix, offset);
-        self.node_occur_next.set_pack(rec_ix, next);
-    }
-
-    pub(super) fn set_record(
-        &mut self,
-        ix: OccurListIx,
-        path_id: PathId,
-        offset: PathStepIx,
-        next: OccurListIx,
-    ) -> bool {
-        if let Some(ix) = ix.to_zero_based() {
-            if ix >= self.path_ids.len() {
-                return false;
-            }
-
-            self.path_ids.set_pack(ix, path_id.0);
-            self.node_occur_offsets.set_pack(ix, offset);
-            self.node_occur_next.set_pack(ix, next);
-
-            true
-        } else {
-            false
-        }
     }
 
     pub(crate) fn iter(&self, head: OccurListIx) -> list::Iter<'_, Self> {

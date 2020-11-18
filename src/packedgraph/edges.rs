@@ -387,6 +387,7 @@ pub(crate) mod tests {
             .collect::<Vec<_>>()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn vec_edge_list_records(
         edges: &EdgeLists,
     ) -> Vec<(u64, u64, u64)> {

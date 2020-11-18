@@ -78,6 +78,8 @@ impl Default for NodeIdIndexMap {
 }
 
 impl NodeIdIndexMap {
+    #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn debug_print(&self) {
         println!("  NodeIdIndexMap storage");
         println!("    min id {}\tmax id {}", self.min_id, self.max_id);
@@ -178,28 +180,15 @@ impl NodeIdIndexMap {
         }
     }
 
-    pub(super) fn set_index(
-        &mut self,
-        id: NodeId,
-        new_ix: NodeRecordId,
-    ) -> Option<()> {
-        let old_ix = self.get_index(id)?;
-        let deque_index = u64::from(id) - self.min_id;
-        self.deque.set_pack(deque_index as usize, new_ix);
-        Some(())
-    }
-
     pub(super) fn iter(&self) -> IndexMapIter<'_> {
         IndexMapIter {
             iter: self.deque.iter(),
-            index: 0,
         }
     }
 }
 
 pub struct IndexMapIter<'a> {
     iter: packed::deque::Iter<'a>,
-    index: usize,
 }
 
 impl<'a> Iterator for IndexMapIter<'a> {
@@ -352,11 +341,6 @@ impl NodeRecords {
     #[inline]
     pub fn node_count(&self) -> usize {
         (self.records_vec.len() / 2) - self.removed_nodes.len()
-    }
-
-    #[inline]
-    pub(crate) fn record_count(&self) -> usize {
-        self.records_vec.len() / 2
     }
 
     #[inline]
@@ -582,7 +566,6 @@ impl NodeRecords {
         let total_len = self.node_count() + self.removed_nodes.len();
 
         for ix in 0..total_len {
-            let rec_id = NodeRecordId::from_zero_based(ix);
             let vec_ix = ix * 2;
 
             let old_left: EdgeListIx = self.records_vec.get_unpack(vec_ix);

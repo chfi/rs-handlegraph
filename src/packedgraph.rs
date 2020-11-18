@@ -354,7 +354,7 @@ impl MutableHandles for PackedGraph {
         let occurrences = self.handle_occurrences(handle).collect::<Vec<_>>();
         for (path_id, step_ix) in occurrences {
             self.with_path_mut_ctx(path_id, |path_mut| {
-                let mut last_step = step_ix;
+                let last_step = step_ix;
                 result
                     .iter()
                     .skip(1)
@@ -476,9 +476,9 @@ impl MutEmbeddedPaths for PackedGraph {
 
     fn rewrite_segment_on(
         &mut self,
-        id: PathId,
-        begin: Self::StepIx,
-        end: Self::StepIx,
+        _id: PathId,
+        _begin: Self::StepIx,
+        _end: Self::StepIx,
     ) -> Option<(Self::StepIx, Self::StepIx)> {
         unimplemented!();
     }
