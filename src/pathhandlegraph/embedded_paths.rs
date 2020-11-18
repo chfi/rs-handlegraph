@@ -104,8 +104,29 @@ pub trait EmbeddedPaths: Sized {
 }
 
 pub trait MutEmbeddedPaths {
+    type StepIx: Sized + Copy + Eq;
+
     fn create_path(&mut self, name: &[u8], circular: bool) -> PathId;
     fn remove_path(&mut self, id: PathId);
+
+    fn append_step_on(
+        &mut self,
+        id: PathId,
+        handle: Handle,
+    ) -> Option<Self::StepIx>;
+
+    fn prepend_step_on(
+        &mut self,
+        id: PathId,
+        handle: Handle,
+    ) -> Option<Self::StepIx>;
+
+    fn rewrite_segment_on(
+        &mut self,
+        id: PathId,
+        begin: Self::StepIx,
+        end: Self::StepIx,
+    ) -> Option<(Self::StepIx, Self::StepIx)>;
 }
 
 pub trait PathOccurrences: EmbeddedPaths {
