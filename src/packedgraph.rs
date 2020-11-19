@@ -8,9 +8,9 @@ use crate::{
     },
     pathhandlegraph::{
         AllPathIds, AllPathRefs, AllPathRefsMut, EmbeddedPaths,
-        HandleOccurrences, MutEmbeddedPaths, MutHandleOccurrences, OccurBase,
-        PathId, PathNames, PathNamesMut, PathRef, PathRefMut, PathRefs,
-        PathRefsMut,
+        HandleOccurrences, MutEmbeddedPaths, MutHandleOccurrences, MutPath,
+        OccurBase, PathId, PathNames, PathNamesMut, PathRefs, PathRefsMut,
+        PathSteps,
     },
 };
 
@@ -354,7 +354,7 @@ impl MutableHandles for PackedGraph {
                 result
                     .iter()
                     .skip(1)
-                    .map(|&h| path_mut.insert_step_after(last_step, h))
+                    .filter_map(|&h| path_mut.insert_step_after(last_step, h))
                     .collect()
             });
         }

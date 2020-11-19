@@ -1,6 +1,6 @@
 use crate::handle::Handle;
 
-use super::{PathBase, PathId, PathRef, PathRefMut, StepHandle, StepUpdate};
+use super::{MutPath, PathBase, PathId, PathSteps, StepHandle, StepUpdate};
 
 pub trait AllPathIds: Sized {
     type PathIds: Iterator<Item = PathId>;
@@ -21,7 +21,7 @@ pub trait PathNamesMut: Sized {
 }
 
 pub trait PathRefs: Sized {
-    type Path: PathRef;
+    type Path: PathSteps;
 
     fn path_ref(self, id: PathId) -> Option<Self::Path>;
 }
@@ -33,21 +33,21 @@ pub trait AllPathRefs: PathRefs {
 }
 
 pub trait PathRefsMut: Sized {
-    type PathMut: PathRefMut;
+    type PathMut: MutPath;
 
     fn path_mut(self, id: PathId) -> Option<Self::PathMut>;
 }
 
 pub trait AllPathRefsMut {
     // type MultiCtx: Sized;
-    type MutCtx: PathRefMut;
+    type MutCtx: MutPath;
     type PathRefsMut: Iterator<Item = Self::MutCtx>;
 
     fn all_paths_mut(self) -> Self::PathRefsMut;
 }
 
 pub trait WithPathRefsMut: Sized {
-    type MutCtx: PathRefMut;
+    type MutCtx: MutPath;
 
     #[allow(clippy::type_complexity)]
     fn with_path_mut<F>(
@@ -83,7 +83,7 @@ pub trait EmbeddedPaths: Sized {
     type PathName: Iterator<Item = u8>;
 
     /// The concrete underlying path
-    type Path: PathRef;
+    type Path: PathSteps;
 
     /// Iterator through all the path IDs in this graph
     fn all_path_ids(self) -> Self::AllPaths;
@@ -138,7 +138,7 @@ pub trait PathOccurrences: EmbeddedPaths {
 }
 
 pub trait EmbeddedMutablePath: EmbeddedPaths {
-    type PathMut: PathRefMut;
+    type PathMut: MutPath;
 
     fn get_path_mut(self, path_id: PathId) -> Option<Self::PathMut>;
 }

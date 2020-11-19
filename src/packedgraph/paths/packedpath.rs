@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use crate::{
     handle::{Handle, NodeId},
     packed::*,
-    pathhandlegraph::{PathBase, PathId, PathRef, PathRefMut, PathStep},
+    pathhandlegraph::{MutPath, PathBase, PathId, PathStep, PathSteps},
 };
 
 use crate::packedgraph::{
@@ -428,6 +428,11 @@ impl<'a> PathBase for PackedPathRef<'a> {
     type StepIx = PathStepIx;
 
     #[inline]
+    fn len(&self) -> usize {
+        self.path.len()
+    }
+
+    #[inline]
     fn circular(&self) -> bool {
         self.properties.circular
     }
@@ -473,6 +478,11 @@ impl<'a> PathBase for PackedPathRefMut<'a> {
     type StepIx = PathStepIx;
 
     #[inline]
+    fn len(&self) -> usize {
+        self.path.len()
+    }
+
+    #[inline]
     fn circular(&self) -> bool {
         self.properties.circular
     }
@@ -512,17 +522,13 @@ impl<'a> PathBase for PackedPathRefMut<'a> {
     }
 }
 
-impl<'a> PathRef for PackedPathRef<'a> {
+impl<'a> PathSteps for PackedPathRef<'a> {
     type Steps = list::Iter<'a, PackedPath>;
 
     fn steps(self) -> Self::Steps {
         let head = self.properties.head;
         let tail = self.properties.tail;
         self.path.iter(head, tail)
-    }
-
-    fn len(self) -> usize {
-        self.path.steps.len() - self.path.removed_steps
     }
 }
 
@@ -631,7 +637,7 @@ impl<'a> PackedPathRefMut<'a> {
     }
 }
 
-impl<'a> PathRef for &'a PackedPathRefMut<'a> {
+impl<'a> PathSteps for &'a PackedPathRefMut<'a> {
     type Steps = list::Iter<'a, PackedPath>;
 
     fn steps(self) -> Self::Steps {
@@ -639,13 +645,9 @@ impl<'a> PathRef for &'a PackedPathRefMut<'a> {
         let tail = self.properties.tail;
         self.path.iter(head, tail)
     }
-
-    fn len(self) -> usize {
-        self.path.steps.len() - self.path.removed_steps
-    }
 }
 
-impl<'a> PathRefMut for PackedPathRefMut<'a> {
+impl<'a> MutPath for PackedPathRefMut<'a> {
     fn append_step(&mut self, handle: Handle) -> StepUpdate {
         self.append_handle(handle)
     }
@@ -658,12 +660,12 @@ impl<'a> PathRefMut for PackedPathRefMut<'a> {
         &mut self,
         ix: Self::StepIx,
         handle: Handle,
-    ) -> StepUpdate {
+    ) -> Option<StepUpdate> {
         if ix == self.properties.tail {
-            self.append_step(handle)
+            Some(self.append_step(handle))
         } else {
-            let step = self.path.insert_after(ix, handle).unwrap();
-            StepUpdate::Insert { handle, step }
+            let step = self.path.insert_after(ix, handle)?;
+            Some(StepUpdate::Insert { handle, step })
         }
     }
 
@@ -680,7 +682,7 @@ impl<'a> PathRefMut for PackedPathRefMut<'a> {
     }
 }
 
-impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
+impl<'a, 'b> MutPath for &'a mut PackedPathRefMut<'b> {
     fn append_step(&mut self, handle: Handle) -> StepUpdate {
         self.append_handle(handle)
     }
@@ -693,10 +695,8 @@ impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
         &mut self,
         ix: Self::StepIx,
         handle: Handle,
-    ) -> StepUpdate {
-        <PackedPathRefMut<'_> as PathRefMut>::insert_step_after(
-            self, ix, handle,
-        )
+    ) -> Option<StepUpdate> {
+        <PackedPathRefMut<'_> as MutPath>::insert_step_after(self, ix, handle)
     }
 
     fn remove_step(&mut self, step: Self::StepIx) -> Option<StepUpdate> {
