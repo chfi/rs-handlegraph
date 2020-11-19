@@ -1,30 +1,22 @@
-#[allow(unused_imports)]
-pub(super) use super::{
-    edges::{EdgeListIx, EdgeLists, EdgeVecIx},
-    index::{NodeRecordId, OneBasedIndex, RecordIndex},
-    nodes::{GraphVecIx, NodeIdIndexMap, NodeRecords},
-    occurrences::{NodeOccurrences, OccurListIx, OccurRecord},
-    paths::{PackedGraphPaths, PathStepIx},
-    sequence::{PackedSeqIter, SeqRecordIx, Sequences},
-};
-
 use fnv::FnvHashSet;
 
-use super::defragment::Defragment;
+use crate::{
+    handle::{Direction, Edge, Handle, NodeId},
+    handlegraph::HandleNeighbors,
+    packed::traits::*,
+    pathhandlegraph::PathId,
+};
 
-#[allow(unused_imports)]
-use crate::handle::{Direction, Edge, Handle, NodeId};
+pub(super) use super::{
+    edges::EdgeLists,
+    index::{NodeRecordId, OneBasedIndex, RecordIndex},
+    nodes::NodeRecords,
+    occurrences::NodeOccurrences,
+    paths::PackedGraphPaths,
+    sequence::SeqRecordIx,
+};
 
-use crate::pathhandlegraph::PathId;
-
-use crate::handlegraph::HandleNeighbors;
-
-use crate::packed::traits::*;
-
-// use super::list;
-// use super::list::{PackedList, PackedListMut};
-
-use super::paths;
+use super::{defragment::Defragment, paths};
 
 pub(crate) static NARROW_PAGE_WIDTH: usize = 256;
 pub(crate) static WIDE_PAGE_WIDTH: usize = 1024;

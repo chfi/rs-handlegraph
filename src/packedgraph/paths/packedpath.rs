@@ -1,28 +1,20 @@
-#![allow(dead_code)]
-
-use super::super::defragment;
-use super::super::defragment::Defragment;
+use std::num::NonZeroUsize;
 
 use fnv::FnvHashMap;
 
-use crate::handle::{Handle, NodeId};
+use crate::{
+    handle::{Handle, NodeId},
+    packed::*,
+    pathhandlegraph::{PathBase, PathId, PathRef, PathRefMut, PathStep},
+};
 
-use std::num::NonZeroUsize;
+use crate::packedgraph::{
+    defragment::Defragment,
+    graph::NARROW_PAGE_WIDTH,
+    index::list::{self, PackedDoubleList, PackedList, PackedListMut},
+};
 
-use super::super::graph::NARROW_PAGE_WIDTH;
-
-use super::{OneBasedIndex, RecordIndex};
-
-use super::super::NodeIdIndexMap;
-
-use crate::packedgraph::index::list;
-use list::{PackedDoubleList, PackedList, PackedListMut};
-
-use crate::pathhandlegraph::{PathBase, PathId, PathRef, PathRefMut, PathStep};
-
-use super::properties::*;
-
-use crate::packed::*;
+use super::{properties::*, OneBasedIndex, RecordIndex};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PathStepIx(Option<NonZeroUsize>);
@@ -698,8 +690,6 @@ impl<'a, 'b> PathRefMut for &'a mut PackedPathRefMut<'b> {
 pub(crate) mod tests {
     use super::*;
 
-    use quickcheck::{Arbitrary, Gen};
-
     impl<'a> PackedPathRefMut<'a> {
         pub(crate) fn add_some_steps(
             &mut self,
@@ -792,23 +782,6 @@ pub(crate) mod tests {
             *max_id += count;
 
             updates
-        }
-
-        pub(crate) fn insert_into_middle(
-            &mut self,
-            max_id: &mut usize,
-        ) -> StepUpdate {
-            let length = self.len();
-            let middle = self
-                .steps()
-                .map(|(ix, _)| ix)
-                .nth((length / 2) - 1)
-                .unwrap();
-
-            let handle = Handle::pack(*max_id + 1, false);
-            *max_id += 1;
-
-            self.insert_step_after(middle, handle)
         }
     }
 

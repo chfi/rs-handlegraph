@@ -1,12 +1,10 @@
-use crate::packed::*;
+use crate::packed::{self, *};
 
-use super::defragment::Defragment;
-
-use super::graph::{NodeRecordId, RecordIndex};
-
-use super::index::OneBasedIndex;
-
-use crate::packed;
+use super::{
+    defragment::Defragment,
+    graph::{NodeRecordId, RecordIndex},
+    index::OneBasedIndex,
+};
 
 // An index into both the offset record and the length record for some
 // sequence. It's a simple index into a packed vector, but the order

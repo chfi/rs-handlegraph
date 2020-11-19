@@ -1,21 +1,18 @@
+use fnv::{FnvHashMap, FnvHashSet};
+
 use crate::{
     handle::{Direction, Handle, NodeId},
-    packed::*,
+    packed::{self, *},
 };
 
-use crate::packed;
-
-use super::defragment::Defragment;
-
 use super::{
+    defragment::Defragment,
     edges::EdgeListIx,
     graph::NARROW_PAGE_WIDTH,
     index::{NodeRecordId, OneBasedIndex, RecordIndex},
     occurrences::OccurListIx,
     sequence::{SeqRecordIx, Sequences},
 };
-
-use fnv::{FnvHashMap, FnvHashSet};
 
 /// The index into the underlying packed vector that is used to
 /// represent the graph records that hold pointers to the two edge

@@ -1,21 +1,18 @@
+use std::num::NonZeroUsize;
+
+use fnv::FnvHashMap;
+
 use crate::{
     handle::{Handle, NodeId},
     packed::*,
 };
 
-use fnv::FnvHashMap;
-
-use std::num::NonZeroUsize;
-
-use super::defragment;
-use super::defragment::Defragment;
-
-use super::graph::WIDE_PAGE_WIDTH;
-
-use super::{OneBasedIndex, RecordIndex};
-
-use super::list;
-use super::list::{PackedList, PackedListMut};
+use super::{
+    defragment::{self, Defragment},
+    graph::WIDE_PAGE_WIDTH,
+    list::{self, PackedList, PackedListMut},
+    OneBasedIndex, RecordIndex,
+};
 
 /// The index for an edge record. Valid indices are natural numbers
 /// starting from 1, each denoting a *record*. An edge list index of

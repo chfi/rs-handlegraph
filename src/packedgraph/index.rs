@@ -2,11 +2,10 @@ use std::num::NonZeroUsize;
 
 use fnv::FnvHashMap;
 
-pub mod list;
-
-pub use list::*;
-
 use crate::packed::traits::PackedElement;
+
+pub mod list;
+pub use list::*;
 
 /// An index that is 1-based, and uses 0 to denote missing data/the
 /// empty record/the empty list.

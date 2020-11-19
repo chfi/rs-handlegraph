@@ -1,25 +1,15 @@
-#![allow(dead_code)]
-
-#[allow(unused_imports)]
-use crate::handle::{Handle, NodeId};
-
-use super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH};
-
 use std::num::NonZeroUsize;
 
 use fnv::FnvHashMap;
 
-#[allow(unused_imports)]
-use super::{NodeRecordId, OneBasedIndex, PathStepIx, RecordIndex};
+use crate::{packed::*, pathhandlegraph::*};
 
-use super::list;
-use super::list::{PackedList, PackedListMut};
-
-use crate::pathhandlegraph::*;
-
-use crate::packed::*;
-
-use super::defragment::Defragment;
+use super::{
+    defragment::Defragment,
+    graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH},
+    list::{self, PackedList, PackedListMut},
+    OneBasedIndex, PathStepIx,
+};
 
 /// The index for a node path occurrence record. Valid indices are
 /// natural numbers starting from 1, each denoting a *record*. A zero

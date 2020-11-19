@@ -1,34 +1,21 @@
-#![allow(dead_code)]
-#![allow(unused_imports)]
-
 use rayon::prelude::*;
 
+use fnv::FnvHashMap;
+
 use crate::{
-    handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::*,
+    packed::{self, *},
+    pathhandlegraph::*,
 };
 
-use fnv::{FnvHashMap, FnvHashSet};
-
-use super::{NodeRecordId, OneBasedIndex, PackedDoubleList, RecordIndex};
-
-use super::NodeIdIndexMap;
-
-use super::defragment;
-use super::defragment::Defragment;
-
-use crate::pathhandlegraph::*;
-
-use crate::packed;
-use crate::packed::*;
+use super::{defragment::Defragment, OneBasedIndex, RecordIndex};
 
 pub(crate) mod packedpath;
 pub(crate) mod properties;
 
-pub use self::packedpath::*;
-pub use self::properties::*;
-
-pub use self::packedpath::StepUpdate;
+pub use self::{
+    packedpath::{StepUpdate, *},
+    properties::*,
+};
 
 #[derive(Debug, Clone)]
 pub struct PackedPathNames {
@@ -548,6 +535,8 @@ impl<'a> WithPathRefsMut for &'a mut PackedGraphPaths {
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use crate::handle::Handle;
+
     use super::*;
 
     /// A little DSL for generating paths because why not~
@@ -634,7 +623,7 @@ pub(crate) mod tests {
 
     #[test]
     fn packedpathpaths_new_path() {
-        let mut p_path = PackedPath::new();
+        let mut p_path = PackedPath::default();
 
         let hnd = |x: u64| Handle::pack(x, false);
 
@@ -969,7 +958,7 @@ pub(crate) mod tests {
 
     #[test]
     fn defrag_path_names() {
-        use bstr::{ByteSlice, B};
+        use bstr::B;
 
         let mut packed_names = PackedPathNames::default();
 
@@ -1028,7 +1017,9 @@ pub(crate) mod tests {
 
     #[test]
     fn defrag_graph_paths() {
-        use bstr::{ByteSlice, ByteVec, B};
+        use bstr::B;
+
+        use crate::packedgraph::defragment::Defragment;
 
         let mut paths = PackedGraphPaths::default();
 

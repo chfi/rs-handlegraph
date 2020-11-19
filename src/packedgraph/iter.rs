@@ -1,8 +1,6 @@
 use crate::handle::Handle;
 
-use super::EdgeLists;
-
-use super::index::list;
+use super::{index::list, EdgeLists};
 
 /// Iterator for stepping through an edge list, returning Handles.
 pub struct EdgeListHandleIter<'a> {

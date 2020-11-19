@@ -1,15 +1,9 @@
-#![allow(dead_code)]
+use crate::{packed::*, pathhandlegraph::PathId};
 
-// use crate::handle::{Direction, Edge, Handle, NodeId};
-
-use super::super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH};
-
-use crate::pathhandlegraph::PathId;
-
-use crate::packed::*;
-
-use super::PathStepIx;
-
+use super::{
+    super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH},
+    PathStepIx,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PathPropertyRecord {

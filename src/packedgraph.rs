@@ -1,3 +1,4 @@
+#[allow(unused_imports)]
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
@@ -5,15 +6,17 @@ use crate::{
         AdditiveHandleGraph, MutableHandleGraph, MutableHandles,
         SubtractiveHandleGraph, TransformNodeIds,
     },
+    pathhandlegraph::{
+        AllPathIds, AllPathRefs, AllPathRefsMut, EmbeddedPaths,
+        HandleOccurrences, MutEmbeddedPaths, MutHandleOccurrences, OccurBase,
+        PathId, PathNames, PathNamesMut, PathRef, PathRefMut, PathRefs,
+        PathRefsMut,
+    },
 };
 
-#[allow(unused_imports)]
-use crate::pathhandlegraph::{
-    AllPathIds, AllPathRefs, AllPathRefsMut, EmbeddedPaths, HandleOccurrences,
-    MutEmbeddedPaths, MutHandleOccurrences, OccurBase, PathId, PathNames,
-    PathNamesMut, PathRef, PathRefMut, PathRefs, PathRefsMut,
-};
+use self::graph::SeqRecordIx;
 
+mod defragment;
 pub mod edges;
 pub mod graph;
 pub mod index;
@@ -22,9 +25,6 @@ pub mod nodes;
 pub mod occurrences;
 pub mod paths;
 pub mod sequence;
-
-mod defragment;
-use defragment::Defragment;
 
 pub use self::{
     edges::{EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx},
@@ -39,10 +39,6 @@ pub use self::{
     paths::*,
     sequence::{PackedSeqIter, Sequences},
 };
-
-use self::graph::SeqRecordIx;
-
-use crate::packed;
 
 impl<'a> AllHandles for &'a PackedGraph {
     type Handles = NodeIdHandles<IndexMapIter<'a>>;
@@ -834,8 +830,6 @@ mod tests {
 
     #[test]
     fn packedgraph_mutate_paths() {
-        use bstr::B;
-
         let mut graph = test_graph_with_paths();
 
         let path_1 = PathId(0);
@@ -959,11 +953,11 @@ mod tests {
     #[test]
     fn defrag_packed_graph() {
         use bstr::B;
-
+        use defragment::Defragment;
         use paths::tests::{apply_step_ops, StepOp};
 
         let get_neighbors = |graph: &PackedGraph, x: u64| {
-            if let Some(rec_id) = graph.nodes.handle_record(hnd(x)) {
+            if let Some(_rec_id) = graph.nodes.handle_record(hnd(x)) {
                 let left = graph
                     .neighbors(hnd(x), Direction::Left)
                     .map(|h| u64::from(h.id()))
@@ -996,23 +990,6 @@ mod tests {
               path2 - 1  8  4  6
               path3 - 5  7  3  9  6
         */
-
-        let handles_on = |paths: &PackedGraphPaths, id: u64| -> Vec<Handle> {
-            let path_ref = paths.path_ref(PathId(id)).unwrap();
-            let head = path_ref.properties.head;
-            let tail = path_ref.properties.tail;
-            let path = path_ref.path;
-            paths::packedpath::tests::path_handles(path, head, tail)
-        };
-
-        let vectors_for = |paths: &PackedGraphPaths,
-                           id: u64|
-        // (step_ix, node, prev, next)
-         -> Vec<(usize, u64, u64, u64)> {
-            let path_ref = paths.path_ref(PathId(id)).unwrap();
-            let path = path_ref.path;
-            paths::packedpath::tests::path_vectors(path)
-        };
 
         let ops_0 = crate::step_ops![A 5, RE 2, A 1, M 1];
         let ops_1 = crate::step_ops![A 3, RE 1, A 1, RS 1, P 1, A 2, RE 1, M 1, RE 1, A 1];
@@ -1109,12 +1086,6 @@ mod tests {
             .map(|n| get_neighbors(&graph, n))
             .collect::<Vec<_>>();
 
-        let pre_defrag_occurrences = [1, 2, 3, 5, 6, 7, 8, 9]
-            .iter()
-            .copied()
-            .map(|n| get_occurs(&graph, n))
-            .collect::<Vec<_>>();
-
         graph.defragment();
 
         let post_defrag_neighbors = [1, 2, 3, 5, 6, 7, 8, 9]
@@ -1193,8 +1164,6 @@ mod tests {
                 .map(|((n, left), (_n, right))| (left, n, right))
                 .collect::<Vec<_>>()
         };
-
-        let pre_transform_neighbors = get_neighbors(&graph, &node_ids);
 
         let pre_occurs = node_ids
             .iter()
