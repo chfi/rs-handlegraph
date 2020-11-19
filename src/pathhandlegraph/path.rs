@@ -53,6 +53,18 @@ pub trait PathBase: Sized {
     type Step: PathStep;
 
     type StepIx: Sized + Copy + Eq;
+
+    fn circular(&self) -> bool;
+
+    fn step_at(&self, index: Self::StepIx) -> Option<Self::Step>;
+
+    fn first_step(&self) -> Self::Step;
+
+    fn last_step(&self) -> Self::Step;
+
+    fn next_step(&self, step: Self::Step) -> Option<Self::Step>;
+
+    fn prev_step(&self, step: Self::Step) -> Option<Self::Step>;
 }
 
 impl<'a, T> PathBase for &'a T
@@ -62,6 +74,36 @@ where
     type Step = T::Step;
 
     type StepIx = T::StepIx;
+
+    #[inline]
+    fn circular(&self) -> bool {
+        <T as PathBase>::circular(self)
+    }
+
+    #[inline]
+    fn step_at(&self, index: Self::StepIx) -> Option<Self::Step> {
+        <T as PathBase>::step_at(self, index)
+    }
+
+    #[inline]
+    fn first_step(&self) -> Self::Step {
+        <T as PathBase>::first_step(self)
+    }
+
+    #[inline]
+    fn last_step(&self) -> Self::Step {
+        <T as PathBase>::last_step(self)
+    }
+
+    #[inline]
+    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
+        <T as PathBase>::next_step(self, step)
+    }
+
+    #[inline]
+    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
+        <T as PathBase>::next_step(self, step)
+    }
 }
 
 impl<'a, T> PathBase for &'a mut T
@@ -71,6 +113,36 @@ where
     type Step = T::Step;
 
     type StepIx = T::StepIx;
+
+    #[inline]
+    fn circular(&self) -> bool {
+        <T as PathBase>::circular(self)
+    }
+
+    #[inline]
+    fn step_at(&self, index: Self::StepIx) -> Option<Self::Step> {
+        <T as PathBase>::step_at(self, index)
+    }
+
+    #[inline]
+    fn first_step(&self) -> Self::Step {
+        <T as PathBase>::first_step(self)
+    }
+
+    #[inline]
+    fn last_step(&self) -> Self::Step {
+        <T as PathBase>::last_step(self)
+    }
+
+    #[inline]
+    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
+        <T as PathBase>::next_step(self, step)
+    }
+
+    #[inline]
+    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
+        <T as PathBase>::next_step(self, step)
+    }
 }
 
 /// Abstraction of an immutable embedded path.
@@ -87,16 +159,6 @@ pub trait PathRef: PathBase {
     fn is_empty(self) -> bool {
         self.len() == 0
     }
-
-    fn circular(self) -> bool;
-
-    fn first_step(self) -> Self::Step;
-
-    fn last_step(self) -> Self::Step;
-
-    fn next_step(self, step: Self::Step) -> Option<Self::Step>;
-
-    fn prev_step(self, step: Self::Step) -> Option<Self::Step>;
 
     fn contains(self, handle: Handle) -> bool {
         self.steps().any(|s| s.handle() == handle)

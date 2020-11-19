@@ -117,10 +117,14 @@ impl PackedPath {
         Some(step)
     }
 
-    fn get_step(&self, ix: PathStepIx) -> PackedStep {
-        let handle = self.step_record(ix).unwrap();
-        let (prev, next) = self.link_record(ix).unwrap();
-        PackedStep { handle, prev, next }
+    fn get_step(&self, ix: PathStepIx) -> Option<PackedStep> {
+        let handle = self.step_record(ix)?;
+        let (prev, next) = self.link_record(ix)?;
+        Some(PackedStep { handle, prev, next })
+    }
+
+    fn get_step_unchecked(&self, ix: PathStepIx) -> PackedStep {
+        self.get_step(ix).unwrap()
     }
 
     pub(super) fn prev_step(&self, ix: PathStepIx) -> Option<PathStepIx> {
@@ -422,12 +426,90 @@ impl<'a> PathBase for PackedPathRef<'a> {
     type Step = (PathStepIx, PackedStep);
 
     type StepIx = PathStepIx;
+
+    #[inline]
+    fn circular(&self) -> bool {
+        self.properties.circular
+    }
+
+    #[inline]
+    fn step_at(&self, index: PathStepIx) -> Option<(PathStepIx, PackedStep)> {
+        let step = self.path.get_step(index)?;
+        Some((index, step))
+    }
+
+    #[inline]
+    fn first_step(&self) -> Self::Step {
+        let head = self.properties.head;
+        let step = self.path.get_step_unchecked(head);
+        (head, step)
+    }
+
+    #[inline]
+    fn last_step(&self) -> Self::Step {
+        let tail = self.properties.tail;
+        let step = self.path.get_step_unchecked(tail);
+        (tail, step)
+    }
+
+    #[inline]
+    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
+        let next = self.path.next_step(step.0)?;
+        let next_step = self.path.get_step_unchecked(next);
+        Some((next, next_step))
+    }
+
+    #[inline]
+    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
+        let prev = self.path.prev_step(step.0)?;
+        let prev_step = self.path.get_step_unchecked(prev);
+        Some((prev, prev_step))
+    }
 }
 
 impl<'a> PathBase for PackedPathRefMut<'a> {
     type Step = (PathStepIx, PackedStep);
 
     type StepIx = PathStepIx;
+
+    #[inline]
+    fn circular(&self) -> bool {
+        self.properties.circular
+    }
+
+    #[inline]
+    fn step_at(&self, index: PathStepIx) -> Option<(PathStepIx, PackedStep)> {
+        let step = self.path.get_step(index)?;
+        Some((index, step))
+    }
+
+    #[inline]
+    fn first_step(&self) -> Self::Step {
+        let head = self.properties.head;
+        let step = self.path.get_step_unchecked(head);
+        (head, step)
+    }
+
+    #[inline]
+    fn last_step(&self) -> Self::Step {
+        let tail = self.properties.tail;
+        let step = self.path.get_step_unchecked(tail);
+        (tail, step)
+    }
+
+    #[inline]
+    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
+        let next = self.path.next_step(step.0)?;
+        let next_step = self.path.get_step_unchecked(next);
+        Some((next, next_step))
+    }
+
+    #[inline]
+    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
+        let prev = self.path.prev_step(step.0)?;
+        let prev_step = self.path.get_step_unchecked(prev);
+        Some((prev, prev_step))
+    }
 }
 
 impl<'a> PathRef for PackedPathRef<'a> {
@@ -441,34 +523,6 @@ impl<'a> PathRef for PackedPathRef<'a> {
 
     fn len(self) -> usize {
         self.path.steps.len() - self.path.removed_steps
-    }
-
-    fn circular(self) -> bool {
-        self.properties.circular
-    }
-
-    fn first_step(self) -> Self::Step {
-        let head = self.properties.head;
-        let step = self.path.get_step(head);
-        (head, step)
-    }
-
-    fn last_step(self) -> Self::Step {
-        let tail = self.properties.tail;
-        let step = self.path.get_step(tail);
-        (tail, step)
-    }
-
-    fn next_step(self, step: Self::Step) -> Option<Self::Step> {
-        let next = self.path.next_step(step.0)?;
-        let next_step = self.path.get_step(next);
-        Some((next, next_step))
-    }
-
-    fn prev_step(self, step: Self::Step) -> Option<Self::Step> {
-        let prev = self.path.prev_step(step.0)?;
-        let prev_step = self.path.get_step(prev);
-        Some((prev, prev_step))
     }
 }
 
@@ -588,34 +642,6 @@ impl<'a> PathRef for &'a PackedPathRefMut<'a> {
 
     fn len(self) -> usize {
         self.path.steps.len() - self.path.removed_steps
-    }
-
-    fn circular(self) -> bool {
-        self.properties.circular
-    }
-
-    fn first_step(self) -> Self::Step {
-        let head = self.properties.head;
-        let step = self.path.get_step(head);
-        (head, step)
-    }
-
-    fn last_step(self) -> Self::Step {
-        let tail = self.properties.tail;
-        let step = self.path.get_step(tail);
-        (tail, step)
-    }
-
-    fn next_step(self, step: Self::Step) -> Option<Self::Step> {
-        let next = self.path.next_step(step.0)?;
-        let next_step = self.path.get_step(next);
-        Some((next, next_step))
-    }
-
-    fn prev_step(self, step: Self::Step) -> Option<Self::Step> {
-        let prev = self.path.prev_step(step.0)?;
-        let prev_step = self.path.get_step(prev);
-        Some((prev, prev_step))
     }
 }
 
