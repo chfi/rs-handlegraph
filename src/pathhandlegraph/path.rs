@@ -112,7 +112,10 @@ pub trait PathSteps: PathBase {
 }
 
 /// A path whose steps are annotated with their sequence position.
-pub trait PositionPathRef: PathBase {
+///
+/// WIP -- will probably change substantially to encode the decoupling
+/// between paths and sequences
+pub trait PathSequence: PathBase {
     /// The length of the sequence encoded by the path.
     fn bases_len(&self) -> usize;
 
@@ -156,12 +159,12 @@ pub trait MutPath: PathBase {
         step: Self::StepIx,
     ) -> Option<Vec<StepUpdate<Self::StepIx>>>;
 
-    // fn rewrite_segment(
-    //     self,
-    //     from: PathStep,
-    //     to: PathStep,
-    //     new_segment: &[Handle],
-    // ) -> Option<(PathStep, PathStep)>;
+    fn rewrite_segment(
+        &mut self,
+        from: Self::StepIx,
+        to: Self::StepIx,
+        new_segment: &[Handle],
+    ) -> Option<Vec<StepUpdate<Self::StepIx>>>;
 
     fn set_circularity(&mut self, circular: bool);
 }

@@ -677,6 +677,15 @@ impl<'a> MutPath for PackedPathRefMut<'a> {
         self.flip_step_orientation(step)
     }
 
+    fn rewrite_segment(
+        &mut self,
+        from: Self::StepIx,
+        to: Self::StepIx,
+        new_segment: &[Handle],
+    ) -> Option<Vec<StepUpdate>> {
+        unimplemented!();
+    }
+
     fn set_circularity(&mut self, circular: bool) {
         self.properties.circular = circular;
     }
@@ -705,6 +714,20 @@ impl<'a, 'b> MutPath for &'a mut PackedPathRefMut<'b> {
 
     fn flip_step(&mut self, step: Self::StepIx) -> Option<Vec<StepUpdate>> {
         self.flip_step_orientation(step)
+    }
+
+    fn rewrite_segment(
+        &mut self,
+        from: Self::StepIx,
+        to: Self::StepIx,
+        new_segment: &[Handle],
+    ) -> Option<Vec<StepUpdate>> {
+        <PackedPathRefMut<'_> as MutPath>::rewrite_segment(
+            self,
+            from,
+            to,
+            new_segment,
+        )
     }
 
     fn set_circularity(&mut self, circular: bool) {

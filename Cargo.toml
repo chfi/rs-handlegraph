@@ -10,7 +10,6 @@ readme = "readme.md"
 keywords = ["bioinformatics", "parser", "graph"]
 categories = ["science"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 # gfa = "0.8"

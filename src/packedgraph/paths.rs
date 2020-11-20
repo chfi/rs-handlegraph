@@ -199,6 +199,7 @@ impl Defragment for PackedGraphPaths {
         let total_len = self.paths.len();
 
         let mut new_props = PathProperties::default();
+        // TODO the paths could be rewritten in place and the vector then shrunk
         let mut new_paths = Vec::with_capacity(self.path_count());
 
         let mut updates: Self::Updates = FnvHashMap::default();
