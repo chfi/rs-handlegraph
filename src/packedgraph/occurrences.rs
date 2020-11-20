@@ -8,7 +8,7 @@ use super::{
     defragment::Defragment,
     graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH},
     list::{self, PackedList, PackedListMut},
-    OneBasedIndex, PathStepIx,
+    OneBasedIndex, StepPtr,
 };
 
 /// The index for a node path occurrence record. Valid indices are
@@ -23,7 +23,7 @@ crate::impl_space_usage_stack_newtype!(OccurListIx);
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct OccurRecord {
     pub(crate) path_id: PathId,
-    pub(crate) offset: PathStepIx,
+    pub(crate) offset: StepPtr,
     next: OccurListIx,
 }
 
@@ -79,7 +79,7 @@ impl Defragment for NodeOccurrences {
         let mut next_ix = 0usize;
 
         for ix in 0..total_len {
-            let offset: PathStepIx = self.node_occur_offsets.get_unpack(ix);
+            let offset: StepPtr = self.node_occur_offsets.get_unpack(ix);
 
             if !offset.is_null() {
                 let path_id: PathId = self.path_ids.get_unpack(ix);
@@ -118,7 +118,7 @@ impl NodeOccurrences {
     pub(super) fn append_entry(
         &mut self,
         path: PathId,
-        offset: PathStepIx,
+        offset: StepPtr,
         next: OccurListIx,
     ) -> OccurListIx {
         let node_rec_ix = OccurListIx::from_zero_based(self.path_ids.len());
@@ -143,10 +143,7 @@ impl NodeOccurrences {
 
     pub(crate) fn apply_path_updates(
         &mut self,
-        updates: &FnvHashMap<
-            PathId,
-            (PathId, FnvHashMap<PathStepIx, PathStepIx>),
-        >,
+        updates: &FnvHashMap<PathId, (PathId, FnvHashMap<StepPtr, StepPtr>)>,
     ) {
         let total_len = self.path_ids.len();
 
@@ -154,7 +151,7 @@ impl NodeOccurrences {
             let old_path_id: PathId = self.path_ids.get_unpack(ix);
             let (new_path_id, offset_map) = updates.get(&old_path_id).unwrap();
 
-            let old_offset: PathStepIx = self.node_occur_offsets.get_unpack(ix);
+            let old_offset: StepPtr = self.node_occur_offsets.get_unpack(ix);
             if let Some(new_offset) = offset_map.get(&old_offset) {
                 self.node_occur_offsets.set_pack(ix, *new_offset);
             }
@@ -249,7 +246,7 @@ impl<'a> OccurrencesIter<'a> {
 }
 
 impl<'a> Iterator for OccurrencesIter<'a> {
-    type Item = (PathId, PathStepIx);
+    type Item = (PathId, StepPtr);
 
     fn next(&mut self) -> Option<Self::Item> {
         let (_occ_ix, occ_rec) = self.list_iter.next()?;

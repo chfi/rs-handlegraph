@@ -143,7 +143,7 @@ impl<'a> HandleGraphRef for &'a PackedGraph {
 
 /*
 impl OccurBase for PackedGraph {
-    type StepIx = PathStepIx;
+    type StepIx = StepPtr;
 }
 
 impl<'a> HandleOccurrences for &'a PackedGraph {
@@ -447,7 +447,7 @@ impl TransformNodeIds for PackedGraph {
 
 /*
 impl MutEmbeddedPaths for PackedGraph {
-    type StepIx = PathStepIx;
+    type StepIx = StepPtr;
 
     fn create_path(&mut self, name: &[u8], _circular: bool) -> PathId {
         self.paths.create_path(name)
@@ -853,7 +853,7 @@ mod tests {
         // remove node 7 from path 4
         graph.with_path_mut_ctx(path_4, |path| {
             if let Some(step) =
-                path.remove_step(PathStepIx::from_one_based(2usize))
+                path.remove_step(StepPtr::from_one_based(2usize))
             {
                 vec![step]
             } else {
@@ -869,9 +869,7 @@ mod tests {
             (0..6)
                 .into_iter()
                 .filter_map(|i| {
-                    path.remove_step(PathStepIx::from_one_based(
-                        (i + 1) as usize,
-                    ))
+                    path.remove_step(StepPtr::from_one_based((i + 1) as usize))
                 })
                 .collect()
         });

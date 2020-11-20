@@ -192,8 +192,7 @@ impl Defragment for PackedGraphPaths {
     /// all of the contained `PackedPathSteps`s. Defragmenting a
     /// `PackedPathSteps` can update its step indices, which means the node
     /// occurrences must be updated accordingly.
-    type Updates =
-        FnvHashMap<PathId, (PathId, FnvHashMap<PathStepIx, PathStepIx>)>;
+    type Updates = FnvHashMap<PathId, (PathId, FnvHashMap<StepPtr, StepPtr>)>;
 
     fn defragment(&mut self) -> Option<Self::Updates> {
         let total_len = self.paths.len();
@@ -322,45 +321,6 @@ impl<'a> std::ops::IndexMut<std::ops::Range<PathId>> for PathsMutationCtx<'a> {
         &mut self.paths[start..end]
     }
 }
-
-/*
-pub struct MultiPathMutContext<'a> {
-    paths: Vec<PackedPathRefMut<'a>>,
-    path_properties: &'a mut PathProperties,
-}
-
-impl<'a> MultiPathMutContext<'a> {
-    pub(super) fn get_ref_muts<'b>(
-        &'b mut self,
-    ) -> std::slice::IterMut<'b, PackedPathRefMut<'a>> {
-        self.paths.iter_mut()
-    }
-
-    pub(super) fn ref_muts_par<'b>(
-        &'b mut self,
-    ) -> rayon::slice::IterMut<'b, PackedPathRefMut<'a>> {
-        self.paths.par_iter_mut()
-    }
-}
-
-impl<'a> Drop for MultiPathMutContext<'a> {
-    fn drop(&mut self) {
-        for path in self.paths.iter() {
-            let path_id = path.path_id;
-            let ix = path_id.0 as usize;
-            let new_props = &path.properties;
-            self.path_properties.heads.set_pack(ix, new_props.head);
-            self.path_properties.tails.set_pack(ix, new_props.tail);
-            self.path_properties
-                .circular
-                .set_pack(ix, new_props.circular);
-            self.path_properties
-                .deleted_steps
-                .set_pack(ix, new_props.deleted_steps);
-        }
-    }
-}
-*/
 
 impl PackedGraphPaths {
     pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
@@ -732,7 +692,7 @@ pub(crate) mod tests {
         let s4 = p_path.insert_after(s3, hnd(2)).unwrap();
 
         let steps_fwd = p_path
-            .iter(s1, PathStepIx::null())
+            .iter(s1, StepPtr::null())
             .map(|(ix, step)| {
                 (ix.to_vector_value(), u64::from(step.handle.id()))
             })
@@ -741,7 +701,7 @@ pub(crate) mod tests {
         assert_eq!(steps_fwd, vec![(1, 1), (2, 4), (3, 3), (4, 2)]);
 
         let steps_bwd = p_path
-            .iter(PathStepIx::null(), s4)
+            .iter(StepPtr::null(), s4)
             .rev()
             .map(|(ix, step)| {
                 (ix.to_vector_value(), u64::from(step.handle.id()))
@@ -754,7 +714,7 @@ pub(crate) mod tests {
         let s6 = p_path.insert_before(s1, hnd(6)).unwrap();
 
         let steps_fwd = p_path
-            .iter(s6, PathStepIx::null())
+            .iter(s6, StepPtr::null())
             .map(|(ix, step)| {
                 (ix.to_vector_value(), u64::from(step.handle.id()))
             })
@@ -766,7 +726,7 @@ pub(crate) mod tests {
         );
 
         let steps_bwd = p_path
-            .iter(PathStepIx::null(), s4)
+            .iter(StepPtr::null(), s4)
             .rev()
             .map(|(ix, step)| {
                 (ix.to_vector_value(), u64::from(step.handle.id()))
@@ -962,7 +922,7 @@ pub(crate) mod tests {
                     steps
                         .iter()
                         .filter_map(|&step_ix| {
-                            let ix = PathStepIx::from_one_based(step_ix);
+                            let ix = StepPtr::from_one_based(step_ix);
                             path.remove_step(ix)
                         })
                         .collect::<Vec<_>>()

@@ -2,13 +2,13 @@ use crate::{packed::*, pathhandlegraph::PathId};
 
 use super::{
     super::graph::{NARROW_PAGE_WIDTH, WIDE_PAGE_WIDTH},
-    PathStepIx,
+    StepPtr,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PathPropertyRecord {
-    pub(crate) head: PathStepIx,
-    pub(crate) tail: PathStepIx,
+    pub(crate) head: StepPtr,
+    pub(crate) tail: StepPtr,
     pub(crate) deleted: bool,
     pub(crate) circular: bool,
     pub(crate) deleted_steps: usize,
