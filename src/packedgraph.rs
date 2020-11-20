@@ -6,12 +6,14 @@ use crate::{
         AdditiveHandleGraph, MutableHandleGraph, MutableHandles,
         SubtractiveHandleGraph, TransformNodeIds,
     },
-    pathhandlegraph::{
-        AllPathIds, AllPathRefs, AllPathRefsMut, EmbeddedPaths,
-        HandleOccurrences, MutEmbeddedPaths, MutHandleOccurrences, MutPath,
-        OccurBase, PathId, PathNames, PathNamesMut, PathRefs, PathRefsMut,
-        PathSteps,
-    },
+
+    pathhandlegraph::PathId,
+    // pathhandlegraph::{
+    //     AllPathIds, AllPathRefs, AllPathRefsMut,
+    //     HandleOccurrences, MutHandleOccurrences, MutPath,
+    //     OccurBase, PathId, PathNames, PathNamesMut, PathRefs, PathRefsMut,
+    //     PathSteps,
+    // },
 };
 
 use self::graph::SeqRecordIx;
@@ -139,6 +141,7 @@ impl<'a> HandleGraphRef for &'a PackedGraph {
     }
 }
 
+/*
 impl OccurBase for PackedGraph {
     type StepIx = PathStepIx;
 }
@@ -152,12 +155,15 @@ impl<'a> HandleOccurrences for &'a PackedGraph {
         OccurrencesIter::new(iter)
     }
 }
+    */
 
+/*
 impl<'a> MutHandleOccurrences for &'a mut PackedGraph {
     fn apply_update(self, path_id: PathId, step: StepUpdate) {
         self.apply_node_occurrence(path_id, step)
     }
 }
+    */
 
 impl AdditiveHandleGraph for PackedGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {
@@ -347,6 +353,7 @@ impl MutableHandles for PackedGraph {
             }
         }
 
+        /*
         let occurrences = self.handle_occurrences(handle).collect::<Vec<_>>();
         for (path_id, step_ix) in occurrences {
             self.with_path_mut_ctx(path_id, |path_mut| {
@@ -358,11 +365,14 @@ impl MutableHandles for PackedGraph {
                     .collect()
             });
         }
+        */
 
         result
     }
 
     fn apply_orientation(&mut self, handle: Handle) -> Handle {
+        unimplemented!();
+        /*
         if !handle.is_reverse() {
             return handle;
         }
@@ -413,6 +423,7 @@ impl MutableHandles for PackedGraph {
         }
 
         handle.flip()
+            */
     }
 }
 
@@ -434,6 +445,7 @@ impl TransformNodeIds for PackedGraph {
     }
 }
 
+/*
 impl MutEmbeddedPaths for PackedGraph {
     type StepIx = PathStepIx;
 
@@ -479,6 +491,7 @@ impl MutEmbeddedPaths for PackedGraph {
         unimplemented!();
     }
 }
+*/
 
 #[cfg(test)]
 mod tests {

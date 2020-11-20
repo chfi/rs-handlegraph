@@ -1,5 +1,7 @@
 use fnv::FnvHashSet;
 
+use rayon::prelude::*;
+
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::HandleNeighbors,
@@ -316,8 +318,7 @@ impl PackedGraph {
 
     pub fn with_path_mut_ctx<F>(&mut self, path_id: PathId, f: F)
     where
-        for<'b> F:
-            Fn(&mut paths::PackedPathRefMut<'b>) -> Vec<paths::StepUpdate>,
+        for<'b> F: Fn(&mut paths::PackedPath<'b>) -> Vec<paths::StepUpdate>,
     {
         let steps = self.paths.with_path_mut_ctx(path_id, f);
         if let Some(steps) = steps {
@@ -327,12 +328,15 @@ impl PackedGraph {
 
     pub fn zip_all_paths_mut_ctx<T, I, F>(&mut self, iter: I, f: F)
     where
-        I: Iterator<Item = T>,
-        for<'b> F: Fn(
-            T,
-            PathId,
-            &mut paths::PackedPathRefMut<'b>,
-        ) -> Vec<paths::StepUpdate>,
+        I: IndexedParallelIterator<Item = T>,
+        T: Send + Sync,
+        for<'b> F: FnMut(
+                T,
+                PathId,
+                &mut paths::PackedPath<'b>,
+            ) -> Vec<paths::StepUpdate>
+            + Send
+            + Sync,
     {
         let all_steps = self.paths.zip_with_paths_mut_ctx(iter, f);
         for (path_id, steps) in all_steps {
@@ -342,13 +346,11 @@ impl PackedGraph {
 
     pub fn with_all_paths_mut_ctx<F>(&mut self, f: F)
     where
-        for<'b> F: Fn(
-                PathId,
-                &mut paths::PackedPathRefMut<'b>,
-            ) -> Vec<paths::StepUpdate>
-            + Sync,
+        for<'b> F: Fn(PathId, &mut paths::PackedPath<'b>) -> Vec<paths::StepUpdate>
+            + Sync
+            + Send,
     {
-        let all_steps = self.paths.with_multipath_mut_ctx_par(f);
+        let all_steps = self.paths.with_all_paths_mut_ctx_par(f);
         for (path_id, steps) in all_steps {
             self.apply_node_occurrences_iter(path_id, steps);
         }
@@ -356,13 +358,9 @@ impl PackedGraph {
 
     pub fn with_all_paths_mut_ctx_chn<F>(&mut self, f: F)
     where
-        for<'b> F: Fn(
-                PathId,
-                &mut paths::PackedPathRefMut<'b>,
-            ) -> Vec<paths::StepUpdate>
+        for<'b> F: Fn(PathId, &mut paths::PackedPath<'b>) -> Vec<paths::StepUpdate>
             + Sync,
     {
-        use rayon::prelude::*;
         use std::sync::mpsc;
 
         let (sender, receiver) =
@@ -372,8 +370,8 @@ impl PackedGraph {
         let nodes = &mut self.nodes;
         let occurrences = &mut self.occurrences;
 
-        let mut mut_ctx = paths.get_multipath_mut_ctx();
-        let refs_mut = mut_ctx.ref_muts_par();
+        let mut mut_ctx = paths.get_all_paths_mut_ctx();
+        let refs_mut = mut_ctx.par_iter_mut();
 
         refs_mut.for_each_with(sender, |s, path| {
             let path_id = path.path_id;

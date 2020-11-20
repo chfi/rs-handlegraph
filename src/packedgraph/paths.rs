@@ -168,7 +168,7 @@ impl PackedPathNames {
 
 #[derive(Debug, Clone)]
 pub struct PackedGraphPaths {
-    paths: Vec<PackedPath>,
+    paths: Vec<PackedPathSteps>,
     pub(crate) path_props: PathProperties,
     pub(crate) path_names: PackedPathNames,
     removed: usize,
@@ -189,8 +189,8 @@ impl Default for PackedGraphPaths {
 
 impl Defragment for PackedGraphPaths {
     /// Defragmenting `PackedGraphPaths` implies also defragmenting
-    /// all of the contained `PackedPath`s. Defragmenting a
-    /// `PackedPath` can update its step indices, which means the node
+    /// all of the contained `PackedPathSteps`s. Defragmenting a
+    /// `PackedPathSteps` can update its step indices, which means the node
     /// occurrences must be updated accordingly.
     type Updates =
         FnvHashMap<PathId, (PathId, FnvHashMap<PathStepIx, PathStepIx>)>;
@@ -245,6 +245,85 @@ impl Defragment for PackedGraphPaths {
     }
 }
 
+pub struct PathsMutationCtx<'a> {
+    paths: Vec<PackedPath<'a>>,
+    properties: &'a mut PathProperties,
+}
+
+impl<'a> PathsMutationCtx<'a> {
+    pub fn paths_slice(&self) -> &[PackedPath<'a>] {
+        self.paths.as_slice()
+    }
+
+    pub fn paths_mut_slice(&mut self) -> &mut [PackedPath<'a>] {
+        self.paths.as_mut_slice()
+    }
+
+    pub(crate) fn iter_mut<'b>(
+        &'b mut self,
+    ) -> std::slice::IterMut<'b, PackedPath<'a>> {
+        self.paths.iter_mut()
+    }
+
+    pub(crate) fn par_iter_mut<'b>(
+        &'b mut self,
+    ) -> rayon::slice::IterMut<'b, PackedPath<'a>> {
+        self.paths.par_iter_mut()
+    }
+}
+
+impl<'a> Drop for PathsMutationCtx<'a> {
+    fn drop(&mut self) {
+        for path in self.paths.iter() {
+            let path_id = path.path_id;
+            let ix = path_id.0 as usize;
+
+            self.properties.heads.set_pack(ix, path.head);
+            self.properties.tails.set_pack(ix, path.tail);
+            self.properties.circular.set_pack(ix, path.circular);
+            self.properties
+                .deleted_steps
+                .set_pack(ix, path.deleted_steps);
+        }
+    }
+}
+
+impl<'a> std::ops::Index<PathId> for PathsMutationCtx<'a> {
+    type Output = PackedPath<'a>;
+
+    fn index(&self, id: PathId) -> &PackedPath<'a> {
+        &self.paths[id.0 as usize]
+    }
+}
+
+impl<'a> std::ops::Index<std::ops::Range<PathId>> for PathsMutationCtx<'a> {
+    type Output = [PackedPath<'a>];
+
+    fn index(&self, ids: std::ops::Range<PathId>) -> &[PackedPath<'a>] {
+        let start = ids.start.0 as usize;
+        let end = ids.end.0 as usize;
+        &self.paths[start..end]
+    }
+}
+
+impl<'a> std::ops::IndexMut<PathId> for PathsMutationCtx<'a> {
+    fn index_mut(&mut self, id: PathId) -> &mut PackedPath<'a> {
+        &mut self.paths[id.0 as usize]
+    }
+}
+
+impl<'a> std::ops::IndexMut<std::ops::Range<PathId>> for PathsMutationCtx<'a> {
+    fn index_mut(
+        &mut self,
+        ids: std::ops::Range<PathId>,
+    ) -> &mut [PackedPath<'a>] {
+        let start = ids.start.0 as usize;
+        let end = ids.end.0 as usize;
+        &mut self.paths[start..end]
+    }
+}
+
+/*
 pub struct MultiPathMutContext<'a> {
     paths: Vec<PackedPathRefMut<'a>>,
     path_properties: &'a mut PathProperties,
@@ -281,11 +360,12 @@ impl<'a> Drop for MultiPathMutContext<'a> {
         }
     }
 }
+*/
 
 impl PackedGraphPaths {
     pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
         let path_id = self.paths.len() as u64;
-        let packed_path = PackedPath::default();
+        let packed_path = PackedPathSteps::default();
         self.paths.push(packed_path);
 
         self.path_props.append_empty();
@@ -298,6 +378,8 @@ impl PackedGraphPaths {
         &mut self,
         id: PathId,
     ) -> Option<Vec<StepUpdate>> {
+        unimplemented!();
+        /*
         let ix = id.0;
 
         let steps = {
@@ -306,6 +388,7 @@ impl PackedGraphPaths {
             path.steps()
                 .map(|(step_ix, _step)| step_ix)
                 .collect::<Vec<_>>()
+                unimplemented!();
         };
 
         let step_updates = self.with_path_mut_ctx(id, move |path_ref| {
@@ -324,36 +407,38 @@ impl PackedGraphPaths {
         self.removed += 1;
 
         Some(step_updates)
+        */
     }
 
     pub fn path_count(&self) -> usize {
         self.paths.len() - self.removed
     }
 
-    pub(super) fn path_ref(&self, id: PathId) -> Option<PackedPathRef<'_>> {
-        let path_id = id;
-        let path = self.paths.get(id.0 as usize)?;
-        let properties = self.path_props.get_record(id);
-        Some(PackedPathRef::new(path_id, path, properties))
+    pub(super) fn path_ref(&self, id: PathId) -> Option<PackedPath<'_>> {
+        unimplemented!();
+        // let path_id = id;
+        // let path = self.paths.get(id.0 as usize)?;
+        // let properties = self.path_props.get_record(id);
+        // Some(PackedPath::new(path_id, path, &properties))
     }
 
     pub(super) fn get_path_mut_ctx(
         &mut self,
         id: PathId,
-    ) -> Option<MultiPathMutContext<'_>> {
+    ) -> Option<PathsMutationCtx<'_>> {
         let path = self.paths.get_mut(id.0 as usize)?;
-        let properties = self.path_props.get_record(id);
-        let path_properties = &mut self.path_props;
+        let props = self.path_props.get_record(id);
+        let properties = &mut self.path_props;
 
-        let ref_mut = PackedPathRefMut::new(id, path, properties);
-        Some(MultiPathMutContext {
-            paths: vec![ref_mut],
-            path_properties,
+        let packed_path = PackedPath::new(id, path, &props);
+        Some(PathsMutationCtx {
+            paths: vec![packed_path],
+            properties,
         })
     }
 
-    pub(super) fn get_multipath_mut_ctx(&mut self) -> MultiPathMutContext<'_> {
-        let path_properties = &mut self.path_props;
+    pub(super) fn get_all_paths_mut_ctx(&mut self) -> PathsMutationCtx<'_> {
+        let properties = &mut self.path_props;
 
         let paths = self
             .paths
@@ -361,15 +446,12 @@ impl PackedGraphPaths {
             .enumerate()
             .map(|(id, path)| {
                 let path_id = PathId(id as u64);
-                let properties = path_properties.get_record(path_id);
-                PackedPathRefMut::new(path_id, path, properties)
+                let props = properties.get_record(path_id);
+                PackedPath::new(path_id, path, &props)
             })
             .collect::<Vec<_>>();
 
-        MultiPathMutContext {
-            paths,
-            path_properties,
-        }
+        PathsMutationCtx { paths, properties }
     }
 
     pub(super) fn with_path_mut_ctx<'a, F>(
@@ -378,7 +460,7 @@ impl PackedGraphPaths {
         f: F,
     ) -> Option<Vec<StepUpdate>>
     where
-        F: FnOnce(&mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
+        F: FnOnce(&mut PackedPath<'a>) -> Vec<StepUpdate>,
     {
         let mut mut_ctx = self.get_path_mut_ctx(id)?;
         let ref_mut = mut_ctx.paths.first_mut()?;
@@ -386,15 +468,15 @@ impl PackedGraphPaths {
         Some(f(ref_mut))
     }
 
-    pub(super) fn with_multipath_mut_ctx_par<'a, F>(
+    pub(super) fn with_all_paths_mut_ctx_par<'a, F>(
         &'a mut self,
         f: F,
     ) -> Vec<(PathId, Vec<StepUpdate>)>
     where
-        F: Fn(PathId, &mut PackedPathRefMut<'a>) -> Vec<StepUpdate> + Sync,
+        F: Fn(PathId, &mut PackedPath<'a>) -> Vec<StepUpdate> + Sync,
     {
-        let mut mut_ctx = self.get_multipath_mut_ctx();
-        let refs_mut = mut_ctx.ref_muts_par();
+        let mut mut_ctx = self.get_all_paths_mut_ctx();
+        let refs_mut = mut_ctx.par_iter_mut();
 
         refs_mut
             .map(|path| {
@@ -411,11 +493,14 @@ impl PackedGraphPaths {
         mut f: F,
     ) -> Vec<(PathId, Vec<StepUpdate>)>
     where
-        I: Iterator<Item = T>,
-        F: FnMut(T, PathId, &mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
+        T: Send + Sync,
+        I: IndexedParallelIterator<Item = T>,
+        F: FnMut(T, PathId, &mut PackedPath<'a>) -> Vec<StepUpdate>
+            + Send
+            + Sync,
     {
-        let mut mut_ctx = self.get_multipath_mut_ctx();
-        let refs_mut = mut_ctx.get_ref_muts();
+        let mut mut_ctx = self.get_all_paths_mut_ctx();
+        let refs_mut = mut_ctx.par_iter_mut();
 
         refs_mut
             .zip(iter)
@@ -432,10 +517,10 @@ impl PackedGraphPaths {
         f: F,
     ) -> Vec<(PathId, Vec<StepUpdate>)>
     where
-        F: Fn(PathId, &mut PackedPathRefMut<'a>) -> Vec<StepUpdate>,
+        F: Fn(PathId, &mut PackedPath<'a>) -> Vec<StepUpdate>,
     {
-        let mut mut_ctx = self.get_multipath_mut_ctx();
-        let refs_mut = mut_ctx.get_ref_muts();
+        let mut mut_ctx = self.get_all_paths_mut_ctx();
+        let refs_mut = mut_ctx.iter_mut();
 
         refs_mut
             .map(|path| {
@@ -478,24 +563,24 @@ impl<'a> PathNamesMut for &'a mut PackedPathNames {
     }
 }
 
-impl<'a> PathRefs for &'a PackedGraphPaths {
-    type Path = PackedPathRef<'a>;
+// impl<'a> PathRefs for &'a PackedGraphPaths {
+//     type Path = PackedPathRef<'a>;
 
-    fn path_ref(self, id: PathId) -> Option<PackedPathRef<'a>> {
-        self.path_ref(id)
-    }
-}
+//     fn path_ref(self, id: PathId) -> Option<PackedPathRef<'a>> {
+//         self.path_ref(id)
+//     }
+// }
 
-impl<'a> AllPathRefs for &'a PackedGraphPaths {
-    type PathIds = &'a PackedPathNames;
+// impl<'a> AllPathRefs for &'a PackedGraphPaths {
+//     type PathIds = &'a PackedPathNames;
 
-    fn all_paths_ref(self) -> Vec<Self::Path> {
-        self.path_names
-            .all_path_ids()
-            .filter_map(|p_id| self.path_ref(p_id))
-            .collect()
-    }
-}
+//     fn all_paths_ref(self) -> Vec<Self::Path> {
+//         self.path_names
+//             .all_path_ids()
+//             .filter_map(|p_id| self.path_ref(p_id))
+//             .collect()
+//     }
+// }
 
 /*
 impl<'a> PathRefsMut for &'a mut PackedGraphPaths {
@@ -507,6 +592,7 @@ impl<'a> PathRefsMut for &'a mut PackedGraphPaths {
 }
 */
 
+/*
 impl<'a, 'b> AllPathRefsMut for &'a mut MultiPathMutContext<'b> {
     type MutCtx = &'a mut PackedPathRefMut<'b>;
     type PathRefsMut = std::slice::IterMut<'a, PackedPathRefMut<'b>>;
@@ -533,6 +619,7 @@ impl<'a> WithPathRefsMut for &'a mut PackedGraphPaths {
         self.with_multipath_mut_ctx(f)
     }
 }
+*/
 
 #[cfg(test)]
 pub(crate) mod tests {
@@ -624,7 +711,7 @@ pub(crate) mod tests {
 
     #[test]
     fn packedpathpaths_new_path() {
-        let mut p_path = PackedPath::default();
+        let mut p_path = PackedPathSteps::default();
 
         let hnd = |x: u64| Handle::pack(x, false);
 
