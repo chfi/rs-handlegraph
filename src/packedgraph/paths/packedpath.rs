@@ -380,6 +380,225 @@ impl Defragment for PackedPathSteps {
     }
 }
 
+enum StepsRef<'a> {
+    Shared(&'a PackedPathSteps),
+    Mutable(&'a mut PackedPathSteps),
+}
+
+impl<'a> std::ops::Deref for StepsRef<'a> {
+    type Target = PackedPathSteps;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            StepsRef::Shared(steps) => &steps,
+            StepsRef::Mutable(steps) => &steps,
+        }
+    }
+}
+
+pub struct PathStepsShared<'a>(&'a PackedPathSteps);
+pub struct PathStepsMutable<'a>(&'a mut PackedPathSteps);
+
+impl<'a> std::ops::Deref for PathStepsShared<'a> {
+    type Target = PackedPathSteps;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> std::ops::Deref for PathStepsMutable<'a> {
+    type Target = PackedPathSteps;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> std::ops::DerefMut for PathStepsMutable<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+/*
+pub trait PathStepsMut: PathStepsRef<'a> {
+    fn steps_mut(&'a mut self) -> &'a mut PackedPathSteps;
+}
+
+impl<'a> PathStepsMut<'a> for &'a mut PackedPathSteps {
+    fn steps_mut(&'a mut self) -> &'a mut PackedPathSteps {
+        self
+    }
+}
+*/
+
+// impl<'a> PackedPathStepsRef for &'a PackedPathSteps {
+//     fn steps_ref(&'a self) -> &'a PackedPathSteps {
+//         self
+//     }
+// }
+
+pub trait PackedPathStepsRef {
+    fn steps_ref(&self) -> &PackedPathSteps;
+}
+
+pub trait PackedPathStepsMut: PackedPathStepsRef {
+    fn steps_mut(&mut self) -> &mut PackedPathSteps;
+}
+
+impl<'a> PackedPathStepsRef for PathStepsShared<'a> {
+    fn steps_ref(&self) -> &PackedPathSteps {
+        self.0
+    }
+}
+
+impl<'a> PackedPathStepsRef for PathStepsMutable<'a> {
+    fn steps_ref(&self) -> &PackedPathSteps {
+        self.0
+    }
+}
+
+impl<'a> PackedPathStepsMut for PathStepsMutable<'a> {
+    fn steps_mut(&mut self) -> &mut PackedPathSteps {
+        self.0
+    }
+}
+
+// pub struct PackedPath_<'a, T: PathStepsRef<'a> + 'a> {
+// pub struct PackedPath_<'a, T: PathStepsRef<'a> + 'a> {
+pub struct PackedPath_<T: PackedPathStepsRef> {
+    pub(crate) path_id: PathId,
+    pub(crate) deleted_steps: usize,
+    pub(crate) head: PathStepIx,
+    pub(crate) tail: PathStepIx,
+    pub(crate) circular: bool,
+    path: T,
+}
+
+// pub type PackedRef<'a> = PackedPath_<'a, &'a PackedPathSteps>;
+// pub type PackedMut<'a> = PackedPath_<'a, &'a mut PackedPathSteps>;
+pub type PackedRef<'a> = PackedPath_<PathStepsShared<'a>>;
+pub type PackedMut<'a> = PackedPath_<PathStepsMutable<'a>>;
+
+impl<'a> PackedRef<'a> {
+    pub(crate) fn new_ref(
+        path_id: PathId,
+        path: &'a PackedPathSteps,
+        properties: &PathPropertyRecord,
+    ) -> Self {
+        Self {
+            path_id,
+            path: PathStepsShared(path),
+            deleted_steps: 0,
+            head: properties.head,
+            tail: properties.tail,
+            circular: properties.circular,
+        }
+    }
+}
+
+impl<'a> PackedMut<'a> {
+    pub(crate) fn new_mut(
+        path_id: PathId,
+        path: &'a mut PackedPathSteps,
+        properties: &PathPropertyRecord,
+    ) -> Self {
+        Self {
+            path_id,
+            path: PathStepsMutable(path),
+            deleted_steps: 0,
+            head: properties.head,
+            tail: properties.tail,
+            circular: properties.circular,
+        }
+    }
+}
+
+/*
+impl<'a, T> PathBase for PackedPath_<'a, T>
+where
+    T: PathStepsRef<'a>,
+{
+    type Step = (PathStepIx, PackedStep);
+
+    type StepIx = PathStepIx;
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.path.steps_ref().len()
+    }
+
+    #[inline]
+    fn circular(&self) -> bool {
+        self.circular
+    }
+
+    #[inline]
+    fn step_at(&self, index: PathStepIx) -> Option<(PathStepIx, PackedStep)> {
+        let step = self.path.steps_ref().get_step(index)?;
+        Some((index, step))
+    }
+
+    #[inline]
+    fn first_step(&self) -> Self::Step {
+        let head = self.head;
+        // let step = self.path.get_step_unchecked(head);
+        let step = self.path.steps_ref().get_step_unchecked(head);
+        (head, step)
+    }
+
+    #[inline]
+    fn last_step(&self) -> Self::Step {
+        let tail = self.tail;
+        let step = self.path.steps_ref().get_step_unchecked(tail);
+        (tail, step)
+    }
+
+    #[inline]
+    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
+        let next = self.path.steps_ref().next_step(step.0)?;
+        let next_step = self.path.steps_ref().get_step_unchecked(next);
+        Some((next, next_step))
+    }
+
+    #[inline]
+    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
+        let prev = self.path.steps_ref().prev_step(step.0)?;
+        let prev_step = self.path.steps_ref().get_step_unchecked(prev);
+        Some((prev, prev_step))
+    }
+}
+*/
+
+/*
+pub struct PackedPath_<'a> {
+    pub(crate) path_id: PathId,
+    pub(crate) deleted_steps: usize,
+    pub(crate) head: PathStepIx,
+    pub(crate) tail: PathStepIx,
+    pub(crate) circular: bool,
+    path: StepsRef<'a>,
+}
+
+impl<'a> PackedPath_<'a> {
+    pub(crate) fn new(
+        path_id: PathId,
+        path: &'a mut PackedPathSteps,
+        properties: &PathPropertyRecord,
+    ) -> Self {
+        Self {
+            path_id,
+            path: StepsRef::Mutable(path),
+            deleted_steps: 0,
+            head: properties.head,
+            tail: properties.tail,
+            circular: properties.circular,
+        }
+    }
+}
+*/
+
 #[derive(Debug)]
 pub struct PackedPath<'a> {
     pub(crate) path_id: PathId,

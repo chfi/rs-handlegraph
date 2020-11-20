@@ -487,6 +487,16 @@ impl PackedGraphPaths {
             .collect::<Vec<_>>()
     }
 
+    // fn path_ref_<'a>(&'a self, id: PathId) -> Option<PackedPath_<PackedStepsShared<'a>>> {
+    fn path_ref_<'a>(&'a self, id: PathId) -> Option<PackedRef<'a>> {
+        let steps = self.paths.get(id.0 as usize)?;
+
+        let properties = &self.path_props;
+        let props = properties.get_record(id);
+
+        Some(PackedPath_::new_ref(id, steps, &props))
+    }
+
     pub(super) fn zip_with_paths_mut_ctx<'a, T, I, F>(
         &'a mut self,
         iter: I,
@@ -499,17 +509,18 @@ impl PackedGraphPaths {
             + Send
             + Sync,
     {
-        let mut mut_ctx = self.get_all_paths_mut_ctx();
-        let refs_mut = mut_ctx.par_iter_mut();
+        unimplemented!();
+        // let mut mut_ctx = self.get_all_paths_mut_ctx();
+        // let refs_mut = mut_ctx.par_iter_mut();
 
-        refs_mut
-            .zip(iter)
-            .map(|(path, val)| {
-                let path_id = path.path_id;
-                let steps = f(val, path_id, path);
-                (path_id, steps)
-            })
-            .collect::<Vec<_>>()
+        // refs_mut
+        //     .zip(iter)
+        //     .map(|(path, val)| {
+        //         let path_id = path.path_id;
+        //         let steps = f(val, path_id, path);
+        //         (path_id, steps)
+        //     })
+        //     .collect::<Vec<_>>()
     }
 
     pub(super) fn with_multipath_mut_ctx<'a, F>(
