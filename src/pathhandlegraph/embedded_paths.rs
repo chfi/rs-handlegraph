@@ -37,20 +37,20 @@ pub trait GraphPaths: Sized {
     ) -> Option<Self::Step>;
 }
 
-pub trait GraphPathNames {
+pub trait GraphPathNames: Sized {
     type PathName: Iterator<Item = u8>;
 
-    fn get_path_id(&self, name: &[u8]) -> Option<PathId>;
+    fn get_path_id(self, name: &[u8]) -> Option<PathId>;
 
-    fn get_path_name(&self, id: PathId) -> Option<Self::PathName>;
+    fn get_path_name(self, id: PathId) -> Option<Self::PathName>;
 
     #[inline]
-    fn get_path_name_vec(&self, id: PathId) -> Option<Vec<u8>> {
+    fn get_path_name_vec(self, id: PathId) -> Option<Vec<u8>> {
         self.get_path_name(id).map(|name| name.collect())
     }
 
     #[inline]
-    fn has_path(&self, name: &[u8]) -> bool {
+    fn has_path(self, name: &[u8]) -> bool {
         self.get_path_id(name).is_some()
     }
 }

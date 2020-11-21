@@ -7,7 +7,10 @@ use crate::{
         SubtractiveHandleGraph, TransformNodeIds,
     },
 
-    pathhandlegraph::{IntoNodeOccurrences, PathId},
+    pathhandlegraph::{
+        GraphPathNames, GraphPathsRef, IntoNodeOccurrences, IntoPathIds,
+        MutPath, MutableGraphPaths, PathId, PathSequences, PathSteps,
+    },
     // pathhandlegraph::{
     //     AllPathIds, AllPathRefs, AllPathRefsMut,
     //     HandleOccurrences, MutHandleOccurrences, MutPath,
@@ -480,6 +483,8 @@ impl MutEmbeddedPaths for PackedGraph {
 
 #[cfg(test)]
 mod tests {
+    use rayon::prelude::*;
+
     use super::*;
 
     use crate::packed::PackedElement;
@@ -515,8 +520,8 @@ mod tests {
     #[allow(dead_code)]
     fn print_path_debug(graph: &PackedGraph, id: u64) {
         let path_ref = graph.paths.path_ref(PathId(id)).unwrap();
-        let head = path_ref.properties.head;
-        let tail = path_ref.properties.tail;
+        let head = path_ref.head;
+        let tail = path_ref.tail;
         paths::packedpath::tests::print_path(&path_ref.path, head, tail);
         paths::packedpath::tests::print_path_vecs(&path_ref.path);
     }
@@ -680,7 +685,7 @@ mod tests {
         let steps_vecs = vec![p_1_steps, p_2_steps, p_3_steps, p_4_steps];
 
         graph.zip_all_paths_mut_ctx(
-            steps_vecs.into_iter(),
+            steps_vecs.into_par_iter(),
             |steps, _path_id, path| {
                 steps
                     .into_iter()
@@ -712,11 +717,10 @@ mod tests {
             Direction::Right,
         );
 
-        let _path_ids =
-            graph.paths.path_names.all_path_ids().collect::<Vec<_>>();
+        let _path_ids = graph.into_path_ids().collect::<Vec<_>>();
 
-        let path_1 = graph.paths.path_names.get_path_id(b"path1").unwrap();
-        let path_4 = graph.paths.path_names.get_path_id(b"path4").unwrap();
+        let path_1 = graph.get_path_id(b"path1").unwrap();
+        let path_4 = graph.get_path_id(b"path4").unwrap();
 
         let steps_1_pre = path_steps(&graph, path_1);
         let steps_4_pre = path_steps(&graph, path_4);
@@ -756,8 +760,8 @@ mod tests {
         assert_eq!(steps_1_pre, steps_1_post);
         assert_eq!(steps_4_pre, steps_4_post);
 
-        let path_2 = graph.paths.path_names.get_path_id(b"path2");
-        let path_3 = graph.paths.path_names.get_path_id(b"path3");
+        let path_2 = graph.get_path_id(b"path2");
+        let path_3 = graph.get_path_id(b"path3");
 
         // The paths that did include 2 have been deleted
         assert!(path_2.is_none());
@@ -808,10 +812,10 @@ mod tests {
         let _node_7_occ = get_occurs(&graph, 7);
         let node_8_occ = get_occurs(&graph, 8);
 
-        let path_3 = graph.paths.path_names.get_path_id(b"path3").unwrap();
-        let path_4 = graph.paths.path_names.get_path_id(b"path4").unwrap();
+        let path_3 = graph.get_path_id(b"path3").unwrap();
+        let path_4 = graph.get_path_id(b"path4").unwrap();
 
-        graph.remove_path(path_4);
+        graph.destroy_path(path_4);
 
         let node_7_occ_1 = get_occurs(&graph, 7);
         let node_8_occ_1 = get_occurs(&graph, 8);
@@ -819,7 +823,7 @@ mod tests {
         assert!(node_7_occ_1.is_empty());
         assert_eq!(node_8_occ, node_8_occ_1);
 
-        graph.remove_path(path_3);
+        graph.destroy_path(path_3);
 
         let node_8_occ_2 = get_occurs(&graph, 8);
 
@@ -1123,7 +1127,7 @@ mod tests {
             .iter()
             .zip(expected_path_ids.into_iter())
             .for_each(|(name, expected)| {
-                assert_eq!(graph.paths.path_names.get_path_id(name), expected);
+                assert_eq!(graph.get_path_id(name), expected);
             });
     }
 

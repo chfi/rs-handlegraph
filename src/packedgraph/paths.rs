@@ -524,11 +524,11 @@ impl<'a> PathNamesMut for &'a mut PackedPathNames {
 impl<'a> GraphPathNames for &'a super::PackedGraph {
     type PathName = packed::vector::IterView<'a, u8>;
 
-    fn get_path_id(&self, name: &[u8]) -> Option<PathId> {
+    fn get_path_id(self, name: &[u8]) -> Option<PathId> {
         self.paths.names.name_id_map.get(name).copied()
     }
 
-    fn get_path_name(&self, id: PathId) -> Option<Self::PathName> {
+    fn get_path_name(self, id: PathId) -> Option<Self::PathName> {
         self.paths.names.name_iter(id)
     }
 }
