@@ -259,13 +259,13 @@ impl<'a> PathsMutationCtx<'a> {
         self.paths.as_mut_slice()
     }
 
-    pub(crate) fn iter_mut<'b>(
+    pub fn iter_mut<'b>(
         &'b mut self,
     ) -> std::slice::IterMut<'b, PackedPathMut<'a>> {
         self.paths.iter_mut()
     }
 
-    pub(crate) fn par_iter_mut<'b>(
+    pub fn par_iter_mut<'b>(
         &'b mut self,
     ) -> rayon::slice::IterMut<'b, PackedPathMut<'a>> {
         self.paths.par_iter_mut()
@@ -369,16 +369,6 @@ impl PackedGraphPaths {
 
     pub fn path_count(&self) -> usize {
         self.paths.len() - self.removed
-    }
-
-    fn get_step_list(&self, id: PathId) -> Option<&StepList> {
-        let path = self.paths.get(id.0 as usize)?;
-        let properties = self.properties.get_record(id);
-        if properties.deleted {
-            None
-        } else {
-            Some(path)
-        }
     }
 
     pub(super) fn path_ref(&self, id: PathId) -> Option<PackedPathRef<'_>> {
@@ -689,7 +679,6 @@ impl MutableGraphPaths for super::PackedGraph {
         let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
             path_mut.flip_step(step).into_iter().flatten().collect()
         })?;
-        let step_ix = steps.first()?.step();
         self.apply_node_occurrences_iter(id, steps);
         Some(step)
     }
@@ -842,7 +831,7 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn apply_step_ops(
-        path: &mut PackedPathRefMut<'_>,
+        path: &mut PackedPathMut<'_>,
         ops: &[StepOp],
     ) -> Vec<StepUpdate> {
         let mut updates = Vec::new();
@@ -875,7 +864,7 @@ pub(crate) mod tests {
 
     #[test]
     fn packedpathpaths_new_path() {
-        let mut p_path = PackedPathSteps::default();
+        let mut p_path = StepList::default();
 
         let hnd = |x: u64| Handle::pack(x, false);
 
@@ -1061,8 +1050,8 @@ pub(crate) mod tests {
 
         let print_path = |paths: &PackedGraphPaths, id: PathId| {
             let path_ref = paths.path_ref(id).unwrap();
-            let head = path_ref.properties.head.pack();
-            let tail = path_ref.properties.tail.pack();
+            let head = path_ref.head.pack();
+            let tail = path_ref.tail.pack();
             println!("path {:2} head {:4} tail {:4}", id.0, head, tail);
             println!(
                 "    {:4}  {:4}  {:4}  {:4}",
@@ -1079,8 +1068,8 @@ pub(crate) mod tests {
         };
 
         let step_updates = {
-            let mut mut_ctx = paths.get_multipath_mut_ctx();
-            let paths_mut = mut_ctx.get_ref_muts();
+            let mut mut_ctx = paths.get_all_paths_mut_ctx();
+            let paths_mut = mut_ctx.iter_mut();
 
             paths_mut
                 .zip(inserts.iter())
@@ -1106,8 +1095,8 @@ pub(crate) mod tests {
         let remove: Vec<Vec<usize>> = vec![rem_1, rem_2, rem_3];
 
         let rem_step_updates = {
-            let mut mut_ctx = paths.get_multipath_mut_ctx();
-            let paths_mut = mut_ctx.get_ref_muts();
+            let mut mut_ctx = paths.get_all_paths_mut_ctx();
+            let paths_mut = mut_ctx.iter_mut();
 
             paths_mut
                 .zip(remove.iter())
@@ -1165,8 +1154,8 @@ pub(crate) mod tests {
         ];
 
         let _step_updates = {
-            let mut mut_ctx = paths.get_multipath_mut_ctx();
-            let paths_mut = mut_ctx.get_ref_muts();
+            let mut mut_ctx = paths.get_all_paths_mut_ctx();
+            let paths_mut = mut_ctx.iter_mut();
 
             paths_mut
                 .zip(to_insert)
@@ -1316,10 +1305,10 @@ pub(crate) mod tests {
 
         let handles_on = |paths: &PackedGraphPaths, id: u64| -> Vec<Handle> {
             let path_ref = paths.path_ref(PathId(id)).unwrap();
-            let head = path_ref.properties.head;
-            let tail = path_ref.properties.tail;
+            let head = path_ref.head;
+            let tail = path_ref.tail;
             let path = path_ref.path;
-            packedpath::tests::path_handles(path, head, tail)
+            packedpath::tests::path_handles(&path, head, tail)
         };
 
         let vectors_for = |paths: &PackedGraphPaths,
@@ -1328,7 +1317,7 @@ pub(crate) mod tests {
          -> Vec<(usize, u64, u64, u64)> {
             let path_ref = paths.path_ref(PathId(id)).unwrap();
             let path = path_ref.path;
-            packedpath::tests::path_vectors(path)
+            packedpath::tests::path_vectors(&path)
         };
 
         let pre_defrag_steps = (0..=4u64)

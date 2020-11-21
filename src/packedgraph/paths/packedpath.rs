@@ -738,7 +738,7 @@ where
 pub(crate) mod tests {
     use super::*;
 
-    impl<'a> PackedPathRefMut<'a> {
+    impl<'a> PackedPathMut<'a> {
         pub(crate) fn add_some_steps(
             &mut self,
             max_id: &mut usize,
@@ -779,7 +779,7 @@ pub(crate) mod tests {
 
             if from_head {
                 for _step in 0..count {
-                    let step = self.properties.head;
+                    let step = self.head;
                     let update = self.remove_step_at_index(step).unwrap();
 
                     updates.push(update);
@@ -820,7 +820,7 @@ pub(crate) mod tests {
             for i in 0..count {
                 let id = *max_id + i + 1;
                 let handle = Handle::pack(id, false);
-                let update = self.insert_step_after(last, handle);
+                let update = self.insert_step_after(last, handle).unwrap();
                 if let StepUpdate::Insert { step, .. } = update {
                     last = step;
                 }
@@ -833,9 +833,9 @@ pub(crate) mod tests {
         }
     }
 
-    impl PackedPathSteps {
-        fn generate_from_length(length: usize) -> (PackedPathSteps, usize) {
-            let mut path = PackedPathSteps::default();
+    impl StepList {
+        fn generate_from_length(length: usize) -> (StepList, usize) {
+            let mut path = StepList::default();
             let mut head = path.append_handle_record(Handle::pack(1, false));
             for id in 2..=length {
                 let handle = Handle::pack(id, false);
@@ -937,7 +937,7 @@ pub(crate) mod tests {
     #[test]
     fn generate_path() {
         let len = 10usize;
-        let (path, _) = PackedPathSteps::generate_from_length(len);
+        let (path, _) = StepList::generate_from_length(len);
         let head = StepPtr::from_zero_based(0usize);
         let tail = StepPtr::from_zero_based(path.steps.len() - 1);
 
@@ -949,11 +949,7 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) fn print_path(
-        path: &PackedPathSteps,
-        head: StepPtr,
-        tail: StepPtr,
-    ) {
+    pub(crate) fn print_path(path: &StepList, head: StepPtr, tail: StepPtr) {
         println!("  Head: {:?}\tTail: {:?}", head, tail);
         println!("  {:5}  {:4}  {:4}  {:4}", "Index", "Node", "Prev", "Next");
         for (step_ix, step) in path.iter(head, tail) {
@@ -968,7 +964,7 @@ pub(crate) mod tests {
         println!("  -----------");
     }
 
-    pub(crate) fn print_path_vecs(path: &PackedPathSteps) {
+    pub(crate) fn print_path_vecs(path: &StepList) {
         println!("{:5}  {:4}  {:4}  {:4}", "Index", "Node", "Prev", "Next");
         for ix in 0..path.steps.len() {
             let handle: Handle = path.steps.get_unpack(ix);
@@ -996,16 +992,14 @@ pub(crate) mod tests {
     }
 
     pub(crate) fn path_handles(
-        path: &PackedPathSteps,
+        path: &StepList,
         head: StepPtr,
         tail: StepPtr,
     ) -> Vec<Handle> {
         path.iter(head, tail).map(|(_, step)| step.handle).collect()
     }
 
-    pub(crate) fn path_vectors(
-        path: &PackedPathSteps,
-    ) -> Vec<(usize, u64, u64, u64)> {
+    pub(crate) fn path_vectors(path: &StepList) -> Vec<(usize, u64, u64, u64)> {
         let mut results = Vec::new();
 
         for ix in 0..path.steps.len() {
@@ -1031,7 +1025,7 @@ pub(crate) mod tests {
     #[test]
     fn defrag_path() {
         let len = 4usize;
-        let (mut path, mut max_id) = PackedPathSteps::generate_from_length(len);
+        let (mut path, mut max_id) = StepList::generate_from_length(len);
 
         let mut head = StepPtr::from_zero_based(0usize);
         let mut tail = StepPtr::from_zero_based(path.steps.len() - 1);
