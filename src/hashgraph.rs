@@ -7,6 +7,10 @@ use crate::{
     handlegraph::*,
     mutablehandlegraph::*,
     pathgraph::PathHandleGraph,
+    pathhandlegraph::{
+        GraphPathNames, GraphPaths, GraphPathsRef, MutableGraphPaths, PathId,
+        PathSequences, PathStep,
+    },
     util::dna,
 };
 
@@ -16,7 +20,7 @@ pub mod path;
 
 pub use self::graph::HashGraph;
 pub use self::node::Node;
-pub use self::path::{Path, PathId, PathStep};
+pub use self::path::Path;
 
 impl<'a> AllHandles for &'a HashGraph {
     type Handles = NodeIdRefHandles<
@@ -41,18 +45,18 @@ impl<'a> AllHandles for &'a HashGraph {
     }
 }
 
-impl<'a> AllHandlesPar for &'a HashGraph {
-    type HandlesPar = rayon::iter::IterBridge<
-        NodeIdRefHandles<
-            'a,
-            std::collections::hash_map::Keys<'a, NodeId, Node>,
-        >,
-    >;
+// impl<'a> AllHandlesPar for &'a HashGraph {
+//     type HandlesPar = rayon::iter::IterBridge<
+//         NodeIdRefHandles<
+//             'a,
+//             std::collections::hash_map::Keys<'a, NodeId, Node>,
+//         >,
+//     >;
 
-    fn all_handles_par(self) -> Self::HandlesPar {
-        self.all_handles().par_bridge()
-    }
-}
+//     fn all_handles_par(self) -> Self::HandlesPar {
+//         self.all_handles().par_bridge()
+//     }
+// }
 
 impl<'a> AllEdges for &'a HashGraph {
     type Edges = EdgesIter<&'a HashGraph>;
@@ -278,7 +282,7 @@ impl MutableHandles for HashGraph {
 
         // TODO this is probably not correct, and it's silly to clone
         // the results all the time
-        let affected_paths: Vec<(i64, usize)> = self
+        let affected_paths: Vec<(_, _)> = self
             .get_node_unchecked(&handle.id())
             .occurrences
             .iter()
@@ -286,8 +290,8 @@ impl MutableHandles for HashGraph {
             .collect();
 
         for (path_id, ix) in affected_paths.into_iter() {
-            let step = PathStep::Step(path_id, ix);
-            self.rewrite_segment(&step, &step, result.clone());
+            let step = path::StepIx::Step(path_id, ix);
+            self.path_rewrite_segment(path_id, step, step, result.clone());
         }
 
         result
@@ -342,9 +346,176 @@ impl MutableHandles for HashGraph {
     }
 }
 
+impl GraphPaths for HashGraph {
+    type Step = path::Step;
+
+    type StepIx = path::StepIx;
+
+    fn path_count(&self) -> usize {
+        self.paths.len()
+    }
+
+    fn path_len(&self, id: PathId) -> Option<usize> {
+        let path = self.paths.get(&id)?;
+        Some(path.nodes.len())
+    }
+
+    fn path_circular(&self, id: PathId) -> Option<bool> {
+        let path = self.paths.get(&id)?;
+        Some(path.is_circular)
+    }
+
+    fn path_step_at(
+        &self,
+        id: PathId,
+        index: Self::StepIx,
+    ) -> Option<Self::Step> {
+        let path = self.paths.get(&id)?;
+        let handle = path.lookup_step_handle(&index)?;
+        Some(path::Step(index, handle))
+    }
+
+    fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
+        let _path = self.paths.get(&id)?;
+        Some(path::StepIx::Front(id))
+    }
+
+    fn path_last_step(&self, id: PathId) -> Option<Self::StepIx> {
+        let _path = self.paths.get(&id)?;
+        Some(path::StepIx::End(id))
+    }
+
+    fn path_next_step(
+        &self,
+        id: PathId,
+        step: Self::StepIx,
+    ) -> Option<Self::Step> {
+        unimplemented!();
+    }
+
+    fn path_prev_step(
+        &self,
+        id: PathId,
+        step: Self::StepIx,
+    ) -> Option<Self::Step> {
+        unimplemented!();
+    }
+}
+
+impl<'a> GraphPathNames for &'a HashGraph {
+    type PathName = std::iter::Copied<std::slice::Iter<'a, u8>>;
+
+    fn get_path_id(self, name: &[u8]) -> Option<PathId> {
+        unimplemented!();
+    }
+
+    fn get_path_name(self, id: PathId) -> Option<Self::PathName> {
+        unimplemented!();
+    }
+}
+
+// impl<'a> IntoPathIds for &'a HashGraph {
+
+// type PathIds: Iterator<Item = PathId>;
+
+//     fn into_path_ids(self) -> Self::PathIds { unimplemented!(); }
+// }
+
+impl MutableGraphPaths for HashGraph {
+    fn create_path(&mut self, name: &[u8]) -> Option<PathId> {
+        unimplemented!();
+    }
+
+    fn destroy_path(&mut self, id: PathId) -> bool {
+        unimplemented!();
+    }
+
+    fn path_append_step(
+        &mut self,
+        id: PathId,
+        handle: Handle,
+    ) -> Option<Self::StepIx> {
+        unimplemented!();
+    }
+
+    fn path_prepend_step(
+        &mut self,
+        id: PathId,
+        handle: Handle,
+    ) -> Option<Self::StepIx> {
+        unimplemented!();
+    }
+
+    fn path_insert_step_after(
+        &mut self,
+        id: PathId,
+        index: Self::StepIx,
+        handle: Handle,
+    ) -> Option<Self::StepIx> {
+        unimplemented!();
+    }
+
+    fn path_remove_step(
+        &mut self,
+        id: PathId,
+        step: Self::StepIx,
+    ) -> Option<Self::StepIx> {
+        unimplemented!();
+    }
+
+    fn path_flip_step(
+        &mut self,
+        id: PathId,
+        step: Self::StepIx,
+    ) -> Option<Self::StepIx> {
+        unimplemented!();
+    }
+
+    fn path_rewrite_segment(
+        &mut self,
+        id: PathId,
+        from: Self::StepIx,
+        to: Self::StepIx,
+        new_segment: &[Handle],
+    ) -> Option<Vec<Self::StepIx>> {
+        unimplemented!();
+    }
+
+    fn path_set_circularity(
+        &mut self,
+        id: PathId,
+        circular: bool,
+    ) -> Option<()> {
+        unimplemented!();
+    }
+}
+
+impl PathSequences for HashGraph {
+    fn path_bases_len(&self, id: PathId) -> Option<usize> {
+        unimplemented!();
+    }
+
+    fn path_step_at_base(
+        &self,
+        id: PathId,
+        pos: usize,
+    ) -> Option<Self::StepIx> {
+        unimplemented!();
+    }
+
+    fn path_step_base_offset(
+        &self,
+        id: PathId,
+        index: Self::StepIx,
+    ) -> Option<usize> {
+        unimplemented!();
+    }
+}
+
+/*
 impl PathHandleGraph for HashGraph {
     type PathHandle = PathId;
-    type StepHandle = PathStep;
+    type StepHandle = path::Step;
 
     fn path_count(&self) -> usize {
         self.path_id.len()
@@ -591,3 +762,4 @@ impl PathHandleGraph for HashGraph {
         )
     }
 }
+*/

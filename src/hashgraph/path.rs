@@ -5,20 +5,18 @@ use fnv::FnvHashMap;
 
 use crate::handle::{Handle, NodeId};
 
-// use crate::pathhandlegraph::{PathBase, PathRef, PathRefMut};
+use crate::pathhandlegraph::{PathBase, PathId, PathStep, PathSteps};
 
 use super::Node;
 
-pub type PathId = i64;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PathStep {
-    Front(i64),
-    End(i64),
-    Step(i64, usize),
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StepIx {
+    Front(PathId),
+    End(PathId),
+    Step(PathId, usize),
 }
 
-impl PathStep {
+impl StepIx {
     pub fn index(&self) -> Option<usize> {
         if let Self::Step(_, ix) = self {
             Some(*ix)
@@ -36,6 +34,15 @@ impl PathStep {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Step(pub StepIx, pub Handle);
+
+impl PathStep for Step {
+    fn handle(&self) -> Handle {
+        *self.1
+    }
+}
+
 #[derive(Debug)]
 pub struct Path {
     pub path_id: PathId,
@@ -43,6 +50,62 @@ pub struct Path {
     pub is_circular: bool,
     pub nodes: Vec<Handle>,
 }
+
+/*
+impl PathBase for Path {
+    type Step = Step;
+
+    type StepIx = StepIx;
+
+    #[inline]
+    fn len(&self) -> usize {
+        self.nodes.len()
+    }
+
+    #[inline]
+    fn circular(&self) -> bool {
+        self.is_circular
+    }
+
+    #[inline]
+    fn step_at(&self, index: StepIx) -> Option<Step> {
+        let step = self.path.steps_ref().get_step(index)?;
+        Some((index, step))
+    }
+
+    #[inline]
+    fn first_step(&self) -> Step {
+        let head = self.head;
+        let step = self.path.steps_ref().get_step_unchecked(head);
+        (head, step)
+    }
+
+    #[inline]
+    fn last_step(&self) -> Step {
+        let tail = self.tail;
+        let step = self.path.steps_ref().get_step_unchecked(tail);
+        (tail, step)
+    }
+
+    #[inline]
+    fn next_step(&self, step: Step) -> Option<Step> {
+        let next = self.path.steps_ref().next_step(step.0)?;
+        let next_step = self.path.steps_ref().get_step_unchecked(next);
+        Some((next, next_step))
+    }
+
+    #[inline]
+    fn prev_step(&self, step: Step) -> Option<Step> {
+        let prev = self.path.steps_ref().prev_step(step.0)?;
+        let prev_step = self.path.steps_ref().get_step_unchecked(prev);
+        Some((prev, prev_step))
+    }
+}
+*/
+
+// impl<'a> PathSteps for &'a Path {
+//     type Steps = stD::slice::
+// }
 
 /*
 pub struct PathStepIter<'a> {
@@ -157,27 +220,27 @@ impl Path {
             .sum()
     }
 
-    pub fn lookup_step_handle(&self, step: &PathStep) -> Option<Handle> {
+    pub fn lookup_step_handle(&self, step: &StepIx) -> Option<Handle> {
         match step {
-            PathStep::Front(_) => None,
-            PathStep::End(_) => None,
-            PathStep::Step(_, ix) => Some(self.nodes[*ix]),
+            StepIx::Front(_) => None,
+            StepIx::End(_) => None,
+            StepIx::Step(_, ix) => Some(self.nodes[*ix]),
         }
     }
 
     pub fn position_of_step(
         &self,
         graph: &FnvHashMap<NodeId, Node>,
-        step: &PathStep,
+        step: &StepIx,
     ) -> Option<usize> {
         if step.path_id() != self.path_id {
             return None;
         }
 
         match step {
-            PathStep::Front(_) => Some(0),
-            PathStep::End(_) => Some(self.bases_len(graph)),
-            &PathStep::Step(_, step_ix) => {
+            StepIx::Front(_) => Some(0),
+            StepIx::End(_) => Some(self.bases_len(graph)),
+            &StepIx::Step(_, step_ix) => {
                 let mut bases = 0;
                 for handle in self.nodes[0..step_ix].iter() {
                     let node = graph.get(&handle.id())?;
@@ -192,7 +255,7 @@ impl Path {
         &self,
         graph: &FnvHashMap<NodeId, Node>,
         pos: usize,
-    ) -> PathStep {
+    ) -> StepIx {
         if pos == 0 {
             return PathStep::Front(self.path_id);
         }
@@ -202,10 +265,10 @@ impl Path {
             let node = graph.get(&handle.id()).unwrap();
             bases += node.sequence.len();
             if pos < bases {
-                return PathStep::Step(self.path_id, ix);
+                return StepIx::Step(self.path_id, ix);
             }
         }
 
-        PathStep::End(self.path_id)
+        StepIx::End(self.path_id)
     }
 }

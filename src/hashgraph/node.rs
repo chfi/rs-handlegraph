@@ -3,7 +3,7 @@ use fnv::FnvHashMap;
 
 use crate::handle::Handle;
 
-use super::PathId;
+use crate::pathhandlegraph::PathId;
 
 #[derive(Debug, Clone)]
 pub struct Node {

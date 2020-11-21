@@ -9,18 +9,19 @@ use crate::{
     handle::{Edge, Handle, NodeId},
     handlegraph::*,
     mutablehandlegraph::*,
-    pathgraph::PathHandleGraph,
+    pathhandlegraph::PathId,
+    // pathgraph::PathHandleGraph,
 };
 
-use super::{Node, Path, PathId};
+use super::{Node, Path};
 
 #[derive(Debug)]
 pub struct HashGraph {
     pub max_id: NodeId,
     pub min_id: NodeId,
     pub graph: FnvHashMap<NodeId, Node>,
-    pub path_id: FnvHashMap<Vec<u8>, i64>,
-    pub paths: FnvHashMap<i64, Path>,
+    pub path_id: FnvHashMap<Vec<u8>, PathId>,
+    pub paths: FnvHashMap<PathId, Path>,
 }
 
 impl Default for HashGraph {
