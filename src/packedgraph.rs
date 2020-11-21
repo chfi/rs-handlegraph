@@ -7,7 +7,7 @@ use crate::{
         SubtractiveHandleGraph, TransformNodeIds,
     },
 
-    pathhandlegraph::PathId,
+    pathhandlegraph::{IntoNodeOccurrences, PathId},
     // pathhandlegraph::{
     //     AllPathIds, AllPathRefs, AllPathRefsMut,
     //     HandleOccurrences, MutHandleOccurrences, MutPath,
@@ -141,29 +141,14 @@ impl<'a> HandleGraphRef for &'a PackedGraph {
     }
 }
 
-/*
-impl OccurBase for PackedGraph {
-    type StepIx = StepPtr;
-}
-
-impl<'a> HandleOccurrences for &'a PackedGraph {
-    type OccurIter = OccurrencesIter<'a>;
-
-    fn handle_occurrences(self, handle: Handle) -> Self::OccurIter {
-        let occ_ix = self.nodes.handle_occur_record(handle).unwrap();
+impl<'a> IntoNodeOccurrences for &'a PackedGraph {
+    type Occurrences = OccurrencesIter<'a>;
+    fn into_steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences> {
+        let occ_ix = self.nodes.handle_occur_record(handle)?;
         let iter = self.occurrences.iter(occ_ix);
-        OccurrencesIter::new(iter)
+        Some(OccurrencesIter::new(iter))
     }
 }
-    */
-
-/*
-impl<'a> MutHandleOccurrences for &'a mut PackedGraph {
-    fn apply_update(self, path_id: PathId, step: StepUpdate) {
-        self.apply_node_occurrence(path_id, step)
-    }
-}
-    */
 
 impl AdditiveHandleGraph for PackedGraph {
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {

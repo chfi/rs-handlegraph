@@ -715,6 +715,76 @@ impl MutableGraphPaths for super::PackedGraph {
     }
 }
 
+impl<'a> IntoPathIds for &'a super::PackedGraph {
+    type PathIds = std::iter::Copied<
+        std::collections::hash_map::Values<'a, Vec<u8>, PathId>,
+    >;
+
+    fn into_path_ids(self) -> Self::PathIds {
+        self.paths.names.name_id_map.values().copied()
+    }
+}
+
+impl<'a> GraphPathsRef for &'a super::PackedGraph {
+    type PathRef = PackedPathRef<'a>;
+
+    fn get_path_ref(self, id: PathId) -> Option<Self::PathRef> {
+        self.paths.path_ref(id)
+    }
+}
+
+impl PathSequences for super::PackedGraph {
+    fn path_bases_len(&self, id: PathId) -> Option<usize> {
+        use crate::handlegraph::HandleSequences;
+
+        let path = self.paths.path_ref(id)?;
+        let len = path
+            .steps()
+            .map(|(_, step)| self.node_len(step.handle))
+            .sum::<usize>();
+
+        Some(len)
+    }
+
+    fn path_step_at_base(&self, id: PathId, pos: usize) -> Option<Self::Step> {
+        use crate::handlegraph::HandleSequences;
+
+        let path = self.paths.path_ref(id)?;
+
+        let mut remaining = pos;
+
+        for (ix, step) in path.steps() {
+            let len = self.node_len(step.handle);
+            if remaining < len {
+                return Some((ix, step));
+            }
+            remaining -= len;
+        }
+        None
+    }
+
+    fn path_step_base_offset(
+        &self,
+        id: PathId,
+        index: Self::StepIx,
+    ) -> Option<usize> {
+        use crate::handlegraph::HandleSequences;
+
+        let path = self.paths.path_ref(id)?;
+
+        let mut offset = 0usize;
+
+        for (ix, step) in path.steps() {
+            if ix == index {
+                return Some(offset);
+            }
+
+            offset += self.node_len(step.handle);
+        }
+        None
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod tests {
     use crate::handle::Handle;

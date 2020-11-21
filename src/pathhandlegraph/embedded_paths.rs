@@ -64,10 +64,9 @@ pub trait IntoPathIds {
 pub trait IntoNodeOccurrences: GraphPaths {
     type Occurrences: Iterator<Item = (PathId, Self::StepIx)>;
 
-    fn into_steps_on_handle(self, handle: Handle) -> Self::Occurrences;
+    fn into_steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences>;
 }
 
-// pub trait MutableGraphPaths: GraphPaths + GraphPathNames {
 pub trait MutableGraphPaths: GraphPaths {
     fn create_path(&mut self, name: &[u8]) -> Option<PathId>;
 
@@ -119,20 +118,22 @@ pub trait MutableGraphPaths: GraphPaths {
     ) -> Option<()>;
 }
 
+pub trait PathSequences: GraphPaths {
+    fn path_bases_len(&self, id: PathId) -> Option<usize>;
+
+    fn path_step_at_base(&self, id: PathId, pos: usize) -> Option<Self::Step>;
+
+    fn path_step_base_offset(
+        &self,
+        id: PathId,
+        index: Self::StepIx,
+    ) -> Option<usize>;
+}
+
 pub trait GraphPathsRef: GraphPaths {
     type PathRef: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
 
-    fn get_path_ref<'a>(&'a self, id: PathId) -> Option<&'a Self::PathRef>;
-}
-
-pub trait IntoPathSteps: GraphPathsRef
-where
-    Self::PathRef: PathSteps,
-{
-    fn into_path_steps(
-        self,
-        id: PathId,
-    ) -> Option<<Self::PathRef as PathSteps>::Steps>;
+    fn get_path_ref(self, id: PathId) -> Option<Self::PathRef>;
 }
 
 pub trait GraphPathsRefMut: GraphPaths {
