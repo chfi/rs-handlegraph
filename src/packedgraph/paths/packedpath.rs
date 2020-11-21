@@ -89,7 +89,11 @@ impl Default for StepList {
 impl StepList {
     #[inline]
     pub fn len(&self) -> usize {
-        self.steps.len() - self.removed_steps
+        if self.path_deleted {
+            0
+        } else {
+            self.steps.len() - self.removed_steps
+        }
     }
 
     #[inline]
@@ -464,6 +468,9 @@ pub struct PackedPath<T: AsStepsRef> {
 
 pub type PackedPathRef<'a> = PackedPath<StepListRef<'a>>;
 pub type PackedPathMut<'a> = PackedPath<StepListMut<'a>>;
+
+// impl<T: AsStepsRef> {
+// }
 
 impl<'a> PackedPathRef<'a> {
     /// Constructs a new `PackedPath` holding a shared reference to

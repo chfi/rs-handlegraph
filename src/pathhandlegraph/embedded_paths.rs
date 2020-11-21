@@ -12,7 +12,7 @@ pub trait GraphPaths: Sized {
 
     fn path_len(&self, id: PathId) -> Option<usize>;
 
-    fn path_circular(&self) -> Option<bool>;
+    fn path_circular(&self, id: PathId) -> Option<bool>;
 
     fn path_step_at(
         &self,
@@ -158,8 +158,8 @@ where
         self.path_len(id)
     }
 
-    fn path_circular(&self) -> Option<bool> {
-        self.path_circular()
+    fn path_circular(&self, id: PathId) -> Option<bool> {
+        self.path_circular(id)
     }
 
     fn path_step_at(
@@ -210,8 +210,8 @@ where
         self.path_len(id)
     }
 
-    fn path_circular(&self) -> Option<bool> {
-        self.path_circular()
+    fn path_circular(&self, id: PathId) -> Option<bool> {
+        self.path_circular(id)
     }
 
     fn path_step_at(

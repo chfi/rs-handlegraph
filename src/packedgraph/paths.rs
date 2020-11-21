@@ -169,19 +169,19 @@ impl PackedPathNames {
 #[derive(Debug, Clone)]
 pub struct PackedGraphPaths {
     paths: Vec<StepList>,
-    pub(crate) path_props: PathProperties,
-    pub(crate) path_names: PackedPathNames,
+    pub(crate) properties: PathProperties,
+    pub(crate) names: PackedPathNames,
     removed: usize,
 }
 
-crate::impl_space_usage!(PackedGraphPaths, [paths, path_props, path_names]);
+crate::impl_space_usage!(PackedGraphPaths, [paths, properties, names]);
 
 impl Default for PackedGraphPaths {
     fn default() -> Self {
         Self {
             paths: Vec::new(),
-            path_props: Default::default(),
-            path_names: Default::default(),
+            properties: Default::default(),
+            names: Default::default(),
             removed: 0,
         }
     }
@@ -215,7 +215,7 @@ impl Defragment for PackedGraphPaths {
                 let mut path = std::mem::take(self.paths.get_mut(ix).unwrap());
                 let path_updates = path.defragment().unwrap_or_default();
 
-                let mut properties = self.path_props.get_record(path_id);
+                let mut properties = self.properties.get_record(path_id);
                 if let Some(new_head) = path_updates.get(&properties.head) {
                     properties.head = *new_head;
                 }
@@ -234,9 +234,9 @@ impl Defragment for PackedGraphPaths {
         }
 
         self.paths = new_paths;
-        self.path_props = new_props;
+        self.properties = new_props;
 
-        self.path_names.defragment();
+        self.names.defragment();
 
         self.removed = 0;
 
@@ -328,8 +328,8 @@ impl PackedGraphPaths {
         let packed_path = StepList::default();
         self.paths.push(packed_path);
 
-        self.path_props.append_empty();
-        self.path_names.add_name(name);
+        self.properties.append_empty();
+        self.names.add_name(name);
 
         PathId(path_id)
     }
@@ -357,9 +357,9 @@ impl PackedGraphPaths {
 
         self.paths[ix as usize].path_deleted = true;
 
-        self.path_names.remove_id(id)?;
+        self.names.remove_id(id)?;
 
-        self.path_props.clear_record(id);
+        self.properties.clear_record(id);
 
         self.removed += 1;
 
@@ -370,10 +370,20 @@ impl PackedGraphPaths {
         self.paths.len() - self.removed
     }
 
+    fn get_step_list(&self, id: PathId) -> Option<&StepList> {
+        let path = self.paths.get(id.0 as usize)?;
+        let properties = self.properties.get_record(id);
+        if properties.deleted {
+            None
+        } else {
+            Some(path)
+        }
+    }
+
     pub(super) fn path_ref(&self, id: PathId) -> Option<PackedPathRef<'_>> {
         let path_id = id;
         let path = self.paths.get(id.0 as usize)?;
-        let properties = self.path_props.get_record(id);
+        let properties = self.properties.get_record(id);
         Some(PackedPath::new_ref(path_id, path, &properties))
     }
 
@@ -382,8 +392,8 @@ impl PackedGraphPaths {
         id: PathId,
     ) -> Option<PathsMutationCtx<'_>> {
         let path = self.paths.get_mut(id.0 as usize)?;
-        let props = self.path_props.get_record(id);
-        let properties = &mut self.path_props;
+        let props = self.properties.get_record(id);
+        let properties = &mut self.properties;
 
         let packed_path = PackedPath::new_mut(id, path, &props);
         Some(PathsMutationCtx {
@@ -393,7 +403,7 @@ impl PackedGraphPaths {
     }
 
     pub(super) fn get_all_paths_mut_ctx(&mut self) -> PathsMutationCtx<'_> {
-        let properties = &mut self.path_props;
+        let properties = &mut self.properties;
 
         let paths = self
             .paths
@@ -517,6 +527,84 @@ impl<'a> PathNamesMut for &'a mut PackedPathNames {
         } else {
             Some(self.add_name(name))
         }
+    }
+}
+
+use super::PackedGraph;
+
+impl<'a> GraphPathNames for &'a PackedGraph {
+    type PathName = packed::vector::IterView<'a, u8>;
+
+    fn get_path_id(&self, name: &[u8]) -> Option<PathId> {
+        self.paths.names.name_id_map.get(name).copied()
+    }
+
+    fn get_path_name(&self, id: PathId) -> Option<Self::PathName> {
+        self.paths.names.name_iter(id)
+    }
+}
+
+impl GraphPaths for PackedGraph {
+    type Step = (StepPtr, PackedStep);
+
+    type StepIx = StepPtr;
+
+    fn path_count(&self) -> usize {
+        self.paths.path_count()
+    }
+
+    fn path_len(&self, id: PathId) -> Option<usize> {
+        let path = self.paths.path_ref(id)?;
+        Some(path.len())
+    }
+
+    fn path_circular(&self, id: PathId) -> Option<bool> {
+        let ix = id.0 as usize;
+        if ix >= self.paths.paths.len() {
+            return None;
+        }
+        let record = self.paths.properties.get_record(id);
+        if record.deleted {
+            return None;
+        }
+        Some(record.circular)
+    }
+
+    fn path_step_at(
+        &self,
+        id: PathId,
+        index: Self::StepIx,
+    ) -> Option<Self::Step> {
+        let path = self.paths.path_ref(id)?;
+        path.steps().find(|&(ix, _)| ix == index)
+    }
+
+    fn path_first_step(&self, id: PathId) -> Option<Self::Step> {
+        let path = self.paths.path_ref(id)?;
+        path.steps().next()
+    }
+
+    fn path_last_step(&self, id: PathId) -> Option<Self::Step> {
+        let path = self.paths.path_ref(id)?;
+        path.steps().rev().next()
+    }
+
+    fn path_next_step(
+        &self,
+        id: PathId,
+        step: Self::Step,
+    ) -> Option<Self::Step> {
+        let (_, step) = step;
+        self.path_step_at(id, step.next)
+    }
+
+    fn path_prev_step(
+        &self,
+        id: PathId,
+        step: Self::Step,
+    ) -> Option<Self::Step> {
+        let (_, step) = step;
+        self.path_step_at(id, step.prev)
     }
 }
 
@@ -675,7 +763,7 @@ pub(crate) mod tests {
 
         let path_1 = paths.create_path(b"path1");
 
-        let pre_record = paths.path_props.get_record(path_1);
+        let pre_record = paths.properties.get_record(path_1);
 
         assert!(pre_record.head.is_null());
         assert!(pre_record.tail.is_null());
@@ -696,7 +784,7 @@ pub(crate) mod tests {
             steps
         };
 
-        let post_record = paths.path_props.get_record(path_1);
+        let post_record = paths.properties.get_record(path_1);
 
         // Heads & tails are path step indices, not handles
         assert_eq!(post_record.head.to_vector_value(), 1);
@@ -741,7 +829,7 @@ pub(crate) mod tests {
                 .collect::<Vec<_>>()
         });
 
-        let post_record = paths.path_props.get_record(path_1);
+        let post_record = paths.properties.get_record(path_1);
         assert_eq!(post_record.head.to_vector_value(), 1);
         assert_eq!(post_record.tail.to_vector_value(), 6);
 
@@ -881,9 +969,9 @@ pub(crate) mod tests {
         // Path 2: 6 2 3 7 5
         // Path 3: 1 6 2 3 4
 
-        let pre_1 = paths.path_props.get_record(path_1);
-        let pre_2 = paths.path_props.get_record(path_2);
-        let pre_3 = paths.path_props.get_record(path_3);
+        let pre_1 = paths.properties.get_record(path_1);
+        let pre_2 = paths.properties.get_record(path_2);
+        let pre_3 = paths.properties.get_record(path_3);
 
         assert!(pre_1.head.is_null() && pre_1.tail.is_null());
         assert!(pre_2.head.is_null() && pre_2.tail.is_null());
@@ -914,9 +1002,9 @@ pub(crate) mod tests {
                 .collect::<Vec<_>>()
         };
 
-        let post_1 = paths.path_props.get_record(path_1);
-        let post_2 = paths.path_props.get_record(path_2);
-        let post_3 = paths.path_props.get_record(path_3);
+        let post_1 = paths.properties.get_record(path_1);
+        let post_2 = paths.properties.get_record(path_2);
+        let post_3 = paths.properties.get_record(path_3);
 
         assert_eq!(post_1.head.to_vector_value(), 1);
         assert_eq!(post_1.tail.to_vector_value(), 5);
@@ -944,7 +1032,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn defrag_path_names() {
+    fn defrag_names() {
         use bstr::B;
 
         let mut packed_names = PackedPathNames::default();
