@@ -46,7 +46,7 @@ impl RecordIndex for PathLinkRecordIx {
     }
 }
 
-/// A reified record of a step in a StepsList, with `handle` taken
+/// A reified record of a step in a StepList, with `handle` taken
 /// from the `steps` list, and `prev` & `next` taking from the `links`
 /// list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,16 +57,25 @@ pub struct PackedStep {
 }
 
 #[derive(Debug, Clone)]
-pub struct StepsList {
+pub struct StepList {
     steps: RobustPagedIntVec,
     links: RobustPagedIntVec,
     pub(super) removed_steps: usize,
     pub(super) path_deleted: bool,
 }
 
-crate::impl_space_usage!(StepsList, [steps, links]);
+/// A representation of a step that's added to a path, that must be
+/// inserted into the occurrences list and linked to the correct list
+/// for the handle.
+///
+/// The path ID must be provided separately, and the `Handle` must be
+/// transformed into a `NodeRecordId` so that the list for the node in
+/// question can be identified.
+pub type StepUpdate = crate::pathhandlegraph::StepUpdate<StepPtr>;
 
-impl Default for StepsList {
+crate::impl_space_usage!(StepList, [steps, links]);
+
+impl Default for StepList {
     fn default() -> Self {
         Self {
             steps: RobustPagedIntVec::new(NARROW_PAGE_WIDTH),
@@ -77,7 +86,7 @@ impl Default for StepsList {
     }
 }
 
-impl StepsList {
+impl StepList {
     #[inline]
     pub fn len(&self) -> usize {
         self.steps.len() - self.removed_steps
@@ -193,7 +202,7 @@ impl StepsList {
         &self,
         head: StepPtr,
         tail: StepPtr,
-    ) -> list::Iter<'_, StepsList> {
+    ) -> list::Iter<'_, StepList> {
         list::Iter::new_double(self, head, tail)
     }
 
@@ -201,7 +210,7 @@ impl StepsList {
         &mut self,
         head: StepPtr,
         tail: StepPtr,
-    ) -> list::IterMut<'_, StepsList> {
+    ) -> list::IterMut<'_, StepList> {
         list::IterMut::new_double(self, head, tail)
     }
 
@@ -223,7 +232,7 @@ impl StepsList {
     }
 }
 
-impl PackedList for StepsList {
+impl PackedList for StepList {
     type ListPtr = StepPtr;
     type ListRecord = PackedStep;
 
@@ -245,7 +254,7 @@ impl PackedList for StepsList {
     }
 }
 
-impl PackedListMut for StepsList {
+impl PackedListMut for StepList {
     type ListLink = (StepPtr, StepPtr);
 
     #[inline]
@@ -304,14 +313,14 @@ impl PackedListMut for StepsList {
     }
 }
 
-impl PackedDoubleList for StepsList {
+impl PackedDoubleList for StepList {
     #[inline]
     fn prev_pointer(rec: &PackedStep) -> StepPtr {
         rec.prev
     }
 }
 
-impl Defragment for StepsList {
+impl Defragment for StepList {
     type Updates = FnvHashMap<StepPtr, StepPtr>;
 
     fn defragment(&mut self) -> Option<Self::Updates> {
@@ -377,78 +386,96 @@ impl Defragment for StepsList {
     }
 }
 
-pub struct PathStepsShared<'a>(&'a StepsList);
-pub struct PathStepsMutable<'a>(&'a mut StepsList);
+/// Helper trait, together with `AsStepsMut` for abstracting over
+/// shared and mutable references in the type parameter of
+/// `PackedPath`
+pub trait AsStepsRef {
+    fn steps_ref(&self) -> &StepList;
+}
 
-impl<'a> std::ops::Deref for PathStepsShared<'a> {
-    type Target = StepsList;
+/// Helper trait, together with `AsStepsRef` for abstracting over
+/// shared and mutable references in the type parameter of
+/// `PackedPath`
+pub trait AsStepsMut: AsStepsRef {
+    fn steps_mut(&mut self) -> &mut StepList;
+}
+
+/// Wrapper over a shared reference to a `StepList`
+pub struct StepListRef<'a>(&'a StepList);
+
+/// Wrapper over a mutable reference to a `StepList`
+pub struct StepListMut<'a>(&'a mut StepList);
+
+impl<'a> std::ops::Deref for StepListRef<'a> {
+    type Target = StepList;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'a> std::ops::Deref for PathStepsMutable<'a> {
-    type Target = StepsList;
+impl<'a> std::ops::Deref for StepListMut<'a> {
+    type Target = StepList;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<'a> std::ops::DerefMut for PathStepsMutable<'a> {
+impl<'a> std::ops::DerefMut for StepListMut<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-pub trait PackedPathStepsRef {
-    fn steps_ref(&self) -> &StepsList;
-}
-
-pub trait PackedPathStepsMut: PackedPathStepsRef {
-    fn steps_mut(&mut self) -> &mut StepsList;
-}
-
-impl<'a> PackedPathStepsRef for PathStepsShared<'a> {
-    fn steps_ref(&self) -> &StepsList {
+impl<'a> AsStepsRef for StepListRef<'a> {
+    fn steps_ref(&self) -> &StepList {
         self.0
     }
 }
 
-impl<'a> PackedPathStepsRef for PathStepsMutable<'a> {
-    fn steps_ref(&self) -> &StepsList {
+impl<'a> AsStepsRef for StepListMut<'a> {
+    fn steps_ref(&self) -> &StepList {
         self.0
     }
 }
 
-impl<'a> PackedPathStepsMut for PathStepsMutable<'a> {
-    fn steps_mut(&mut self) -> &mut StepsList {
+impl<'a> AsStepsMut for StepListMut<'a> {
+    fn steps_mut(&mut self) -> &mut StepList {
         self.0
     }
 }
 
-pub struct PackedPath_<T: PackedPathStepsRef> {
+/// An encapsulation of a packed path, represented as a list of steps,
+/// and with various properties that cannot be *stored* in the same
+/// place as the steps list, but are semantically associated with a
+/// path, and are needed for querying and manipulating the path.
+///
+/// The parameter `T: AsStepsRef` lets us use this one type for both
+/// immutable and mutable path references.
+pub struct PackedPath<T: AsStepsRef> {
     pub(crate) path_id: PathId,
     pub(crate) deleted_steps: usize,
     pub(crate) head: StepPtr,
     pub(crate) tail: StepPtr,
     pub(crate) circular: bool,
-    path: T,
+    pub(crate) path: T,
 }
 
-pub type PackedRef<'a> = PackedPath_<PathStepsShared<'a>>;
-pub type PackedMut<'a> = PackedPath_<PathStepsMutable<'a>>;
+pub type PackedPathRef<'a> = PackedPath<StepListRef<'a>>;
+pub type PackedPathMut<'a> = PackedPath<StepListMut<'a>>;
 
-impl<'a> PackedRef<'a> {
+impl<'a> PackedPathRef<'a> {
+    /// Constructs a new `PackedPath` holding a shared reference to
+    /// its path steps.
     pub(crate) fn new_ref(
         path_id: PathId,
-        path: &'a StepsList,
+        path: &'a StepList,
         properties: &PathPropertyRecord,
     ) -> Self {
         Self {
             path_id,
-            path: PathStepsShared(path),
+            path: StepListRef(path),
             deleted_steps: 0,
             head: properties.head,
             tail: properties.tail,
@@ -457,30 +484,37 @@ impl<'a> PackedRef<'a> {
     }
 }
 
-impl<'a> PackedMut<'a> {
+impl<'a> PackedPathMut<'a> {
+    /// Constructs a new `PackedPath` holding a mutable reference to
+    /// its path steps.
     pub(crate) fn new_mut(
         path_id: PathId,
-        path: &'a mut StepsList,
+        path: &'a mut StepList,
         properties: &PathPropertyRecord,
     ) -> Self {
         Self {
             path_id,
-            path: PathStepsMutable(path),
+            path: StepListMut(path),
             deleted_steps: 0,
             head: properties.head,
             tail: properties.tail,
             circular: properties.circular,
         }
     }
+}
 
+impl<T> PackedPath<T>
+where
+    T: AsStepsMut,
+{
     #[must_use]
     pub(crate) fn append_handle(&mut self, handle: Handle) -> StepUpdate {
         let tail = self.tail;
-        let step = self.path.append_handle_record(handle);
+        let step = self.path.steps_mut().append_handle_record(handle);
 
         // add back link from new step to old tail
         let new_prev_ix = step.to_record_ix(2, 0).unwrap();
-        self.path.links.set_pack(new_prev_ix, tail);
+        self.path.steps_mut().links.set_pack(new_prev_ix, tail);
 
         // just in case the path was empty, set the head as well
         if self.head.is_null() {
@@ -489,7 +523,7 @@ impl<'a> PackedMut<'a> {
 
         if let Some(tail_next_ix) = tail.to_record_ix(2, 1) {
             // add forward link from old tail to new step
-            self.path.links.set_pack(tail_next_ix, step);
+            self.path.steps_mut().links.set_pack(tail_next_ix, step);
         }
         // set the new tail
         self.tail = step;
@@ -500,11 +534,11 @@ impl<'a> PackedMut<'a> {
     #[must_use]
     pub(crate) fn prepend_handle(&mut self, handle: Handle) -> StepUpdate {
         let head = self.head;
-        let step = self.path.append_handle_record(handle);
+        let step = self.path.steps_mut().append_handle_record(handle);
 
         // add forward link from new step to old head
         let new_next_ix = step.to_record_ix(2, 1).unwrap();
-        self.path.links.set_pack(new_next_ix, head);
+        self.path.steps_mut().links.set_pack(new_next_ix, head);
 
         // just in case the path was empty, set the tail as well
         if self.tail.is_null() {
@@ -513,7 +547,7 @@ impl<'a> PackedMut<'a> {
 
         if let Some(head_prev_ix) = head.to_record_ix(2, 0) {
             // add back link from old head to new step
-            self.path.links.set_pack(head_prev_ix, step);
+            self.path.steps_mut().links.set_pack(head_prev_ix, step);
         }
         // set the new head
         self.head = step;
@@ -528,15 +562,16 @@ impl<'a> PackedMut<'a> {
         let head = self.head;
         let tail = self.tail;
 
-        let handle = self.path.step_record(rem_step_ix)?;
+        let handle = self.path.steps_mut().step_record(rem_step_ix)?;
 
         if tail == rem_step_ix {
-            let (prev, _) = self.path.link_record(rem_step_ix)?;
+            let (prev, _) = self.path.steps_mut().link_record(rem_step_ix)?;
             self.tail = prev;
         }
 
         let new_head = self
             .path
+            .steps_mut()
             .iter_mut(head, tail)
             .remove_record_with(|step_ix, _step| step_ix == rem_step_ix)?;
 
@@ -555,8 +590,12 @@ impl<'a> PackedMut<'a> {
         step: StepPtr,
     ) -> Option<Vec<StepUpdate>> {
         let step_rec_ix = step.to_record_start(1)?;
-        let handle: Handle = self.path.steps.get_unpack(step_rec_ix);
-        self.path.steps.set_pack(step_rec_ix, handle.flip());
+        let handle: Handle =
+            self.path.steps_mut().steps.get_unpack(step_rec_ix);
+        self.path
+            .steps_mut()
+            .steps
+            .set_pack(step_rec_ix, handle.flip());
         Some(vec![
             StepUpdate::Remove { handle, step },
             StepUpdate::Insert {
@@ -567,9 +606,17 @@ impl<'a> PackedMut<'a> {
     }
 }
 
-impl<T> PathBase for PackedPath_<T>
+impl PathStep for (StepPtr, PackedStep) {
+    fn handle(&self) -> Handle {
+        self.1.handle
+    }
+}
+
+/// Both `PackedPath<StepListRef<'a>>` and
+/// `PackedPath<StepListMut<'a>>` implement `PathBase`
+impl<T> PathBase for PackedPath<T>
 where
-    T: PackedPathStepsRef,
+    T: AsStepsRef,
 {
     type Step = (StepPtr, PackedStep);
 
@@ -621,177 +668,10 @@ where
     }
 }
 
-#[derive(Debug)]
-pub struct PackedPath<'a> {
-    pub(crate) path_id: PathId,
-    pub(crate) path: &'a mut PackedPathSteps,
-    pub(crate) deleted_steps: usize,
-    pub(crate) head: StepPtr,
-    pub(crate) tail: StepPtr,
-    pub(crate) circular: bool,
-}
-
-impl<'a> PackedPath<'a> {
-    pub(crate) fn new(
-        path_id: PathId,
-        path: &'a mut PackedPathSteps,
-        properties: &PathPropertyRecord,
-    ) -> Self {
-        Self {
-            path_id,
-            path,
-            deleted_steps: 0,
-            head: properties.head,
-            tail: properties.tail,
-            circular: properties.circular,
-        }
-    }
-
-    #[must_use]
-    pub(crate) fn append_handle(&mut self, handle: Handle) -> StepUpdate {
-        let tail = self.tail;
-        let step = self.path.append_handle_record(handle);
-
-        // add back link from new step to old tail
-        let new_prev_ix = step.to_record_ix(2, 0).unwrap();
-        self.path.links.set_pack(new_prev_ix, tail);
-
-        // just in case the path was empty, set the head as well
-        if self.head.is_null() {
-            self.head = step;
-        }
-
-        if let Some(tail_next_ix) = tail.to_record_ix(2, 1) {
-            // add forward link from old tail to new step
-            self.path.links.set_pack(tail_next_ix, step);
-        }
-        // set the new tail
-        self.tail = step;
-
-        StepUpdate::Insert { handle, step }
-    }
-
-    #[must_use]
-    pub(crate) fn prepend_handle(&mut self, handle: Handle) -> StepUpdate {
-        let head = self.head;
-        let step = self.path.append_handle_record(handle);
-
-        // add forward link from new step to old head
-        let new_next_ix = step.to_record_ix(2, 1).unwrap();
-        self.path.links.set_pack(new_next_ix, head);
-
-        // just in case the path was empty, set the tail as well
-        if self.tail.is_null() {
-            self.tail = step;
-        }
-
-        if let Some(head_prev_ix) = head.to_record_ix(2, 0) {
-            // add back link from old head to new step
-            self.path.links.set_pack(head_prev_ix, step);
-        }
-        // set the new head
-        self.head = step;
-
-        StepUpdate::Insert { handle, step }
-    }
-
-    pub(crate) fn remove_step_at_index(
-        &mut self,
-        rem_step_ix: StepPtr,
-    ) -> Option<StepUpdate> {
-        let head = self.head;
-        let tail = self.tail;
-
-        let handle = self.path.step_record(rem_step_ix)?;
-
-        if tail == rem_step_ix {
-            let (prev, _) = self.path.link_record(rem_step_ix)?;
-            self.tail = prev;
-        }
-
-        let new_head = self
-            .path
-            .iter_mut(head, tail)
-            .remove_record_with(|step_ix, _step| step_ix == rem_step_ix)?;
-
-        self.head = new_head;
-
-        self.deleted_steps += 1;
-
-        Some(StepUpdate::Remove {
-            handle,
-            step: rem_step_ix,
-        })
-    }
-
-    pub(crate) fn flip_step_orientation(
-        &mut self,
-        step: StepPtr,
-    ) -> Option<Vec<StepUpdate>> {
-        let step_rec_ix = step.to_record_start(1)?;
-        let handle: Handle = self.path.steps.get_unpack(step_rec_ix);
-        self.path.steps.set_pack(step_rec_ix, handle.flip());
-        Some(vec![
-            StepUpdate::Remove { handle, step },
-            StepUpdate::Insert {
-                handle: handle.flip(),
-                step,
-            },
-        ])
-    }
-}
-
-impl<'a> PathBase for PackedPath<'a> {
-    type Step = (StepPtr, PackedStep);
-
-    type StepIx = StepPtr;
-
-    #[inline]
-    fn len(&self) -> usize {
-        self.path.len()
-    }
-
-    #[inline]
-    fn circular(&self) -> bool {
-        self.circular
-    }
-
-    #[inline]
-    fn step_at(&self, index: StepPtr) -> Option<(StepPtr, PackedStep)> {
-        let step = self.path.get_step(index)?;
-        Some((index, step))
-    }
-
-    #[inline]
-    fn first_step(&self) -> Self::Step {
-        let head = self.head;
-        let step = self.path.get_step_unchecked(head);
-        (head, step)
-    }
-
-    #[inline]
-    fn last_step(&self) -> Self::Step {
-        let tail = self.tail;
-        let step = self.path.get_step_unchecked(tail);
-        (tail, step)
-    }
-
-    #[inline]
-    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
-        let next = self.path.next_step(step.0)?;
-        let next_step = self.path.get_step_unchecked(next);
-        Some((next, next_step))
-    }
-
-    #[inline]
-    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
-        let prev = self.path.prev_step(step.0)?;
-        let prev_step = self.path.get_step_unchecked(prev);
-        Some((prev, prev_step))
-    }
-}
-
-impl<'a> MutPath for PackedPath<'a> {
+impl<T> MutPath for PackedPath<T>
+where
+    T: AsStepsMut,
+{
     fn append_step(&mut self, handle: Handle) -> StepUpdate {
         self.append_handle(handle)
     }
@@ -808,7 +688,7 @@ impl<'a> MutPath for PackedPath<'a> {
         if ix == self.tail {
             Some(self.append_step(handle))
         } else {
-            let step = self.path.insert_after(ix, handle)?;
+            let step = self.path.steps_mut().insert_after(ix, handle)?;
             Some(StepUpdate::Insert { handle, step })
         }
     }
@@ -835,358 +715,16 @@ impl<'a> MutPath for PackedPath<'a> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct PackedPathRef<'a> {
-    pub path_id: PathId,
-    pub(crate) path: &'a PackedPathSteps,
-    pub(crate) properties: PathPropertyRecord,
-}
-
-impl<'a> PackedPathRef<'a> {
-    pub(super) fn new(
-        path_id: PathId,
-        path: &'a PackedPathSteps,
-        properties: PathPropertyRecord,
-    ) -> Self {
-        PackedPathRef {
-            path_id,
-            path,
-            properties,
-        }
-    }
-}
-
-/// A representation of a step that's added to a path, that must be
-/// inserted into the occurrences list and linked to the correct list
-/// for the handle.
-///
-/// The path ID must be provided separately, and the `Handle` must be
-/// transformed into a `NodeRecordId` so that the list for the node in
-/// question can be identified.
-pub type StepUpdate = crate::pathhandlegraph::StepUpdate<StepPtr>;
-
-pub struct PackedPathRefMut<'a> {
-    pub(crate) path_id: PathId,
-    pub(crate) path: &'a mut PackedPathSteps,
-    pub(crate) properties: PathPropertyRecord,
-}
-
-impl PathStep for (StepPtr, PackedStep) {
-    fn handle(&self) -> Handle {
-        self.1.handle
-    }
-}
-
-impl<'a> PathBase for PackedPathRef<'a> {
-    type Step = (StepPtr, PackedStep);
-
-    type StepIx = StepPtr;
-
-    #[inline]
-    fn len(&self) -> usize {
-        self.path.len()
-    }
-
-    #[inline]
-    fn circular(&self) -> bool {
-        self.properties.circular
-    }
-
-    #[inline]
-    fn step_at(&self, index: StepPtr) -> Option<(StepPtr, PackedStep)> {
-        let step = self.path.get_step(index)?;
-        Some((index, step))
-    }
-
-    #[inline]
-    fn first_step(&self) -> Self::Step {
-        let head = self.properties.head;
-        let step = self.path.get_step_unchecked(head);
-        (head, step)
-    }
-
-    #[inline]
-    fn last_step(&self) -> Self::Step {
-        let tail = self.properties.tail;
-        let step = self.path.get_step_unchecked(tail);
-        (tail, step)
-    }
-
-    #[inline]
-    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
-        let next = self.path.next_step(step.0)?;
-        let next_step = self.path.get_step_unchecked(next);
-        Some((next, next_step))
-    }
-
-    #[inline]
-    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
-        let prev = self.path.prev_step(step.0)?;
-        let prev_step = self.path.get_step_unchecked(prev);
-        Some((prev, prev_step))
-    }
-}
-
-impl<'a> PathBase for PackedPathRefMut<'a> {
-    type Step = (StepPtr, PackedStep);
-
-    type StepIx = StepPtr;
-
-    #[inline]
-    fn len(&self) -> usize {
-        self.path.len()
-    }
-
-    #[inline]
-    fn circular(&self) -> bool {
-        self.properties.circular
-    }
-
-    #[inline]
-    fn step_at(&self, index: StepPtr) -> Option<(StepPtr, PackedStep)> {
-        let step = self.path.get_step(index)?;
-        Some((index, step))
-    }
-
-    #[inline]
-    fn first_step(&self) -> Self::Step {
-        let head = self.properties.head;
-        let step = self.path.get_step_unchecked(head);
-        (head, step)
-    }
-
-    #[inline]
-    fn last_step(&self) -> Self::Step {
-        let tail = self.properties.tail;
-        let step = self.path.get_step_unchecked(tail);
-        (tail, step)
-    }
-
-    #[inline]
-    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
-        let next = self.path.next_step(step.0)?;
-        let next_step = self.path.get_step_unchecked(next);
-        Some((next, next_step))
-    }
-
-    #[inline]
-    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
-        let prev = self.path.prev_step(step.0)?;
-        let prev_step = self.path.get_step_unchecked(prev);
-        Some((prev, prev_step))
-    }
-}
-
-impl<'a> PathSteps for PackedPathRef<'a> {
-    type Steps = list::Iter<'a, PackedPathSteps>;
+impl<'a, T> PathSteps for &'a PackedPath<T>
+where
+    T: AsStepsRef,
+{
+    type Steps = list::Iter<'a, StepList>;
 
     fn steps(self) -> Self::Steps {
-        let head = self.properties.head;
-        let tail = self.properties.tail;
-        self.path.iter(head, tail)
-    }
-}
-
-impl<'a> PackedPathRefMut<'a> {
-    pub(super) fn new(
-        path_id: PathId,
-        path: &'a mut PackedPathSteps,
-        properties: PathPropertyRecord,
-    ) -> Self {
-        PackedPathRefMut {
-            path_id,
-            path,
-            properties,
-        }
-    }
-
-    #[must_use]
-    pub(crate) fn append_handle(&mut self, handle: Handle) -> StepUpdate {
-        let tail = self.properties.tail;
-        let step = self.path.append_handle_record(handle);
-
-        // add back link from new step to old tail
-        let new_prev_ix = step.to_record_ix(2, 0).unwrap();
-        self.path.links.set_pack(new_prev_ix, tail);
-
-        // just in case the path was empty, set the head as well
-        if self.properties.head.is_null() {
-            self.properties.head = step;
-        }
-
-        if let Some(tail_next_ix) = tail.to_record_ix(2, 1) {
-            // add forward link from old tail to new step
-            self.path.links.set_pack(tail_next_ix, step);
-        }
-        // set the new tail
-        self.properties.tail = step;
-
-        StepUpdate::Insert { handle, step }
-    }
-
-    #[must_use]
-    pub(crate) fn prepend_handle(&mut self, handle: Handle) -> StepUpdate {
-        let head = self.properties.head;
-        let step = self.path.append_handle_record(handle);
-
-        // add forward link from new step to old head
-        let new_next_ix = step.to_record_ix(2, 1).unwrap();
-        self.path.links.set_pack(new_next_ix, head);
-
-        // just in case the path was empty, set the tail as well
-        if self.properties.tail.is_null() {
-            self.properties.tail = step;
-        }
-
-        if let Some(head_prev_ix) = head.to_record_ix(2, 0) {
-            // add back link from old head to new step
-            self.path.links.set_pack(head_prev_ix, step);
-        }
-        // set the new head
-        self.properties.head = step;
-
-        StepUpdate::Insert { handle, step }
-    }
-
-    pub(crate) fn remove_step_at_index(
-        &mut self,
-        rem_step_ix: StepPtr,
-    ) -> Option<StepUpdate> {
-        let head = self.properties.head;
-        let tail = self.properties.tail;
-
-        let handle = self.path.step_record(rem_step_ix)?;
-
-        if tail == rem_step_ix {
-            let (prev, _) = self.path.link_record(rem_step_ix)?;
-            self.properties.tail = prev;
-        }
-
-        let new_head = self
-            .path
-            .iter_mut(head, tail)
-            .remove_record_with(|step_ix, _step| step_ix == rem_step_ix)?;
-
-        self.properties.head = new_head;
-
-        Some(StepUpdate::Remove {
-            handle,
-            step: rem_step_ix,
-        })
-    }
-
-    pub(crate) fn flip_step_orientation(
-        &mut self,
-        step: StepPtr,
-    ) -> Option<Vec<StepUpdate>> {
-        let step_rec_ix = step.to_record_start(1)?;
-        let handle: Handle = self.path.steps.get_unpack(step_rec_ix);
-        self.path.steps.set_pack(step_rec_ix, handle.flip());
-        Some(vec![
-            StepUpdate::Remove { handle, step },
-            StepUpdate::Insert {
-                handle: handle.flip(),
-                step,
-            },
-        ])
-    }
-}
-
-impl<'a> PathSteps for &'a PackedPathRefMut<'a> {
-    type Steps = list::Iter<'a, PackedPathSteps>;
-
-    fn steps(self) -> Self::Steps {
-        let head = self.properties.head;
-        let tail = self.properties.tail;
-        self.path.iter(head, tail)
-    }
-}
-
-impl<'a> MutPath for PackedPathRefMut<'a> {
-    fn append_step(&mut self, handle: Handle) -> StepUpdate {
-        self.append_handle(handle)
-    }
-
-    fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
-        self.prepend_handle(handle)
-    }
-
-    fn insert_step_after(
-        &mut self,
-        ix: Self::StepIx,
-        handle: Handle,
-    ) -> Option<StepUpdate> {
-        if ix == self.properties.tail {
-            Some(self.append_step(handle))
-        } else {
-            let step = self.path.insert_after(ix, handle)?;
-            Some(StepUpdate::Insert { handle, step })
-        }
-    }
-
-    fn remove_step(&mut self, rem_step_ix: Self::StepIx) -> Option<StepUpdate> {
-        self.remove_step_at_index(rem_step_ix)
-    }
-
-    fn flip_step(&mut self, step: Self::StepIx) -> Option<Vec<StepUpdate>> {
-        self.flip_step_orientation(step)
-    }
-
-    fn rewrite_segment(
-        &mut self,
-        from: Self::StepIx,
-        to: Self::StepIx,
-        new_segment: &[Handle],
-    ) -> Option<Vec<StepUpdate>> {
-        unimplemented!();
-    }
-
-    fn set_circularity(&mut self, circular: bool) {
-        self.properties.circular = circular;
-    }
-}
-
-impl<'a, 'b> MutPath for &'a mut PackedPathRefMut<'b> {
-    fn append_step(&mut self, handle: Handle) -> StepUpdate {
-        self.append_handle(handle)
-    }
-
-    fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
-        self.prepend_handle(handle)
-    }
-
-    fn insert_step_after(
-        &mut self,
-        ix: Self::StepIx,
-        handle: Handle,
-    ) -> Option<StepUpdate> {
-        <PackedPathRefMut<'_> as MutPath>::insert_step_after(self, ix, handle)
-    }
-
-    fn remove_step(&mut self, step: Self::StepIx) -> Option<StepUpdate> {
-        self.remove_step_at_index(step)
-    }
-
-    fn flip_step(&mut self, step: Self::StepIx) -> Option<Vec<StepUpdate>> {
-        self.flip_step_orientation(step)
-    }
-
-    fn rewrite_segment(
-        &mut self,
-        from: Self::StepIx,
-        to: Self::StepIx,
-        new_segment: &[Handle],
-    ) -> Option<Vec<StepUpdate>> {
-        <PackedPathRefMut<'_> as MutPath>::rewrite_segment(
-            self,
-            from,
-            to,
-            new_segment,
-        )
-    }
-
-    fn set_circularity(&mut self, circular: bool) {
-        self.properties.circular = circular;
+        let head = self.head;
+        let tail = self.tail;
+        self.path.steps_ref().iter(head, tail)
     }
 }
 

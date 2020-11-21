@@ -318,7 +318,7 @@ impl PackedGraph {
 
     pub fn with_path_mut_ctx<F>(&mut self, path_id: PathId, f: F)
     where
-        for<'b> F: Fn(&mut paths::PackedPath<'b>) -> Vec<paths::StepUpdate>,
+        for<'b> F: Fn(&mut paths::PackedPathMut<'b>) -> Vec<paths::StepUpdate>,
     {
         let steps = self.paths.with_path_mut_ctx(path_id, f);
         if let Some(steps) = steps {
@@ -333,7 +333,7 @@ impl PackedGraph {
         for<'b> F: FnMut(
                 T,
                 PathId,
-                &mut paths::PackedPath<'b>,
+                &mut paths::PackedPathMut<'b>,
             ) -> Vec<paths::StepUpdate>
             + Send
             + Sync,
@@ -346,7 +346,7 @@ impl PackedGraph {
 
     pub fn with_all_paths_mut_ctx<F>(&mut self, f: F)
     where
-        for<'b> F: Fn(PathId, &mut paths::PackedPath<'b>) -> Vec<paths::StepUpdate>
+        for<'b> F: Fn(PathId, &mut paths::PackedPathMut<'b>) -> Vec<paths::StepUpdate>
             + Sync
             + Send,
     {
@@ -358,7 +358,7 @@ impl PackedGraph {
 
     pub fn with_all_paths_mut_ctx_chn<F>(&mut self, f: F)
     where
-        for<'b> F: Fn(PathId, &mut paths::PackedPath<'b>) -> Vec<paths::StepUpdate>
+        for<'b> F: Fn(PathId, &mut paths::PackedPathMut<'b>) -> Vec<paths::StepUpdate>
             + Sync,
     {
         use std::sync::mpsc;

@@ -168,7 +168,7 @@ impl PackedPathNames {
 
 #[derive(Debug, Clone)]
 pub struct PackedGraphPaths {
-    paths: Vec<PackedPathSteps>,
+    paths: Vec<StepList>,
     pub(crate) path_props: PathProperties,
     pub(crate) path_names: PackedPathNames,
     removed: usize,
@@ -245,28 +245,28 @@ impl Defragment for PackedGraphPaths {
 }
 
 pub struct PathsMutationCtx<'a> {
-    paths: Vec<PackedPath<'a>>,
+    paths: Vec<PackedPathMut<'a>>,
     properties: &'a mut PathProperties,
 }
 
 impl<'a> PathsMutationCtx<'a> {
-    pub fn paths_slice(&self) -> &[PackedPath<'a>] {
+    pub fn paths_slice(&self) -> &[PackedPathMut<'a>] {
         self.paths.as_slice()
     }
 
-    pub fn paths_mut_slice(&mut self) -> &mut [PackedPath<'a>] {
+    pub fn paths_mut_slice(&mut self) -> &mut [PackedPathMut<'a>] {
         self.paths.as_mut_slice()
     }
 
     pub(crate) fn iter_mut<'b>(
         &'b mut self,
-    ) -> std::slice::IterMut<'b, PackedPath<'a>> {
+    ) -> std::slice::IterMut<'b, PackedPathMut<'a>> {
         self.paths.iter_mut()
     }
 
     pub(crate) fn par_iter_mut<'b>(
         &'b mut self,
-    ) -> rayon::slice::IterMut<'b, PackedPath<'a>> {
+    ) -> rayon::slice::IterMut<'b, PackedPathMut<'a>> {
         self.paths.par_iter_mut()
     }
 }
@@ -288,17 +288,17 @@ impl<'a> Drop for PathsMutationCtx<'a> {
 }
 
 impl<'a> std::ops::Index<PathId> for PathsMutationCtx<'a> {
-    type Output = PackedPath<'a>;
+    type Output = PackedPathMut<'a>;
 
-    fn index(&self, id: PathId) -> &PackedPath<'a> {
+    fn index(&self, id: PathId) -> &PackedPathMut<'a> {
         &self.paths[id.0 as usize]
     }
 }
 
 impl<'a> std::ops::Index<std::ops::Range<PathId>> for PathsMutationCtx<'a> {
-    type Output = [PackedPath<'a>];
+    type Output = [PackedPathMut<'a>];
 
-    fn index(&self, ids: std::ops::Range<PathId>) -> &[PackedPath<'a>] {
+    fn index(&self, ids: std::ops::Range<PathId>) -> &[PackedPathMut<'a>] {
         let start = ids.start.0 as usize;
         let end = ids.end.0 as usize;
         &self.paths[start..end]
@@ -306,7 +306,7 @@ impl<'a> std::ops::Index<std::ops::Range<PathId>> for PathsMutationCtx<'a> {
 }
 
 impl<'a> std::ops::IndexMut<PathId> for PathsMutationCtx<'a> {
-    fn index_mut(&mut self, id: PathId) -> &mut PackedPath<'a> {
+    fn index_mut(&mut self, id: PathId) -> &mut PackedPathMut<'a> {
         &mut self.paths[id.0 as usize]
     }
 }
@@ -315,7 +315,7 @@ impl<'a> std::ops::IndexMut<std::ops::Range<PathId>> for PathsMutationCtx<'a> {
     fn index_mut(
         &mut self,
         ids: std::ops::Range<PathId>,
-    ) -> &mut [PackedPath<'a>] {
+    ) -> &mut [PackedPathMut<'a>] {
         let start = ids.start.0 as usize;
         let end = ids.end.0 as usize;
         &mut self.paths[start..end]
@@ -325,7 +325,7 @@ impl<'a> std::ops::IndexMut<std::ops::Range<PathId>> for PathsMutationCtx<'a> {
 impl PackedGraphPaths {
     pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
         let path_id = self.paths.len() as u64;
-        let packed_path = PackedPathSteps::default();
+        let packed_path = StepList::default();
         self.paths.push(packed_path);
 
         self.path_props.append_empty();
@@ -374,7 +374,7 @@ impl PackedGraphPaths {
         self.paths.len() - self.removed
     }
 
-    pub(super) fn path_ref(&self, id: PathId) -> Option<PackedPath<'_>> {
+    pub(super) fn path_ref(&self, id: PathId) -> Option<PackedPathRef<'_>> {
         unimplemented!();
         // let path_id = id;
         // let path = self.paths.get(id.0 as usize)?;
@@ -390,7 +390,7 @@ impl PackedGraphPaths {
         let props = self.path_props.get_record(id);
         let properties = &mut self.path_props;
 
-        let packed_path = PackedPath::new(id, path, &props);
+        let packed_path = PackedPath::new_mut(id, path, &props);
         Some(PathsMutationCtx {
             paths: vec![packed_path],
             properties,
@@ -407,7 +407,7 @@ impl PackedGraphPaths {
             .map(|(id, path)| {
                 let path_id = PathId(id as u64);
                 let props = properties.get_record(path_id);
-                PackedPath::new(path_id, path, &props)
+                PackedPath::new_mut(path_id, path, &props)
             })
             .collect::<Vec<_>>();
 
@@ -420,7 +420,7 @@ impl PackedGraphPaths {
         f: F,
     ) -> Option<Vec<StepUpdate>>
     where
-        F: FnOnce(&mut PackedPath<'a>) -> Vec<StepUpdate>,
+        F: FnOnce(&mut PackedPathMut<'a>) -> Vec<StepUpdate>,
     {
         let mut mut_ctx = self.get_path_mut_ctx(id)?;
         let ref_mut = mut_ctx.paths.first_mut()?;
@@ -433,7 +433,7 @@ impl PackedGraphPaths {
         f: F,
     ) -> Vec<(PathId, Vec<StepUpdate>)>
     where
-        F: Fn(PathId, &mut PackedPath<'a>) -> Vec<StepUpdate> + Sync,
+        F: Fn(PathId, &mut PackedPathMut<'a>) -> Vec<StepUpdate> + Sync,
     {
         let mut mut_ctx = self.get_all_paths_mut_ctx();
         let refs_mut = mut_ctx.par_iter_mut();
@@ -448,13 +448,13 @@ impl PackedGraphPaths {
     }
 
     // fn path_ref_<'a>(&'a self, id: PathId) -> Option<PackedPath_<PackedStepsShared<'a>>> {
-    fn path_ref_<'a>(&'a self, id: PathId) -> Option<PackedRef<'a>> {
+    fn path_ref_<'a>(&'a self, id: PathId) -> Option<PackedPathRef<'a>> {
         let steps = self.paths.get(id.0 as usize)?;
 
         let properties = &self.path_props;
         let props = properties.get_record(id);
 
-        Some(PackedPath_::new_ref(id, steps, &props))
+        Some(PackedPath::new_ref(id, steps, &props))
     }
 
     pub(super) fn zip_with_paths_mut_ctx<'a, T, I, F>(
@@ -465,7 +465,7 @@ impl PackedGraphPaths {
     where
         T: Send + Sync,
         I: IndexedParallelIterator<Item = T>,
-        F: FnMut(T, PathId, &mut PackedPath<'a>) -> Vec<StepUpdate>
+        F: FnMut(T, PathId, &mut PackedPathMut<'a>) -> Vec<StepUpdate>
             + Send
             + Sync,
     {
@@ -488,7 +488,7 @@ impl PackedGraphPaths {
         f: F,
     ) -> Vec<(PathId, Vec<StepUpdate>)>
     where
-        F: Fn(PathId, &mut PackedPath<'a>) -> Vec<StepUpdate>,
+        F: Fn(PathId, &mut PackedPathMut<'a>) -> Vec<StepUpdate>,
     {
         let mut mut_ctx = self.get_all_paths_mut_ctx();
         let refs_mut = mut_ctx.iter_mut();
