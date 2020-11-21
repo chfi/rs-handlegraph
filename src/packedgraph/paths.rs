@@ -3,6 +3,7 @@ use rayon::prelude::*;
 use fnv::FnvHashMap;
 
 use crate::{
+    handle::Handle,
     packed::{self, *},
     pathhandlegraph::*,
 };
@@ -530,9 +531,7 @@ impl<'a> PathNamesMut for &'a mut PackedPathNames {
     }
 }
 
-use super::PackedGraph;
-
-impl<'a> GraphPathNames for &'a PackedGraph {
+impl<'a> GraphPathNames for &'a super::PackedGraph {
     type PathName = packed::vector::IterView<'a, u8>;
 
     fn get_path_id(&self, name: &[u8]) -> Option<PathId> {
@@ -544,7 +543,7 @@ impl<'a> GraphPathNames for &'a PackedGraph {
     }
 }
 
-impl GraphPaths for PackedGraph {
+impl GraphPaths for super::PackedGraph {
     type Step = (StepPtr, PackedStep);
 
     type StepIx = StepPtr;
@@ -605,6 +604,114 @@ impl GraphPaths for PackedGraph {
     ) -> Option<Self::Step> {
         let (_, step) = step;
         self.path_step_at(id, step.prev)
+    }
+}
+
+impl MutableGraphPaths for super::PackedGraph {
+    fn create_path(&mut self, name: &[u8]) -> Option<PathId> {
+        if self.paths.names.name_id_map.contains_key(name) {
+            return None;
+        } else {
+            Some(self.paths.create_path(name))
+        }
+    }
+
+    fn destroy_path(&mut self, id: PathId) -> bool {
+        if let Some(step_updates) = self.paths.remove_path(id) {
+            self.apply_node_occurrences_iter(id, step_updates);
+            true
+        } else {
+            false
+        }
+    }
+
+    fn path_append_step(
+        &mut self,
+        id: PathId,
+        handle: Handle,
+    ) -> Option<Self::StepIx> {
+        let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
+            vec![path_mut.append_step(handle)]
+        })?;
+        let step_ix = steps.first()?.step();
+        self.apply_node_occurrences_iter(id, steps);
+        Some(step_ix)
+    }
+
+    fn path_prepend_step(
+        &mut self,
+        id: PathId,
+        handle: Handle,
+    ) -> Option<Self::StepIx> {
+        let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
+            vec![path_mut.prepend_step(handle)]
+        })?;
+        let step_ix = steps.first()?.step();
+        self.apply_node_occurrences_iter(id, steps);
+        Some(step_ix)
+    }
+
+    fn path_insert_step_after(
+        &mut self,
+        id: PathId,
+        index: Self::StepIx,
+        handle: Handle,
+    ) -> Option<Self::StepIx> {
+        let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
+            path_mut
+                .insert_step_after(index, handle)
+                .into_iter()
+                .collect()
+        })?;
+        let step_ix = steps.first()?.step();
+        self.apply_node_occurrences_iter(id, steps);
+        Some(step_ix)
+    }
+
+    fn path_remove_step(
+        &mut self,
+        id: PathId,
+        step: Self::StepIx,
+    ) -> Option<Self::StepIx> {
+        let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
+            path_mut.remove_step(step).into_iter().collect()
+        })?;
+        let step_ix = steps.first()?.step();
+        self.apply_node_occurrences_iter(id, steps);
+        Some(step_ix)
+    }
+
+    fn path_flip_step(
+        &mut self,
+        id: PathId,
+        step: Self::StepIx,
+    ) -> Option<Self::StepIx> {
+        let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
+            path_mut.flip_step(step).into_iter().flatten().collect()
+        })?;
+        let step_ix = steps.first()?.step();
+        self.apply_node_occurrences_iter(id, steps);
+        Some(step)
+    }
+
+    fn path_rewrite_segment(
+        &mut self,
+        id: PathId,
+        from: Self::StepIx,
+        to: Self::StepIx,
+        new_segment: &[Handle],
+    ) -> Option<Vec<Self::StepIx>> {
+        unimplemented!();
+    }
+
+    fn path_set_circularity(
+        &mut self,
+        id: PathId,
+        circular: bool,
+    ) -> Option<()> {
+        let mut mut_ctx = self.paths.get_path_mut_ctx(id)?;
+        mut_ctx.paths.first_mut()?.set_circularity(circular);
+        Some(())
     }
 }
 
