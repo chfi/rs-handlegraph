@@ -338,8 +338,6 @@ impl PackedGraphPaths {
         &mut self,
         id: PathId,
     ) -> Option<Vec<StepUpdate>> {
-        unimplemented!();
-        /*
         let ix = id.0;
 
         let steps = {
@@ -348,7 +346,6 @@ impl PackedGraphPaths {
             path.steps()
                 .map(|(step_ix, _step)| step_ix)
                 .collect::<Vec<_>>()
-                unimplemented!();
         };
 
         let step_updates = self.with_path_mut_ctx(id, move |path_ref| {
@@ -367,7 +364,6 @@ impl PackedGraphPaths {
         self.removed += 1;
 
         Some(step_updates)
-        */
     }
 
     pub fn path_count(&self) -> usize {
@@ -375,11 +371,10 @@ impl PackedGraphPaths {
     }
 
     pub(super) fn path_ref(&self, id: PathId) -> Option<PackedPathRef<'_>> {
-        unimplemented!();
-        // let path_id = id;
-        // let path = self.paths.get(id.0 as usize)?;
-        // let properties = self.path_props.get_record(id);
-        // Some(PackedPath::new(path_id, path, &properties))
+        let path_id = id;
+        let path = self.paths.get(id.0 as usize)?;
+        let properties = self.path_props.get_record(id);
+        Some(PackedPath::new_ref(path_id, path, &properties))
     }
 
     pub(super) fn get_path_mut_ctx(
@@ -447,42 +442,32 @@ impl PackedGraphPaths {
             .collect::<Vec<_>>()
     }
 
-    // fn path_ref_<'a>(&'a self, id: PathId) -> Option<PackedPath_<PackedStepsShared<'a>>> {
-    fn path_ref_<'a>(&'a self, id: PathId) -> Option<PackedPathRef<'a>> {
-        let steps = self.paths.get(id.0 as usize)?;
-
-        let properties = &self.path_props;
-        let props = properties.get_record(id);
-
-        Some(PackedPath::new_ref(id, steps, &props))
-    }
-
     pub(super) fn zip_with_paths_mut_ctx<'a, T, I, F>(
         &'a mut self,
         iter: I,
-        mut f: F,
+        f: F,
     ) -> Vec<(PathId, Vec<StepUpdate>)>
     where
         T: Send + Sync,
         I: IndexedParallelIterator<Item = T>,
-        F: FnMut(T, PathId, &mut PackedPathMut<'a>) -> Vec<StepUpdate>
+        for<'b> F: Fn(T, PathId, &mut PackedPathMut<'b>) -> Vec<StepUpdate>
             + Send
             + Sync,
     {
-        unimplemented!();
-        // let mut mut_ctx = self.get_all_paths_mut_ctx();
-        // let refs_mut = mut_ctx.par_iter_mut();
+        let mut mut_ctx = self.get_all_paths_mut_ctx();
+        let refs_mut = mut_ctx.par_iter_mut();
 
-        // refs_mut
-        //     .zip(iter)
-        //     .map(|(path, val)| {
-        //         let path_id = path.path_id;
-        //         let steps = f(val, path_id, path);
-        //         (path_id, steps)
-        //     })
-        //     .collect::<Vec<_>>()
+        refs_mut
+            .zip(iter)
+            .map(|(path, val)| {
+                let path_id = path.path_id;
+                let steps = f(val, path_id, path);
+                (path_id, steps)
+            })
+            .collect::<Vec<_>>()
     }
 
+    /*
     pub(super) fn with_multipath_mut_ctx<'a, F>(
         &'a mut self,
         f: F,
@@ -501,6 +486,7 @@ impl PackedGraphPaths {
             })
             .collect::<Vec<_>>()
     }
+    */
 }
 impl<'a> AllPathIds for &'a PackedPathNames {
     type PathIds = std::iter::Copied<

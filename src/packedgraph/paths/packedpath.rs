@@ -641,7 +641,6 @@ where
     #[inline]
     fn first_step(&self) -> Self::Step {
         let head = self.head;
-        // let step = self.path.get_step_unchecked(head);
         let step = self.path.steps_ref().get_step_unchecked(head);
         (head, step)
     }

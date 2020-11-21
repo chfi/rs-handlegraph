@@ -330,7 +330,7 @@ impl PackedGraph {
     where
         I: IndexedParallelIterator<Item = T>,
         T: Send + Sync,
-        for<'b> F: FnMut(
+        for<'b> F: Fn(
                 T,
                 PathId,
                 &mut paths::PackedPathMut<'b>,
