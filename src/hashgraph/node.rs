@@ -5,6 +5,22 @@ use crate::handle::Handle;
 
 use crate::pathhandlegraph::PathId;
 
+use super::path::StepIx;
+
+pub struct OccurIter<'a> {
+    pub(super) iter: std::collections::hash_map::Iter<'a, PathId, usize>,
+}
+
+impl<'a> Iterator for OccurIter<'a> {
+    type Item = (PathId, StepIx);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let (id, offset) = self.iter.next()?;
+        Some((*id, StepIx::Step(*id, *offset)))
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Node {
     pub sequence: BString,

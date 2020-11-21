@@ -239,7 +239,7 @@ impl Path {
     pub fn position_of_step(
         &self,
         graph: &FnvHashMap<NodeId, Node>,
-        step: &StepIx,
+        step: StepIx,
     ) -> Option<usize> {
         if step.path_id() != self.path_id {
             return None;
@@ -248,7 +248,7 @@ impl Path {
         match step {
             StepIx::Front(_) => Some(0),
             StepIx::End(_) => Some(self.bases_len(graph)),
-            &StepIx::Step(_, step_ix) => {
+            StepIx::Step(_, step_ix) => {
                 let mut bases = 0;
                 for handle in self.nodes[0..step_ix].iter() {
                     let node = graph.get(&handle.id())?;

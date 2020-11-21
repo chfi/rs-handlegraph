@@ -8,8 +8,8 @@ use crate::{
     mutablehandlegraph::*,
     pathgraph::PathHandleGraph,
     pathhandlegraph::{
-        GraphPathNames, GraphPaths, GraphPathsRef, MutableGraphPaths, PathId,
-        PathSequences, PathStep,
+        GraphPathNames, GraphPaths, GraphPathsRef, IntoNodeOccurrences,
+        IntoPathIds, MutableGraphPaths, PathId, PathSequences, PathStep,
     },
     util::dna,
 };
@@ -434,12 +434,24 @@ impl<'a> GraphPathNames for &'a HashGraph {
     }
 }
 
-// impl<'a> IntoPathIds for &'a HashGraph {
+impl<'a> IntoPathIds for &'a HashGraph {
+    type PathIds =
+        std::iter::Copied<std::collections::hash_map::Keys<'a, PathId, Path>>;
 
-// type PathIds: Iterator<Item = PathId>;
+    fn into_path_ids(self) -> Self::PathIds {
+        self.paths.keys().copied()
+    }
+}
 
-//     fn into_path_ids(self) -> Self::PathIds { unimplemented!(); }
-// }
+impl<'a> IntoNodeOccurrences for &'a HashGraph {
+    type Occurrences = node::OccurIter<'a>;
+
+    fn into_steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences> {
+        let node = self.get_node(&handle.id())?;
+        let iter = node.occurrences.iter();
+        Some(node::OccurIter { iter })
+    }
+}
 
 impl MutableGraphPaths for HashGraph {
     fn create_path(&mut self, name: &[u8], circular: bool) -> Option<PathId> {
@@ -655,7 +667,13 @@ impl MutableGraphPaths for HashGraph {
 
 impl PathSequences for HashGraph {
     fn path_bases_len(&self, id: PathId) -> Option<usize> {
-        unimplemented!();
+        let path = self.paths.get(&id)?;
+        let len = path
+            .nodes
+            .iter()
+            .filter_map(|h| self.graph.get(&h.id()).map(|n| n.sequence.len()))
+            .sum();
+        Some(len)
     }
 
     fn path_step_at_base(
@@ -663,7 +681,8 @@ impl PathSequences for HashGraph {
         id: PathId,
         pos: usize,
     ) -> Option<Self::StepIx> {
-        unimplemented!();
+        let path = self.paths.get(&id)?;
+        Some(path.step_at_position(&self.graph, pos))
     }
 
     fn path_step_base_offset(
@@ -671,7 +690,8 @@ impl PathSequences for HashGraph {
         id: PathId,
         index: Self::StepIx,
     ) -> Option<usize> {
-        unimplemented!();
+        let path = self.paths.get(&id)?;
+        path.position_of_step(&self.graph, index)
     }
 }
 
