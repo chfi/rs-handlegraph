@@ -568,31 +568,27 @@ impl GraphPaths for super::PackedGraph {
         path.steps().find(|&(ix, _)| ix == index)
     }
 
-    fn path_first_step(&self, id: PathId) -> Option<Self::Step> {
+    fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
         let path = self.paths.path_ref(id)?;
-        path.steps().next()
+        Some(path.head)
     }
 
-    fn path_last_step(&self, id: PathId) -> Option<Self::Step> {
+    fn path_last_step(&self, id: PathId) -> Option<Self::StepIx> {
         let path = self.paths.path_ref(id)?;
-        path.steps().rev().next()
+        Some(path.tail)
     }
 
     fn path_next_step(
         &self,
         id: PathId,
-        step: Self::Step,
+        ix: Self::StepIx,
     ) -> Option<Self::Step> {
-        let (_, step) = step;
+        let (_, step) = self.path_step_at(id, ix)?;
         self.path_step_at(id, step.next)
     }
 
-    fn path_prev_step(
-        &self,
-        id: PathId,
-        step: Self::Step,
-    ) -> Option<Self::Step> {
-        let (_, step) = step;
+    fn path_prev_step(&self, id: PathId, ix: Self::Step) -> Option<Self::Step> {
+        let (_, step) = self.path_step_at(id, ix)?;
         self.path_step_at(id, step.prev)
     }
 }

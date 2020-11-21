@@ -20,20 +20,20 @@ pub trait GraphPaths: Sized {
         index: Self::StepIx,
     ) -> Option<Self::Step>;
 
-    fn path_first_step(&self, id: PathId) -> Option<Self::Step>;
+    fn path_first_step(&self, id: PathId) -> Option<Self::StepIx>;
 
-    fn path_last_step(&self, id: PathId) -> Option<Self::Step>;
+    fn path_last_step(&self, id: PathId) -> Option<Self::StepIx>;
 
     fn path_next_step(
         &self,
         id: PathId,
-        step: Self::Step,
+        step: Self::StepIx,
     ) -> Option<Self::Step>;
 
     fn path_prev_step(
         &self,
         id: PathId,
-        step: Self::Step,
+        step: Self::StepIx,
     ) -> Option<Self::Step>;
 }
 
@@ -121,7 +121,8 @@ pub trait MutableGraphPaths: GraphPaths {
 pub trait PathSequences: GraphPaths {
     fn path_bases_len(&self, id: PathId) -> Option<usize>;
 
-    fn path_step_at_base(&self, id: PathId, pos: usize) -> Option<Self::Step>;
+    fn path_step_at_base(&self, id: PathId, pos: usize)
+        -> Option<Self::StepIx>;
 
     fn path_step_base_offset(
         &self,
@@ -172,18 +173,18 @@ where
         T::path_step_at(self, id, index)
     }
 
-    fn path_first_step(&self, id: PathId) -> Option<Self::Step> {
+    fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
         T::path_first_step(self, id)
     }
 
-    fn path_last_step(&self, id: PathId) -> Option<Self::Step> {
+    fn path_last_step(&self, id: PathId) -> Option<Self::StepIx> {
         T::path_last_step(self, id)
     }
 
     fn path_next_step(
         &self,
         id: PathId,
-        step: Self::Step,
+        step: Self::StepIx,
     ) -> Option<Self::Step> {
         T::path_next_step(self, id, step)
     }
@@ -191,7 +192,7 @@ where
     fn path_prev_step(
         &self,
         id: PathId,
-        step: Self::Step,
+        step: Self::StepIx,
     ) -> Option<Self::Step> {
         T::path_prev_step(self, id, step)
     }
@@ -224,18 +225,18 @@ where
         T::path_step_at(self, id, index)
     }
 
-    fn path_first_step(&self, id: PathId) -> Option<Self::Step> {
+    fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
         T::path_first_step(self, id)
     }
 
-    fn path_last_step(&self, id: PathId) -> Option<Self::Step> {
+    fn path_last_step(&self, id: PathId) -> Option<Self::StepIx> {
         T::path_last_step(self, id)
     }
 
     fn path_next_step(
         &self,
         id: PathId,
-        step: Self::Step,
+        step: Self::StepIx,
     ) -> Option<Self::Step> {
         T::path_next_step(self, id, step)
     }
@@ -243,7 +244,7 @@ where
     fn path_prev_step(
         &self,
         id: PathId,
-        step: Self::Step,
+        step: Self::StepIx,
     ) -> Option<Self::Step> {
         T::path_prev_step(self, id, step)
     }

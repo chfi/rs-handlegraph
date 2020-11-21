@@ -84,18 +84,18 @@ pub trait PathBase: Sized {
     fn step_at(&self, index: Self::StepIx) -> Option<Self::Step>;
 
     /// Return the first step of the path.
-    fn first_step(&self) -> Self::Step;
+    fn first_step(&self) -> Self::StepIx;
 
     /// Return the last step of the path.
-    fn last_step(&self) -> Self::Step;
+    fn last_step(&self) -> Self::StepIx;
 
     /// Return the step after the provided `step`, if `step` is not
     /// the last step on the path.
-    fn next_step(&self, step: Self::Step) -> Option<Self::Step>;
+    fn next_step(&self, step: Self::StepIx) -> Option<Self::Step>;
 
     /// Return the step before the provided `step`, if `step` is not
     /// the first step on the path.
-    fn prev_step(&self, step: Self::Step) -> Option<Self::Step>;
+    fn prev_step(&self, step: Self::StepIx) -> Option<Self::Step>;
 }
 
 /// A path that provides an iterator through its steps in both
@@ -195,22 +195,22 @@ where
     }
 
     #[inline]
-    fn first_step(&self) -> Self::Step {
+    fn first_step(&self) -> Self::StepIx {
         <T as PathBase>::first_step(self)
     }
 
     #[inline]
-    fn last_step(&self) -> Self::Step {
+    fn last_step(&self) -> Self::StepIx {
         <T as PathBase>::last_step(self)
     }
 
     #[inline]
-    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
+    fn next_step(&self, step: Self::StepIx) -> Option<Self::Step> {
         <T as PathBase>::next_step(self, step)
     }
 
     #[inline]
-    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
+    fn prev_step(&self, step: Self::StepIx) -> Option<Self::Step> {
         <T as PathBase>::next_step(self, step)
     }
 }
@@ -239,22 +239,22 @@ where
     }
 
     #[inline]
-    fn first_step(&self) -> Self::Step {
+    fn first_step(&self) -> Self::StepIx {
         <T as PathBase>::first_step(self)
     }
 
     #[inline]
-    fn last_step(&self) -> Self::Step {
+    fn last_step(&self) -> Self::StepIx {
         <T as PathBase>::last_step(self)
     }
 
     #[inline]
-    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
+    fn next_step(&self, step: Self::StepIx) -> Option<Self::Step> {
         <T as PathBase>::next_step(self, step)
     }
 
     #[inline]
-    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
+    fn prev_step(&self, step: Self::StepIx) -> Option<Self::Step> {
         <T as PathBase>::next_step(self, step)
     }
 }

@@ -646,29 +646,25 @@ where
     }
 
     #[inline]
-    fn first_step(&self) -> Self::Step {
-        let head = self.head;
-        let step = self.path.steps_ref().get_step_unchecked(head);
-        (head, step)
+    fn first_step(&self) -> Self::StepIx {
+        self.head
     }
 
     #[inline]
-    fn last_step(&self) -> Self::Step {
-        let tail = self.tail;
-        let step = self.path.steps_ref().get_step_unchecked(tail);
-        (tail, step)
+    fn last_step(&self) -> Self::StepIx {
+        self.tail
     }
 
     #[inline]
-    fn next_step(&self, step: Self::Step) -> Option<Self::Step> {
-        let next = self.path.steps_ref().next_step(step.0)?;
+    fn next_step(&self, step: Self::StepIx) -> Option<Self::Step> {
+        let next = self.path.steps_ref().next_step(step)?;
         let next_step = self.path.steps_ref().get_step_unchecked(next);
         Some((next, next_step))
     }
 
     #[inline]
-    fn prev_step(&self, step: Self::Step) -> Option<Self::Step> {
-        let prev = self.path.steps_ref().prev_step(step.0)?;
+    fn prev_step(&self, step: Self::StepIx) -> Option<Self::Step> {
+        let prev = self.path.steps_ref().prev_step(step)?;
         let prev_step = self.path.steps_ref().get_step_unchecked(prev);
         Some((prev, prev_step))
     }
