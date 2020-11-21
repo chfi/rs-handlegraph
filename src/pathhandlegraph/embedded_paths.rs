@@ -3,33 +3,10 @@ use crate::handle::Handle;
 use super::{
     MutPath, PathBase, PathId, PathStep, PathSteps, StepHandle, StepUpdate,
 };
-
 pub trait GraphPaths: Sized {
-    type PathName: Iterator<Item = u8>;
-
-    type Path: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
-
-    // "Aliases" to the associated types on `Path`, to avoid having to
-    // deal with fully qualified syntax everywhere in the subtrait
-    // definitions that use Step and StepIx
-    // See https://github.com/rust-lang/rust/issues/38078#issuecomment-386796174
     type Step: PathStep;
 
     type StepIx: Sized + Copy + Eq;
-
-    fn get_path_id(&self, name: &[u8]) -> Option<PathId>;
-
-    fn get_path_name(&self, id: PathId) -> Option<Self::PathName>;
-
-    #[inline]
-    fn get_path_name_vec(&self, id: PathId) -> Option<Vec<u8>> {
-        self.get_path_name(id).map(|name| name.collect())
-    }
-
-    #[inline]
-    fn has_path(&self, name: &[u8]) -> bool {
-        self.get_path_id(name).is_some()
-    }
 
     fn path_count(&self) -> usize;
 
@@ -60,7 +37,37 @@ pub trait GraphPaths: Sized {
     ) -> Option<Self::Step>;
 }
 
-pub trait GraphMutablePaths: GraphPaths {
+pub trait GraphPathNames {
+    type PathName: Iterator<Item = u8>;
+
+    fn get_path_id(&self, name: &[u8]) -> Option<PathId>;
+
+    fn get_path_name(&self, id: PathId) -> Option<Self::PathName>;
+
+    #[inline]
+    fn get_path_name_vec(&self, id: PathId) -> Option<Vec<u8>> {
+        self.get_path_name(id).map(|name| name.collect())
+    }
+
+    #[inline]
+    fn has_path(&self, name: &[u8]) -> bool {
+        self.get_path_id(name).is_some()
+    }
+}
+
+pub trait IntoPathIds {
+    type PathIds: Iterator<Item = PathId>;
+
+    fn into_path_ids(self) -> Self::PathIds;
+}
+
+pub trait IntoNodeOccurrences: GraphPaths {
+    type Occurrences: Iterator<Item = (PathId, Self::StepIx)>;
+
+    fn into_steps_on_handle(self, handle: Handle) -> Self::Occurrences;
+}
+
+pub trait MutableGraphPaths: GraphPaths + GraphPathNames {
     fn create_path(&mut self, name: &[u8]) -> Option<PathId>;
 
     fn destroy_path(&mut self, id: PathId) -> bool;
@@ -112,125 +119,132 @@ pub trait GraphMutablePaths: GraphPaths {
 }
 
 pub trait GraphPathsRef: GraphPaths {
-    fn get_path_ref<'a>(&'a self, id: PathId) -> Option<&'a Self::Path>;
+    type PathRef: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
+
+    fn get_path_ref<'a>(&'a self, id: PathId) -> Option<&'a Self::PathRef>;
+}
+
+pub trait IntoPathSteps: GraphPathsRef
+where
+    Self::PathRef: PathSteps,
+{
+    fn into_path_steps(
+        self,
+        id: PathId,
+    ) -> Option<<Self::PathRef as PathSteps>::Steps>;
+}
+
+pub trait GraphPathsRefMut: GraphPaths {
+    type PathMut: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
 
     fn get_path_mut_ref<'a>(
         &'a mut self,
         id: PathId,
-    ) -> Option<&'a mut Self::Path>;
+    ) -> Option<&'a mut Self::PathMut>;
 }
 
-pub trait GraphPathsRefAlt: GraphPaths {
-    type PathRef: MutPath<Step = Self::Step, StepIx = Self::StepIx>;
+impl<'a, T> GraphPaths for &'a T
+where
+    T: GraphPaths,
+{
+    type Step = T::Step;
+    type StepIx = T::StepIx;
 
-    fn get_path_ref_<'a>(&'a self, id: PathId) -> Option<&'a Self::PathRef>;
+    fn path_count(&self) -> usize {
+        self.path_count()
+    }
 
-    fn get_path_mut_ref_<'a>(
-        &'a mut self,
+    fn path_len(&self, id: PathId) -> Option<usize> {
+        self.path_len(id)
+    }
+
+    fn path_circular(&self) -> Option<bool> {
+        self.path_circular()
+    }
+
+    fn path_step_at(
+        &self,
         id: PathId,
-    ) -> Option<&'a mut Self::PathRef>;
-}
-
-pub trait EmbeddedPaths_: Sized {
-    type NameIter: Iterator<Item = u8>;
-
-    // type Path: PathBase;
-
-    fn get_path_id(&self, name: &[u8]) -> Option<PathId>;
-
-    fn get_path_name(&self, id: PathId) -> Option<Self::NameIter>;
-
-    #[inline]
-    fn get_path_name_vec(&self, id: PathId) -> Option<Vec<u8>> {
-        self.get_path_name(id).map(|name| name.collect())
+        index: Self::StepIx,
+    ) -> Option<Self::Step> {
+        self.path_step_at(id, index)
     }
 
-    // fn get_path_ref(&self, id: PathId) -> Option<Self::Path>;
-
-    #[inline]
-    fn has_path(&self, name: &[u8]) -> bool {
-        self.get_path_id(name).is_some()
+    fn path_first_step(&self, id: PathId) -> Option<Self::Step> {
+        self.path_first_step(id)
     }
 
-    fn path_count(&self) -> usize;
+    fn path_last_step(&self, id: PathId) -> Option<Self::Step> {
+        self.path_last_step(id)
+    }
+
+    fn path_next_step(
+        &self,
+        id: PathId,
+        step: Self::Step,
+    ) -> Option<Self::Step> {
+        self.path_next_step(id, step)
+    }
+
+    fn path_prev_step(
+        &self,
+        id: PathId,
+        step: Self::Step,
+    ) -> Option<Self::Step> {
+        self.path_prev_step(id, step)
+    }
 }
 
-pub trait EmbeddedPathRef {
-    type Path: PathBase;
-
-    fn get_path_ref(&self, id: PathId) -> Option<Self::Path>;
-}
-
-impl<'a, T> EmbeddedPaths_ for &'a T
+impl<'a, T> GraphPaths for &'a mut T
 where
-    T: EmbeddedPaths_,
+    T: GraphPaths,
 {
-    type NameIter = T::NameIter;
-
-    // type Path = T::Path;
-
-    fn get_path_id(&self, name: &[u8]) -> Option<PathId> {
-        T::get_path_id(self, name)
-    }
-
-    fn get_path_name(&self, id: PathId) -> Option<Self::NameIter> {
-        T::get_path_name(self, id)
-    }
-
-    // fn get_path_ref(&self, id: PathId) -> Option<Self::Path> {
-    // T::get_path_ref(self, id)
-    // }
+    type Step = T::Step;
+    type StepIx = T::StepIx;
 
     fn path_count(&self) -> usize {
-        T::path_count(self)
-    }
-}
-
-/*
-impl<'a, T> EmbeddedPaths_ for &'a mut T
-where
-    T: EmbeddedPaths_,
-{
-    type NameIter = T::NameIter;
-
-    type Path = T::Path;
-
-    fn get_path_id(&self, name: &[u8]) -> Option<PathId> {
-        T::get_path_id(self, name)
+        self.path_count()
     }
 
-    fn get_path_name(&self, id: PathId) -> Option<Self::NameIter> {
-        T::get_path_name(self, id)
+    fn path_len(&self, id: PathId) -> Option<usize> {
+        self.path_len(id)
     }
 
-    fn get_path_ref(&self, id: PathId) -> Option<Self::Path> {
-        T::get_path_ref(self, id)
+    fn path_circular(&self) -> Option<bool> {
+        self.path_circular()
     }
 
-    fn path_count(&self) -> usize {
-        T::path_count(self)
+    fn path_step_at(
+        &self,
+        id: PathId,
+        index: Self::StepIx,
+    ) -> Option<Self::Step> {
+        self.path_step_at(id, index)
     }
-}
-*/
 
-pub trait IntoPaths: EmbeddedPathRef {
-    type PathIdIter: Iterator<Item = PathId>;
+    fn path_first_step(&self, id: PathId) -> Option<Self::Step> {
+        self.path_first_step(id)
+    }
 
-    type PathIter: Iterator<Item = Self::Path>;
+    fn path_last_step(&self, id: PathId) -> Option<Self::Step> {
+        self.path_last_step(id)
+    }
 
-    fn all_path_ids(self) -> Self::PathIdIter;
+    fn path_next_step(
+        &self,
+        id: PathId,
+        step: Self::Step,
+    ) -> Option<Self::Step> {
+        self.path_next_step(id, step)
+    }
 
-    fn all_paths(self) -> Self::PathIter;
-}
-
-pub trait MutEmbeddedPaths_: EmbeddedPaths_ {
-    type PathMut: MutPath;
-
-    fn get_path_mut(&mut self, id: PathId) -> Option<&mut Self::PathMut>;
-
-    fn create_path(&mut self, name: &[u8]) -> Option<PathId>;
-
-    fn destroy_path(&mut self, id: PathId) -> bool;
+    fn path_prev_step(
+        &self,
+        id: PathId,
+        step: Self::Step,
+    ) -> Option<Self::Step> {
+        self.path_prev_step(id, step)
+    }
 }
 
 pub trait AllPathIds: Sized {
@@ -250,132 +264,3 @@ pub trait PathNames: Sized {
 pub trait PathNamesMut: Sized {
     fn insert_name(self, name: &[u8]) -> Option<PathId>;
 }
-
-pub trait PathRefs: Sized {
-    type Path: PathSteps;
-
-    fn path_ref(self, id: PathId) -> Option<Self::Path>;
-}
-
-pub trait AllPathRefs: PathRefs {
-    type PathIds: AllPathIds;
-
-    fn all_paths_ref(self) -> Vec<Self::Path>;
-}
-
-pub trait PathRefsMut: Sized {
-    type PathMut: MutPath;
-
-    fn path_mut(self, id: PathId) -> Option<Self::PathMut>;
-}
-
-pub trait AllPathRefsMut {
-    // type MultiCtx: Sized;
-    type MutCtx: MutPath;
-    type PathRefsMut: Iterator<Item = Self::MutCtx>;
-
-    fn all_paths_mut(self) -> Self::PathRefsMut;
-}
-
-pub trait WithPathRefsMut: Sized {
-    type MutCtx: MutPath;
-
-    #[allow(clippy::type_complexity)]
-    fn with_path_mut<F>(
-        self,
-        id: PathId,
-        f: F,
-    ) -> Option<Vec<StepUpdate<<Self::MutCtx as PathBase>::StepIx>>>
-    where
-        for<'b> F: Fn(
-            &mut Self::MutCtx,
-        )
-            -> Vec<StepUpdate<<Self::MutCtx as PathBase>::StepIx>>;
-
-    #[allow(clippy::type_complexity)]
-    fn with_paths_mut<F>(
-        self,
-        f: F,
-    ) -> Vec<(PathId, Vec<StepUpdate<<Self::MutCtx as PathBase>::StepIx>>)>
-    where
-        for<'b> F: Fn(
-            PathId,
-            &mut Self::MutCtx,
-        )
-            -> Vec<StepUpdate<<Self::MutCtx as PathBase>::StepIx>>;
-}
-
-/*
-/// A collection of embedded paths in a graph.
-pub trait EmbeddedPaths: Sized {
-    /// Iterator through all path IDs in the graph
-    type AllPaths: Iterator<Item = PathId>;
-
-    /// Iterator through the name of a given path
-    type PathName: Iterator<Item = u8>;
-
-    /// The concrete underlying path
-    type Path: PathSteps;
-
-    /// Iterator through all the path IDs in this graph
-    fn all_path_ids(self) -> Self::AllPaths;
-
-    /// Retrieve a path by name.
-    fn get_path(self, path_id: PathId) -> Option<Self::Path>;
-
-    /// Get the path ID for the given name, if it exists
-    fn lookup_path_id(self, name: &[u8]) -> Option<PathId>;
-
-    /// Get the text name for the given ID, if it exists
-    fn get_path_name(self, path_id: PathId) -> Option<Self::PathName>;
-
-    // fn contains_path(self, name: &[u8]) -> bool;
-
-    /// The number of embedded paths
-    fn path_count(self) -> usize;
-}
-
-pub trait MutEmbeddedPaths {
-    type StepIx: Sized + Copy + Eq;
-
-    fn create_path(&mut self, name: &[u8], circular: bool) -> PathId;
-    fn remove_path(&mut self, id: PathId);
-
-    fn append_step_on(
-        &mut self,
-        id: PathId,
-        handle: Handle,
-    ) -> Option<Self::StepIx>;
-
-    fn prepend_step_on(
-        &mut self,
-        id: PathId,
-        handle: Handle,
-    ) -> Option<Self::StepIx>;
-
-    fn rewrite_segment_on(
-        &mut self,
-        id: PathId,
-        begin: Self::StepIx,
-        end: Self::StepIx,
-    ) -> Option<(Self::StepIx, Self::StepIx)>;
-}
-
-*/
-
-/*
-pub trait PathOccurrences: EmbeddedPaths {
-    type Occurrences: Iterator<Item = StepHandle>;
-
-    /// Iterator through all the steps on the given handle, across all
-    /// paths.
-    fn steps_on_handle(self, handle: Handle) -> Self::Occurrences;
-}
-
-pub trait EmbeddedMutablePath: EmbeddedPaths {
-    type PathMut: MutPath;
-
-    fn get_path_mut(self, path_id: PathId) -> Option<Self::PathMut>;
-}
-
-*/

@@ -520,64 +520,6 @@ impl<'a> PathNamesMut for &'a mut PackedPathNames {
     }
 }
 
-// impl<'a> PathRefs for &'a PackedGraphPaths {
-//     type Path = PackedPathRef<'a>;
-
-//     fn path_ref(self, id: PathId) -> Option<PackedPathRef<'a>> {
-//         self.path_ref(id)
-//     }
-// }
-
-// impl<'a> AllPathRefs for &'a PackedGraphPaths {
-//     type PathIds = &'a PackedPathNames;
-
-//     fn all_paths_ref(self) -> Vec<Self::Path> {
-//         self.path_names
-//             .all_path_ids()
-//             .filter_map(|p_id| self.path_ref(p_id))
-//             .collect()
-//     }
-// }
-
-/*
-impl<'a> PathRefsMut for &'a mut PackedGraphPaths {
-    type PathMut = PathMutContext<'a>;
-
-    fn path_mut(self, id: PathId) -> Option<PathMutContext<'a>> {
-        self.get_path_mut_ctx(id)
-    }
-}
-*/
-
-/*
-impl<'a, 'b> AllPathRefsMut for &'a mut MultiPathMutContext<'b> {
-    type MutCtx = &'a mut PackedPathRefMut<'b>;
-    type PathRefsMut = std::slice::IterMut<'a, PackedPathRefMut<'b>>;
-
-    fn all_paths_mut(self) -> Self::PathRefsMut {
-        self.get_ref_muts()
-    }
-}
-
-impl<'a> WithPathRefsMut for &'a mut PackedGraphPaths {
-    type MutCtx = PackedPathRefMut<'a>;
-
-    fn with_path_mut<F>(self, id: PathId, f: F) -> Option<Vec<StepUpdate>>
-    where
-        for<'b> F: Fn(&mut Self::MutCtx) -> Vec<StepUpdate>,
-    {
-        self.with_path_mut_ctx(id, f)
-    }
-
-    fn with_paths_mut<F>(self, f: F) -> Vec<(PathId, Vec<StepUpdate>)>
-    where
-        for<'b> F: Fn(PathId, &mut Self::MutCtx) -> Vec<StepUpdate>,
-    {
-        self.with_multipath_mut_ctx(f)
-    }
-}
-*/
-
 #[cfg(test)]
 pub(crate) mod tests {
     use crate::handle::Handle;
