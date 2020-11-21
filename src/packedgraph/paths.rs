@@ -587,7 +587,11 @@ impl GraphPaths for super::PackedGraph {
         self.path_step_at(id, step.next)
     }
 
-    fn path_prev_step(&self, id: PathId, ix: Self::Step) -> Option<Self::Step> {
+    fn path_prev_step(
+        &self,
+        id: PathId,
+        ix: Self::StepIx,
+    ) -> Option<Self::Step> {
         let (_, step) = self.path_step_at(id, ix)?;
         self.path_step_at(id, step.prev)
     }
@@ -731,7 +735,11 @@ impl PathSequences for super::PackedGraph {
         Some(len)
     }
 
-    fn path_step_at_base(&self, id: PathId, pos: usize) -> Option<Self::Step> {
+    fn path_step_at_base(
+        &self,
+        id: PathId,
+        pos: usize,
+    ) -> Option<Self::StepIx> {
         use crate::handlegraph::HandleSequences;
 
         let path = self.paths.path_ref(id)?;
@@ -741,7 +749,8 @@ impl PathSequences for super::PackedGraph {
         for (ix, step) in path.steps() {
             let len = self.node_len(step.handle);
             if remaining < len {
-                return Some((ix, step));
+                // return Some((ix, step));
+                return Some(ix);
             }
             remaining -= len;
         }

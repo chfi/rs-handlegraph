@@ -279,9 +279,6 @@ impl MutableHandles for HashGraph {
         }
 
         // update paths and path occurrences
-
-        // TODO this is probably not correct, and it's silly to clone
-        // the results all the time
         let affected_paths: Vec<(_, _)> = self
             .get_node_unchecked(&handle.id())
             .occurrences
@@ -291,7 +288,7 @@ impl MutableHandles for HashGraph {
 
         for (path_id, ix) in affected_paths.into_iter() {
             let step = path::StepIx::Step(path_id, ix);
-            self.path_rewrite_segment(path_id, step, step, result.clone());
+            self.path_rewrite_segment(path_id, step, step, &result);
         }
 
         result

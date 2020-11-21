@@ -39,7 +39,7 @@ pub struct Step(pub StepIx, pub Handle);
 
 impl PathStep for Step {
     fn handle(&self) -> Handle {
-        *self.1
+        self.1
     }
 }
 
@@ -257,7 +257,7 @@ impl Path {
         pos: usize,
     ) -> StepIx {
         if pos == 0 {
-            return PathStep::Front(self.path_id);
+            return StepIx::Front(self.path_id);
         }
 
         let mut bases = 0;

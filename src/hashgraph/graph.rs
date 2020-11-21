@@ -41,6 +41,7 @@ impl HashGraph {
         Default::default()
     }
 
+    /*
     fn add_gfa_segment<'a, 'b, T: OptFields>(
         &'a mut self,
         seg: &'b Segment<usize, T>,
@@ -69,7 +70,9 @@ impl HashGraph {
         gfa.paths.iter().for_each(|p| graph.add_gfa_path(p));
         graph
     }
+    */
 
+    /*
     pub fn print_path(&self, path_id: &PathId) {
         let path = self.paths.get(&path_id).unwrap();
         println!("Path\t{}", path_id);
@@ -90,6 +93,7 @@ impl HashGraph {
             println!("{} - {:?}", node.sequence, node.occurrences);
         });
     }
+    */
 
     pub fn get_node(&self, node_id: &NodeId) -> Option<&Node> {
         self.graph.get(node_id)
