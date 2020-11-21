@@ -58,8 +58,8 @@ pub struct PackedStep {
 
 #[derive(Debug, Clone)]
 pub struct StepList {
-    steps: RobustPagedIntVec,
-    links: RobustPagedIntVec,
+    pub(super) steps: RobustPagedIntVec,
+    pub(super) links: RobustPagedIntVec,
     pub(super) removed_steps: usize,
     pub(super) path_deleted: bool,
 }

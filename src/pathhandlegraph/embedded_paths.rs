@@ -4,7 +4,7 @@ use super::{
     MutPath, PathBase, PathId, PathStep, PathSteps, StepHandle, StepUpdate,
 };
 pub trait GraphPaths: Sized {
-    type Step: PathStep;
+    // type Step: PathStep;
 
     type StepIx: Sized + Copy + Eq;
 
@@ -14,11 +14,11 @@ pub trait GraphPaths: Sized {
 
     fn path_circular(&self, id: PathId) -> Option<bool>;
 
-    fn path_step_at(
+    fn path_handle_at_step(
         &self,
         id: PathId,
         index: Self::StepIx,
-    ) -> Option<Self::Step>;
+    ) -> Option<Handle>;
 
     fn path_first_step(&self, id: PathId) -> Option<Self::StepIx>;
 
@@ -28,13 +28,13 @@ pub trait GraphPaths: Sized {
         &self,
         id: PathId,
         step: Self::StepIx,
-    ) -> Option<Self::Step>;
+    ) -> Option<Self::StepIx>;
 
     fn path_prev_step(
         &self,
         id: PathId,
         step: Self::StepIx,
-    ) -> Option<Self::Step>;
+    ) -> Option<Self::StepIx>;
 }
 
 pub trait GraphPathNames: Sized {
@@ -68,7 +68,7 @@ pub trait IntoNodeOccurrences: GraphPaths {
 }
 
 pub trait MutableGraphPaths: GraphPaths {
-    fn create_path(&mut self, name: &[u8]) -> Option<PathId>;
+    fn create_path(&mut self, name: &[u8], circular: bool) -> Option<PathId>;
 
     fn destroy_path(&mut self, id: PathId) -> bool;
 
@@ -109,7 +109,7 @@ pub trait MutableGraphPaths: GraphPaths {
         from: Self::StepIx,
         to: Self::StepIx,
         new_segment: &[Handle],
-    ) -> Option<Vec<Self::StepIx>>;
+    ) -> Option<(Self::StepIx, Self::StepIx)>;
 
     fn path_set_circularity(
         &mut self,
@@ -132,13 +132,15 @@ pub trait PathSequences: GraphPaths {
 }
 
 pub trait GraphPathsRef: GraphPaths {
-    type PathRef: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
+    // type PathRef: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
+    type PathRef: PathBase<StepIx = Self::StepIx>;
 
     fn get_path_ref(self, id: PathId) -> Option<Self::PathRef>;
 }
 
 pub trait GraphPathsRefMut: GraphPaths {
-    type PathMut: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
+    // type PathMut: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
+    type PathMut: PathBase<StepIx = Self::StepIx>;
 
     fn get_path_mut_ref<'a>(
         &'a mut self,
@@ -150,7 +152,7 @@ impl<'a, T> GraphPaths for &'a T
 where
     T: GraphPaths,
 {
-    type Step = T::Step;
+    // type Step = T::Step;
     type StepIx = T::StepIx;
 
     fn path_count(&self) -> usize {
@@ -165,13 +167,21 @@ where
         T::path_circular(self, id)
     }
 
-    fn path_step_at(
+    fn path_handle_at_step(
         &self,
         id: PathId,
         index: Self::StepIx,
-    ) -> Option<Self::Step> {
-        T::path_step_at(self, id, index)
+    ) -> Option<Handle> {
+        T::path_handle_at_step(self, id, index)
     }
+
+    // fn path_step_at(
+    //     &self,
+    //     id: PathId,
+    //     index: Self::StepIx,
+    // ) -> Option<Handle> {
+    //     T::path_step_at(self, id, index)
+    // }
 
     fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
         T::path_first_step(self, id)
@@ -185,7 +195,7 @@ where
         &self,
         id: PathId,
         step: Self::StepIx,
-    ) -> Option<Self::Step> {
+    ) -> Option<Self::StepIx> {
         T::path_next_step(self, id, step)
     }
 
@@ -193,7 +203,7 @@ where
         &self,
         id: PathId,
         step: Self::StepIx,
-    ) -> Option<Self::Step> {
+    ) -> Option<Self::StepIx> {
         T::path_prev_step(self, id, step)
     }
 }
@@ -202,7 +212,7 @@ impl<'a, T> GraphPaths for &'a mut T
 where
     T: GraphPaths,
 {
-    type Step = T::Step;
+    // type Step = T::Step;
     type StepIx = T::StepIx;
 
     fn path_count(&self) -> usize {
@@ -217,13 +227,21 @@ where
         T::path_circular(self, id)
     }
 
-    fn path_step_at(
+    fn path_handle_at_step(
         &self,
         id: PathId,
         index: Self::StepIx,
-    ) -> Option<Self::Step> {
-        T::path_step_at(self, id, index)
+    ) -> Option<Handle> {
+        T::path_handle_at_step(self, id, index)
     }
+
+    // fn path_step_at(
+    //     &self,
+    //     id: PathId,
+    //     index: Self::StepIx,
+    // ) -> Option<Self::Step> {
+    //     T::path_step_at(self, id, index)
+    // }
 
     fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
         T::path_first_step(self, id)
@@ -237,7 +255,7 @@ where
         &self,
         id: PathId,
         step: Self::StepIx,
-    ) -> Option<Self::Step> {
+    ) -> Option<Self::StepIx> {
         T::path_next_step(self, id, step)
     }
 
@@ -245,7 +263,7 @@ where
         &self,
         id: PathId,
         step: Self::StepIx,
-    ) -> Option<Self::Step> {
+    ) -> Option<Self::StepIx> {
         T::path_prev_step(self, id, step)
     }
 }

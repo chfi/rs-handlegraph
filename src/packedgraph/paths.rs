@@ -502,10 +502,12 @@ impl<'a> AllPathIds for &'a PackedPathNames {
 impl<'a> PathNames for &'a PackedPathNames {
     type PathName = packed::vector::IterView<'a, u8>;
 
+    #[inline]
     fn get_path_name(self, id: PathId) -> Option<Self::PathName> {
         self.name_iter(id)
     }
 
+    #[inline]
     fn get_path_id(self, name: &[u8]) -> Option<PathId> {
         self.name_id_map.get(name).copied()
     }
@@ -524,29 +526,34 @@ impl<'a> PathNamesMut for &'a mut PackedPathNames {
 impl<'a> GraphPathNames for &'a super::PackedGraph {
     type PathName = packed::vector::IterView<'a, u8>;
 
+    #[inline]
     fn get_path_id(self, name: &[u8]) -> Option<PathId> {
         self.paths.names.name_id_map.get(name).copied()
     }
 
+    #[inline]
     fn get_path_name(self, id: PathId) -> Option<Self::PathName> {
         self.paths.names.name_iter(id)
     }
 }
 
 impl GraphPaths for super::PackedGraph {
-    type Step = (StepPtr, PackedStep);
+    // type Step = (StepPtr, PackedStep);
 
     type StepIx = StepPtr;
 
+    #[inline]
     fn path_count(&self) -> usize {
         self.paths.path_count()
     }
 
+    #[inline]
     fn path_len(&self, id: PathId) -> Option<usize> {
         let path = self.paths.path_ref(id)?;
         Some(path.len())
     }
 
+    #[inline]
     fn path_circular(&self, id: PathId) -> Option<bool> {
         let ix = id.0 as usize;
         if ix >= self.paths.paths.len() {
@@ -559,46 +566,55 @@ impl GraphPaths for super::PackedGraph {
         Some(record.circular)
     }
 
-    fn path_step_at(
+    #[inline]
+    fn path_handle_at_step(
         &self,
         id: PathId,
         index: Self::StepIx,
-    ) -> Option<Self::Step> {
+    ) -> Option<Handle> {
         let path = self.paths.path_ref(id)?;
-        path.steps().find(|&(ix, _)| ix == index)
+        let (_, step) = path.steps().find(|&(ix, _)| ix == index)?;
+        Some(step.handle)
     }
 
+    #[inline]
     fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
         let path = self.paths.path_ref(id)?;
         Some(path.head)
     }
 
+    #[inline]
     fn path_last_step(&self, id: PathId) -> Option<Self::StepIx> {
         let path = self.paths.path_ref(id)?;
         Some(path.tail)
     }
 
+    #[inline]
     fn path_next_step(
         &self,
         id: PathId,
         ix: Self::StepIx,
-    ) -> Option<Self::Step> {
-        let (_, step) = self.path_step_at(id, ix)?;
-        self.path_step_at(id, step.next)
+    ) -> Option<Self::StepIx> {
+        let path = self.paths.path_ref(id)?;
+        let (_, step) = path.step_at(ix)?;
+        Some(step.next)
     }
 
+    #[inline]
     fn path_prev_step(
         &self,
         id: PathId,
         ix: Self::StepIx,
-    ) -> Option<Self::Step> {
-        let (_, step) = self.path_step_at(id, ix)?;
-        self.path_step_at(id, step.prev)
+    ) -> Option<Self::StepIx> {
+        let path = self.paths.path_ref(id)?;
+        let (_, step) = path.step_at(ix)?;
+        Some(step.prev)
     }
 }
 
 impl MutableGraphPaths for super::PackedGraph {
-    fn create_path(&mut self, name: &[u8]) -> Option<PathId> {
+    // TODO
+    fn create_path(&mut self, name: &[u8], circular: bool) -> Option<PathId> {
         if self.paths.names.name_id_map.contains_key(name) {
             return None;
         } else {
@@ -689,7 +705,7 @@ impl MutableGraphPaths for super::PackedGraph {
         from: Self::StepIx,
         to: Self::StepIx,
         new_segment: &[Handle],
-    ) -> Option<Vec<Self::StepIx>> {
+    ) -> Option<(Self::StepIx, Self::StepIx)> {
         unimplemented!();
     }
 

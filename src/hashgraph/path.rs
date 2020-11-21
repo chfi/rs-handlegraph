@@ -203,6 +203,14 @@ impl Path {
         }
     }
 
+    pub fn step_index_offset(&self, step: StepIx) -> usize {
+        match step {
+            StepIx::Front(_) => 0,
+            StepIx::End(_) => self.nodes.len() - 1,
+            StepIx::Step(_, i) => i,
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.nodes.len()
     }
