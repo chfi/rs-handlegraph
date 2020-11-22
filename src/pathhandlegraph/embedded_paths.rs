@@ -101,35 +101,53 @@ pub trait GraphPathNames: Sized {
     }
 }
 
+/// Trait for iterating through all `PathIds` in a graph.
 pub trait IntoPathIds {
     type PathIds: Iterator<Item = PathId>;
 
     fn into_path_ids(self) -> Self::PathIds;
 }
 
+/// Trait for iterating through all the path steps on a handle in a graph.
 pub trait IntoNodeOccurrences: GraphPaths {
+    /// An iterator through the steps on a path, by `PathId` and `StepIx`.
     type Occurrences: Iterator<Item = (PathId, Self::StepIx)>;
 
     fn into_steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences>;
 }
 
+/// A handlegraph with embedded paths that can be created, destroyed,
+/// and otherwise manipulated.
 pub trait MutableGraphPaths: GraphPaths {
+    /// Create a new path with the given name and return its `PathId`.
+    /// Returns `None` if the path already exists in the graph.
     fn create_path(&mut self, name: &[u8], circular: bool) -> Option<PathId>;
 
+    /// Destroy the path with the given `id`. Returns `true` if the
+    /// path was destroyed, `false` if the path did not exist or
+    /// couldn't be destroyed.
     fn destroy_path(&mut self, id: PathId) -> bool;
 
+    /// Append a step on the given `handle` to the end of path `id`,
+    /// if the path exists. Returns the index of the new step.
     fn path_append_step(
         &mut self,
         id: PathId,
         handle: Handle,
     ) -> Option<Self::StepIx>;
 
+    /// Prepend a step on the given `handle` to the beginning of path
+    /// `id`, if the path exists. Returns the index of the new step.
     fn path_prepend_step(
         &mut self,
         id: PathId,
         handle: Handle,
     ) -> Option<Self::StepIx>;
 
+    /// Insert a step on the given `handle` into path `id`, after the
+    /// step at `index`. Returns the index of the new step if it was
+    /// successfully inserted, or `None` if either the path or the
+    /// step does not exist.
     fn path_insert_step_after(
         &mut self,
         id: PathId,
@@ -137,18 +155,26 @@ pub trait MutableGraphPaths: GraphPaths {
         handle: Handle,
     ) -> Option<Self::StepIx>;
 
+    /// Remove the step at `index` from path `id`. Returns the index
+    /// of the removed step if it existed and was removed.
     fn path_remove_step(
         &mut self,
         id: PathId,
-        step: Self::StepIx,
+        index: Self::StepIx,
     ) -> Option<Self::StepIx>;
 
+    /// Flip the orientation of the handle on step at `index` on path
+    /// `id`, if it exists.
     fn path_flip_step(
         &mut self,
         id: PathId,
-        step: Self::StepIx,
+        index: Self::StepIx,
     ) -> Option<Self::StepIx>;
 
+    /// Remove all steps between the indices `from` and `to`
+    /// (inclusive) on `path`, and insert new steps on the `Handle`s
+    /// in `new_segment`. Returns a pair with the new step indices of
+    /// the first and last new handles.
     fn path_rewrite_segment(
         &mut self,
         id: PathId,
@@ -157,6 +183,7 @@ pub trait MutableGraphPaths: GraphPaths {
         new_segment: &[Handle],
     ) -> Option<(Self::StepIx, Self::StepIx)>;
 
+    /// Set the circularity of path `id`.
     fn path_set_circularity(
         &mut self,
         id: PathId,
@@ -164,12 +191,20 @@ pub trait MutableGraphPaths: GraphPaths {
     ) -> Option<()>;
 }
 
+/// A handlegraph with embedded paths whose steps are associated with
+/// the sequence positions and lengths of their nodes.
 pub trait PathSequences: GraphPaths {
+    /// Return the length of path `id` in nucleotides, if it exists.
     fn path_bases_len(&self, id: PathId) -> Option<usize>;
 
+    /// Return the index of the step at sequence position `pos` along
+    /// path `id`, or `None` if either the path doesn't exist, or if
+    /// the path is shorter than `pos` bases.
     fn path_step_at_base(&self, id: PathId, pos: usize)
         -> Option<Self::StepIx>;
 
+    /// Return the sequence offset of the step at `index` in path
+    /// `id`, if it exists.
     fn path_step_base_offset(
         &self,
         id: PathId,
@@ -177,6 +212,7 @@ pub trait PathSequences: GraphPaths {
     ) -> Option<usize>;
 }
 
+/// A handlegraph that can produce references to specific paths.
 pub trait GraphPathsRef: GraphPaths {
     type PathRef: PathBase<StepIx = Self::StepIx>;
 
