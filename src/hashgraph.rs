@@ -287,7 +287,7 @@ impl MutableHandles for HashGraph {
             .collect();
 
         for (path_id, ix) in affected_paths.into_iter() {
-            let step = path::StepIx::Step(path_id, ix);
+            let step = path::StepIx::Step(ix);
             self.path_rewrite_segment(path_id, step, step, &result);
         }
 
@@ -372,12 +372,12 @@ impl GraphPaths for HashGraph {
 
     fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
         let _path = self.paths.get(&id)?;
-        Some(path::StepIx::Front(id))
+        Some(path::StepIx::Front)
     }
 
     fn path_last_step(&self, id: PathId) -> Option<Self::StepIx> {
         let _path = self.paths.get(&id)?;
-        Some(path::StepIx::End(id))
+        Some(path::StepIx::End)
     }
 
     fn path_next_step(
@@ -386,14 +386,14 @@ impl GraphPaths for HashGraph {
         step: Self::StepIx,
     ) -> Option<Self::StepIx> {
         match step {
-            path::StepIx::Front(pid) => self.path_first_step(pid),
-            path::StepIx::End(pid) => self.path_last_step(pid),
-            path::StepIx::Step(pid, ix) => {
-                let len = self.path_len(pid)?;
+            path::StepIx::Front => self.path_first_step(id),
+            path::StepIx::End => self.path_last_step(id),
+            path::StepIx::Step(ix) => {
+                let len = self.path_len(id)?;
                 if ix < len - 1 {
-                    Some(path::StepIx::Step(pid, ix + 1))
+                    Some(path::StepIx::Step(ix + 1))
                 } else {
-                    self.path_last_step(pid)
+                    self.path_last_step(id)
                 }
             }
         }
@@ -405,16 +405,16 @@ impl GraphPaths for HashGraph {
         step: Self::StepIx,
     ) -> Option<Self::StepIx> {
         match step {
-            path::StepIx::Front(pid) => Some(path::StepIx::Front(pid)),
-            path::StepIx::End(pid) => {
-                let len = self.path_len(pid)?;
-                Some(path::StepIx::Step(pid, len - 1))
+            path::StepIx::Front => Some(path::StepIx::Front),
+            path::StepIx::End => {
+                let len = self.path_len(id)?;
+                Some(path::StepIx::Step(len - 1))
             }
-            path::StepIx::Step(pid, ix) => {
+            path::StepIx::Step(ix) => {
                 if ix > 0 {
-                    Some(path::StepIx::Step(pid, ix - 1))
+                    Some(path::StepIx::Step(ix - 1))
                 } else {
-                    Some(path::StepIx::Front(pid))
+                    Some(path::StepIx::Front)
                 }
             }
         }
@@ -450,6 +450,14 @@ impl<'a> IntoNodeOccurrences for &'a HashGraph {
         let node = self.get_node(&handle.id())?;
         let iter = node.occurrences.iter();
         Some(node::OccurIter { iter })
+    }
+}
+
+impl<'a> GraphPathsRef for &'a HashGraph {
+    type PathRef = &'a Path;
+
+    fn get_path_ref(self, id: PathId) -> Option<&'a Path> {
+        self.paths.get(&id)
     }
 }
 
@@ -493,7 +501,7 @@ impl MutableGraphPaths for HashGraph {
 
         node.occurrences.insert(id, step_offset);
 
-        Some(path::StepIx::Step(id, step_offset))
+        Some(path::StepIx::Step(step_offset))
     }
 
     fn path_prepend_step(
@@ -519,7 +527,7 @@ impl MutableGraphPaths for HashGraph {
         let node: &mut Node = self.graph.get_mut(&handle.id())?;
 
         node.occurrences.insert(id, step_offset);
-        Some(path::StepIx::Step(id, step_offset))
+        Some(path::StepIx::Step(step_offset))
     }
 
     // TODO the offsets in here will probably need some fixing
@@ -535,9 +543,9 @@ impl MutableGraphPaths for HashGraph {
 
         let path: &mut Path = self.paths.get_mut(&id)?;
         let offset = match index {
-            path::StepIx::Front(_) => 0,
-            path::StepIx::End(_) => path.nodes.len() - 1,
-            path::StepIx::Step(_, i) => (path.nodes.len() - 1).min(i + 1),
+            path::StepIx::Front => 0,
+            path::StepIx::End => path.nodes.len() - 1,
+            path::StepIx::Step(i) => (path.nodes.len() - 1).min(i + 1),
         };
 
         if offset < path.nodes.len() - 1 {
@@ -555,7 +563,7 @@ impl MutableGraphPaths for HashGraph {
         let node: &mut Node = self.graph.get_mut(&handle.id())?;
         node.occurrences.insert(id, inserted_offset);
 
-        Some(path::StepIx::Step(id, inserted_offset))
+        Some(path::StepIx::Step(inserted_offset))
     }
 
     fn path_remove_step(
@@ -567,9 +575,9 @@ impl MutableGraphPaths for HashGraph {
 
         // There's no step to remove at the indices before or after the path
         let to_remove = match index {
-            path::StepIx::Front(_) => None,
-            path::StepIx::End(_) => None,
-            path::StepIx::Step(_, i) => Some(i),
+            path::StepIx::Front => None,
+            path::StepIx::End => None,
+            path::StepIx::Step(i) => Some(i),
         }?;
 
         if to_remove < path.nodes.len() - 1 {
@@ -585,7 +593,7 @@ impl MutableGraphPaths for HashGraph {
         let node: &mut Node = self.graph.get_mut(&handle.id())?;
         node.occurrences.remove(&id);
 
-        Some(path::StepIx::Step(id, to_remove))
+        Some(path::StepIx::Step(to_remove))
     }
 
     fn path_flip_step(
@@ -597,9 +605,9 @@ impl MutableGraphPaths for HashGraph {
 
         // There's no step to alter at the indices before or after the path
         let to_flip = match index {
-            path::StepIx::Front(_) => None,
-            path::StepIx::End(_) => None,
-            path::StepIx::Step(_, i) => Some(i),
+            path::StepIx::Front => None,
+            path::StepIx::End => None,
+            path::StepIx::Step(i) => Some(i),
         }?;
 
         let handle = path.nodes.get_mut(to_flip)?;
@@ -648,8 +656,8 @@ impl MutableGraphPaths for HashGraph {
             });
         }
 
-        let start_step = path::StepIx::Step(id, start);
-        let end_step = path::StepIx::Step(id, start + new_segment.len() - 1);
+        let start_step = path::StepIx::Step(start);
+        let end_step = path::StepIx::Step(start + new_segment.len() - 1);
 
         Some((start_step, end_step))
     }
@@ -694,255 +702,3 @@ impl PathSequences for HashGraph {
         path.position_of_step(&self.graph, index)
     }
 }
-
-/*
-impl PathHandleGraph for HashGraph {
-    type PathHandle = PathId;
-    type StepHandle = path::Step;
-
-    fn path_count(&self) -> usize {
-        self.path_id.len()
-    }
-
-    fn has_path(&self, name: &[u8]) -> bool {
-        self.path_id.contains_key(name)
-    }
-
-    fn name_to_path_handle(&self, name: &[u8]) -> Option<Self::PathHandle> {
-        self.path_id.get(name).copied()
-    }
-
-    fn path_handle_to_name(&self, path_id: &Self::PathHandle) -> &[u8] {
-        self.get_path_unchecked(path_id).name.as_slice()
-    }
-
-    fn is_circular(&self, path_id: &Self::PathHandle) -> bool {
-        self.get_path_unchecked(path_id).is_circular
-    }
-
-    fn step_count(&self, path_id: &Self::PathHandle) -> usize {
-        self.get_path_unchecked(path_id).nodes.len()
-    }
-
-    fn handle_of_step(&self, step: &Self::StepHandle) -> Option<Handle> {
-        self.get_path_unchecked(&step.path_id())
-            .lookup_step_handle(step)
-    }
-
-    fn path_handle_of_step(&self, step: &Self::StepHandle) -> Self::PathHandle {
-        step.path_id()
-    }
-
-    fn path_begin(&self, path: &Self::PathHandle) -> Self::StepHandle {
-        PathStep::Step(*path, 0)
-    }
-
-    fn path_end(&self, path: &Self::PathHandle) -> Self::StepHandle {
-        PathStep::End(*path)
-    }
-
-    fn path_back(&self, path: &Self::PathHandle) -> Self::StepHandle {
-        PathStep::Step(*path, self.step_count(path) - 1)
-    }
-
-    fn path_front_end(&self, path: &Self::PathHandle) -> Self::StepHandle {
-        PathStep::Front(*path)
-    }
-
-    fn has_next_step(&self, step: &Self::StepHandle) -> bool {
-        matches!(step, PathStep::End(_))
-    }
-
-    fn has_previous_step(&self, step: &Self::StepHandle) -> bool {
-        matches!(step, PathStep::Front(_))
-    }
-
-    fn path_bases_len(&self, path_handle: &Self::PathHandle) -> Option<usize> {
-        let path = self.paths.get(path_handle)?;
-        Some(path.bases_len(&self.graph))
-    }
-
-    fn position_of_step(&self, step: &Self::StepHandle) -> Option<usize> {
-        let path = self.paths.get(&step.path_id())?;
-        path.position_of_step(&self.graph, step)
-    }
-
-    fn step_at_position(
-        &self,
-        path_handle: &Self::PathHandle,
-        pos: usize,
-    ) -> Option<Self::StepHandle> {
-        let path = self.paths.get(path_handle)?;
-        Some(path.step_at_position(&self.graph, pos))
-    }
-
-    fn next_step(&self, step: &Self::StepHandle) -> Self::StepHandle {
-        match step {
-            PathStep::Front(pid) => self.path_begin(pid),
-            PathStep::End(pid) => self.path_end(pid),
-            PathStep::Step(pid, ix) => {
-                if *ix < self.step_count(pid) - 1 {
-                    PathStep::Step(*pid, ix + 1)
-                } else {
-                    self.path_end(pid)
-                }
-            }
-        }
-    }
-
-    fn previous_step(&self, step: &Self::StepHandle) -> Self::StepHandle {
-        match step {
-            PathStep::Front(pid) => self.path_front_end(pid),
-            PathStep::End(pid) => self.path_back(pid),
-            PathStep::Step(pid, ix) => {
-                if *ix > 0 {
-                    PathStep::Step(*pid, ix - 1)
-                } else {
-                    self.path_end(pid)
-                }
-            }
-        }
-    }
-
-    fn destroy_path(&mut self, path: &Self::PathHandle) {
-        let p: &Path = self.paths.get(&path).unwrap();
-
-        for handle in p.nodes.iter() {
-            let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
-            node.occurrences.remove(path);
-        }
-        self.paths.remove(&path);
-    }
-
-    fn create_path_handle(
-        &mut self,
-        name: &[u8],
-        is_circular: bool,
-    ) -> Self::PathHandle {
-        let path_id = self.paths.len() as i64;
-        let path = Path::new(name, path_id, is_circular);
-        self.path_id.insert(name.into(), path_id);
-        self.paths.insert(path_id, path);
-        path_id
-    }
-
-    fn append_step(
-        &mut self,
-        path_id: &Self::PathHandle,
-        to_append: Handle,
-    ) -> Self::StepHandle {
-        let path: &mut Path = self.paths.get_mut(path_id).unwrap();
-        path.nodes.push(to_append);
-        let step = (*path_id, path.nodes.len() - 1);
-        let node: &mut Node = self.graph.get_mut(&to_append.id()).unwrap();
-        node.occurrences.insert(step.0, step.1);
-        PathStep::Step(*path_id, path.nodes.len() - 1)
-    }
-
-    fn prepend_step(
-        &mut self,
-        path_id: &Self::PathHandle,
-        to_prepend: Handle,
-    ) -> Self::StepHandle {
-        let path: &mut Path = self.paths.get_mut(path_id).unwrap();
-        // update occurrences in nodes already in the graph
-        for h in path.nodes.iter() {
-            let node: &mut Node = self.graph.get_mut(&h.id()).unwrap();
-            *node.occurrences.get_mut(path_id).unwrap() += 1;
-        }
-        path.nodes.insert(0, to_prepend);
-        let node: &mut Node = self.graph.get_mut(&to_prepend.id()).unwrap();
-        node.occurrences.insert(*path_id, 0);
-        PathStep::Step(*path_id, 0)
-    }
-
-    fn rewrite_segment(
-        &mut self,
-        begin: &Self::StepHandle,
-        end: &Self::StepHandle,
-        new_segment: Vec<Handle>,
-    ) -> (Self::StepHandle, Self::StepHandle) {
-        // extract the index range from the begin and end handles
-
-        if begin.path_id() != end.path_id() {
-            panic!("Tried to rewrite path segment between two different paths");
-        }
-
-        let path_id = begin.path_id();
-        let path_len = self.paths.get(&path_id).unwrap().nodes.len();
-
-        let step_index = |s: &Self::StepHandle| match s {
-            PathStep::Front(_) => 0,
-            PathStep::End(_) => path_len - 1,
-            PathStep::Step(_, i) => *i,
-        };
-
-        let l = step_index(begin);
-        let r = step_index(end);
-
-        let range = l..=r;
-
-        // first delete the occurrences of the nodes in the range
-        for handle in self
-            .paths
-            .get(&path_id)
-            .unwrap()
-            .nodes
-            .iter()
-            .skip(l)
-            .take(r - l + 1)
-        {
-            let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
-            node.occurrences.remove(&path_id);
-        }
-
-        // get a &mut to the path's vector of handles
-        let handles: &mut Vec<Handle> =
-            &mut self.paths.get_mut(&path_id).unwrap().nodes;
-
-        let r = l + new_segment.len();
-        // replace the range of the path's handle vector with the new segment
-        handles.splice(range, new_segment);
-
-        // update occurrences
-        for (ix, handle) in
-            self.paths.get(&path_id).unwrap().nodes.iter().enumerate()
-        {
-            let node: &mut Node = self.graph.get_mut(&handle.id()).unwrap();
-            node.occurrences.insert(path_id, ix);
-        }
-
-        // return the new beginning and end step handles: even if the
-        // input steps were Front and/or End, the output steps exist
-        // on the path
-        (PathStep::Step(path_id, l), PathStep::Step(path_id, r))
-    }
-
-    fn paths_iter<'a>(
-        &'a self,
-    ) -> Box<dyn Iterator<Item = &'a Self::PathHandle> + 'a> {
-        Box::new(self.paths.keys())
-    }
-
-    fn occurrences_iter<'a>(
-        &'a self,
-        handle: Handle,
-    ) -> Box<dyn Iterator<Item = Self::StepHandle> + 'a> {
-        let node: &Node = self.get_node_unchecked(&handle.id());
-        Box::new(node.occurrences.iter().map(|(k, v)| PathStep::Step(*k, *v)))
-    }
-
-    fn steps_iter<'a>(
-        &'a self,
-        path_handle: &'a Self::PathHandle,
-    ) -> Box<dyn Iterator<Item = Self::StepHandle> + 'a> {
-        let path = self.get_path_unchecked(path_handle);
-        Box::new(
-            path.nodes
-                .iter()
-                .enumerate()
-                .map(move |(i, _)| PathStep::Step(*path_handle, i)),
-        )
-    }
-}
-*/

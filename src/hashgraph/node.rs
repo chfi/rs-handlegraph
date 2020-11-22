@@ -17,7 +17,7 @@ impl<'a> Iterator for OccurIter<'a> {
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let (id, offset) = self.iter.next()?;
-        Some((*id, StepIx::Step(*id, *offset)))
+        Some((*id, StepIx::Step(*offset)))
     }
 }
 
