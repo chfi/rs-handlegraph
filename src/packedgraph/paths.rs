@@ -324,12 +324,17 @@ impl<'a> std::ops::IndexMut<std::ops::Range<PathId>> for PathsMutationCtx<'a> {
 }
 
 impl PackedGraphPaths {
-    pub(super) fn create_path(&mut self, name: &[u8]) -> PathId {
+    pub(super) fn create_path(
+        &mut self,
+        name: &[u8],
+        circular: bool,
+    ) -> PathId {
         let path_id = self.paths.len() as u64;
         let packed_path = StepList::default();
         self.paths.push(packed_path);
 
-        self.properties.append_empty();
+        self.properties.append_new(circular);
+
         self.names.add_name(name);
 
         PathId(path_id)
@@ -613,12 +618,11 @@ impl GraphPaths for super::PackedGraph {
 }
 
 impl MutableGraphPaths for super::PackedGraph {
-    // TODO
     fn create_path(&mut self, name: &[u8], circular: bool) -> Option<PathId> {
         if self.paths.names.name_id_map.contains_key(name) {
             return None;
         } else {
-            Some(self.paths.create_path(name))
+            Some(self.paths.create_path(name, circular))
         }
     }
 
@@ -706,7 +710,15 @@ impl MutableGraphPaths for super::PackedGraph {
         to: Self::StepIx,
         new_segment: &[Handle],
     ) -> Option<(Self::StepIx, Self::StepIx)> {
-        unimplemented!();
+        let (start, end, updates) = {
+            let mut mut_ctx = self.paths.get_path_mut_ctx(id)?;
+            let ref_mut = mut_ctx.paths.first_mut()?;
+            ref_mut.rewrite_segment(from, to, new_segment)?
+        };
+
+        self.apply_node_occurrences_iter(id, updates);
+
+        Some((start, end))
     }
 
     fn path_set_circularity(

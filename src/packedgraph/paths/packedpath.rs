@@ -708,8 +708,79 @@ where
         from: Self::StepIx,
         to: Self::StepIx,
         new_segment: &[Handle],
-    ) -> Option<Vec<StepUpdate>> {
-        unimplemented!();
+    ) -> Option<(Self::StepIx, Self::StepIx, Vec<StepUpdate>)> {
+        if new_segment.is_empty() {
+            return None;
+        }
+
+        // make sure both steps actually exist in this path
+        let (from_step, to_step) = {
+            let steps = self.path.steps_ref();
+            let from_step = steps.get_step(from)?;
+            let to_step = steps.get_step(to)?;
+            if from_step.handle.pack() == 0 || to_step.handle.pack() == 0 {
+                return None;
+            }
+            (from_step, to_step)
+        };
+
+        let mut res = Vec::new();
+
+        // clear the steps to be removed, and push their corresponding
+        // step updates
+        {
+            let steps = self.path.steps_mut();
+            let to_remove = steps.iter(from, to).collect::<Vec<_>>();
+
+            for (ptr, step) in to_remove.into_iter() {
+                res.push(StepUpdate::Remove {
+                    step: ptr,
+                    handle: step.handle,
+                });
+
+                let step_ix = ptr.to_record_ix(1, 0)?;
+                let link_ix = ptr.to_record_ix(2, 0)?;
+
+                steps.steps.set(step_ix, 0);
+                steps.links.set(link_ix, 0);
+                steps.links.set(link_ix + 1, 0);
+                steps.removed_steps += 1;
+            }
+        }
+
+        let mut handles = new_segment.iter();
+        let first_handle = *handles.next()?;
+
+        let start = {
+            let update = if from_step.prev.is_null() {
+                self.prepend_step(first_handle)
+            } else {
+                self.insert_step_after(from_step.prev, first_handle)?
+            };
+            let step = update.step();
+            res.push(update);
+            step
+        };
+
+        let mut last = start;
+        for &handle in handles {
+            let update = self.insert_step_after(last, handle)?;
+            last = update.step();
+            res.push(update);
+        }
+
+        let end = last;
+
+        let steps = self.path.steps_mut();
+
+        if let Some(ix) = from_step.prev.to_record_ix(2, 1) {
+            steps.links.set_pack(ix, start);
+        }
+        if let Some(ix) = to_step.next.to_record_ix(2, 0) {
+            steps.links.set_pack(ix, end);
+        }
+
+        Some((start, end, res))
     }
 
     fn set_circularity(&mut self, circular: bool) {

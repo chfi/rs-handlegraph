@@ -164,7 +164,7 @@ pub trait MutPath: PathBase {
         from: Self::StepIx,
         to: Self::StepIx,
         new_segment: &[Handle],
-    ) -> Option<Vec<StepUpdate<Self::StepIx>>>;
+    ) -> Option<(Self::StepIx, Self::StepIx, Vec<StepUpdate<Self::StepIx>>)>;
 
     fn set_circularity(&mut self, circular: bool);
 }

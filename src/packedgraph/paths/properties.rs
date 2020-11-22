@@ -49,6 +49,18 @@ impl PathProperties {
         self.deleted_steps.append(0);
     }
 
+    pub(super) fn append_new(&mut self, circular: bool) {
+        self.heads.append(0);
+        self.tails.append(0);
+        self.deleted.append(0);
+        if circular {
+            self.circular.append(1);
+        } else {
+            self.circular.append(0);
+        }
+        self.deleted_steps.append(0);
+    }
+
     pub(super) fn append_record(&mut self, record: PathPropertyRecord) {
         self.heads.append(record.head.pack());
         self.tails.append(record.tail.pack());
