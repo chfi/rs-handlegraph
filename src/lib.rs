@@ -5,6 +5,5 @@ pub mod hashgraph;
 pub mod mutablehandlegraph;
 pub mod packed;
 pub mod packedgraph;
-pub mod pathgraph;
 pub mod pathhandlegraph;
 pub mod util;

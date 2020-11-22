@@ -2,7 +2,7 @@ use crate::{
     handle::{Edge, Handle, NodeId},
     handlegraph::HandleGraphRef,
     mutablehandlegraph::*,
-    pathgraph::PathHandleGraph,
+    pathhandlegraph::*,
 };
 
 use gfa::{
@@ -15,7 +15,7 @@ use bstr::ByteVec;
 
 pub fn from_gfa<G, T>(gfa: &GFA<usize, T>) -> G
 where
-    G: Default + AdditiveHandleGraph + PathHandleGraph,
+    G: Default + AdditiveHandleGraph + MutableGraphPaths,
     T: OptFields,
 {
     let mut graph: G = Default::default();
@@ -34,10 +34,10 @@ where
 
     for path in gfa.paths.iter() {
         let name = &path.path_name;
-        let path_id = graph.create_path_handle(name, false);
+        let path_id = graph.create_path(name, false).unwrap();
         for (seg, orient) in path.iter() {
             let handle = Handle::new(seg, orient);
-            graph.append_step(&path_id, handle);
+            graph.path_append_step(path_id, handle);
         }
     }
 
@@ -46,7 +46,7 @@ where
 
 pub fn fill_gfa_lines<G, I, T>(graph: &mut G, gfa_lines: I) -> GFAResult<()>
 where
-    G: AdditiveHandleGraph + PathHandleGraph,
+    G: AdditiveHandleGraph + MutableGraphPaths,
     I: Iterator<Item = GFAResult<Line<usize, T>>>,
     T: OptFields,
 {
@@ -64,10 +64,10 @@ where
             }
             Line::Path(v) => {
                 let name = &v.path_name;
-                let path_id = graph.create_path_handle(name, false);
+                let path_id = graph.create_path(name, false).unwrap();
                 for (seg, orient) in v.iter() {
                     let handle = Handle::new(seg, orient);
-                    graph.append_step(&path_id, handle);
+                    graph.path_append_step(path_id, handle);
                 }
             }
             _ => (),
@@ -79,7 +79,12 @@ where
 
 pub fn to_gfa<G>(graph: &G) -> GFA<usize, ()>
 where
-    G: HandleGraphRef + PathHandleGraph,
+    G: HandleGraphRef
+        + GraphPaths
+        + AllPathIds
+        + GraphPathNames
+        + GraphPathsRef,
+    G::PathRef: PathSteps,
 {
     let mut gfa = GFA::new();
 
@@ -123,12 +128,17 @@ where
         gfa.links.push(link);
     }
 
-    for path_id in graph.paths_iter() {
-        let path_name: Vec<_> = graph.path_handle_to_name(path_id).into();
+    for path_id in graph.all_path_ids() {
+        let path_name: Vec<_> = graph.get_path_name(path_id).unwrap().collect();
         let overlaps = Vec::new();
         let mut segment_names: Vec<Vec<u8>> = Vec::new();
-        for step in graph.steps_iter(path_id) {
-            let handle = graph.handle_of_step(&step).unwrap();
+
+        let path = graph.get_path_ref(path_id).unwrap();
+
+        for step in path.steps() {
+            // for step in graph.steps_iter(path_id) {
+            let handle = step.handle();
+            // let handle = graph.handle_of_step(&step).unwrap();
             let segment: usize = handle.id().into();
             let orientation = orient(handle.is_reverse());
             segment_names.push(segment.to_string().into());
