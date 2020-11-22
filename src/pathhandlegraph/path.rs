@@ -19,32 +19,6 @@ impl crate::packed::PackedElement for PathId {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StepUpdate<StepIx: Sized + Copy + Eq> {
-    Insert { handle: Handle, step: StepIx },
-    Remove { handle: Handle, step: StepIx },
-    // InsertSegment {
-    //     start: StepIx,
-    //     steps: Vec<(Handle, StepIx)>,
-    // },
-}
-
-impl<StepIx: Sized + Copy + Eq> StepUpdate<StepIx> {
-    pub fn handle(&self) -> Handle {
-        match self {
-            StepUpdate::Insert { handle, .. } => *handle,
-            StepUpdate::Remove { handle, .. } => *handle,
-        }
-    }
-
-    pub fn step(&self) -> StepIx {
-        match self {
-            StepUpdate::Insert { step, .. } => *step,
-            StepUpdate::Remove { step, .. } => *step,
-        }
-    }
-}
-
 pub trait PathStep: Sized + Copy + Eq {
     fn handle(&self) -> Handle;
 }
@@ -105,6 +79,24 @@ pub trait PathSteps: PathBase {
 
     fn steps(self) -> Self::Steps;
 
+    // Return an iterator on the path's steps starting from the step
+    // at `index`. Returns `None` if `index` is not on the path.
+
+    // fn steps_from(self, index: Self::StepIx) -> Option<Self::Steps>;
+
+    // Return an iterator on the path's steps from the start, until
+    // the step at `index`. If `index` is not a step on the path, the
+    // iterator will produce all steps.
+
+    // fn steps_until(self, index: Self::StepIx) -> Self::Steps;
+
+    // Return an iterator on the steps between `from` and `to`, both
+    // inclusive. Returns `None` if `from` does not exist in the path.
+    // If `to` does not exist in the path, the iterator will continue
+    // until the end of the path.
+
+    // fn steps_in_range(self, from: Self::StepIx, to: Self::StepIx) -> Option<Self::Steps>;
+
     /// `true` if one of the path's steps is on `handle`.
     fn contains(self, handle: Handle) -> bool {
         self.steps().any(|s| s.handle() == handle)
@@ -149,16 +141,18 @@ pub trait MutPath: PathBase {
         handle: Handle,
     ) -> Option<StepUpdate<Self::StepIx>>;
 
+    /// Remove the step at `index` from this path if it exists, and
+    /// return the corresponding `StepUpdate`.
     fn remove_step(
         &mut self,
-        step: Self::StepIx,
+        index: Self::StepIx,
     ) -> Option<StepUpdate<Self::StepIx>>;
 
-    fn flip_step(
-        &mut self,
-        step: Self::StepIx,
-    ) -> Option<Vec<StepUpdate<Self::StepIx>>>;
-
+    /// Remove all steps between the indices `from` and `to`
+    /// (inclusive), and insert new steps on the `Handle`s in
+    /// `new_segment`. Returns a tuple with the step indices of the
+    /// first and last new handles, and the corresponding
+    /// `StepUpdate`s.
     fn rewrite_segment(
         &mut self,
         from: Self::StepIx,
@@ -166,7 +160,45 @@ pub trait MutPath: PathBase {
         new_segment: &[Handle],
     ) -> Option<(Self::StepIx, Self::StepIx, Vec<StepUpdate<Self::StepIx>>)>;
 
+    /// Set the circularity of the path to the provided `circular`.
     fn set_circularity(&mut self, circular: bool);
+
+    /// Flip the handle orientation of the step at `index`, if it
+    /// exists. Returns the corresponding `StepUpdates` that remove
+    /// the handle with the original orientation, and inserts the
+    /// handle with the flipped orientation at `index`.
+    fn flip_step(
+        &mut self,
+        index: Self::StepIx,
+    ) -> Option<Vec<StepUpdate<Self::StepIx>>>;
+}
+
+/// Defines a change to a path that can be used update the occurrence
+/// records of a node in a graph.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StepUpdate<StepIx: Sized + Copy + Eq> {
+    Insert { handle: Handle, step: StepIx },
+    Remove { handle: Handle, step: StepIx },
+    // InsertSegment {
+    //     start: StepIx,
+    //     steps: Vec<(Handle, StepIx)>,
+    // },
+}
+
+impl<StepIx: Sized + Copy + Eq> StepUpdate<StepIx> {
+    pub fn handle(&self) -> Handle {
+        match self {
+            StepUpdate::Insert { handle, .. } => *handle,
+            StepUpdate::Remove { handle, .. } => *handle,
+        }
+    }
+
+    pub fn step(&self) -> StepIx {
+        match self {
+            StepUpdate::Insert { step, .. } => *step,
+            StepUpdate::Remove { step, .. } => *step,
+        }
+    }
 }
 
 /// Blanket implementation of `PathBase` for references of types that
