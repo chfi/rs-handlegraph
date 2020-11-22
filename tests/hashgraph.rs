@@ -1,9 +1,13 @@
 use handlegraph::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
-    hashgraph::{HashGraph, PathStep},
+    hashgraph::{
+        path::{Step, StepIx},
+        HashGraph,
+    },
     mutablehandlegraph::*,
-    pathgraph::PathHandleGraph,
+    pathhandlegraph::*,
+    // pathgraph::PathHandleGraph,
 };
 
 static H1: Handle = Handle::from_integer(2);
@@ -191,6 +195,7 @@ fn graph_all_handles_iter() {
     }
 
     assert!(iter_nodes.iter().all(|n| graph.get_node(n).is_some()));
+
     assert!(nodes.iter().all(|n| iter_nodes.contains(n)));
 }
 
@@ -207,7 +212,6 @@ fn graph_all_edges_iter() {
     graph.create_edge(Edge(H3, H5));
 
     let mut edges_found: Vec<_> = graph.all_edges().collect();
-    // let mut edges_found: Vec<_> = graph.edges_iter().collect();
 
     edges_found.sort();
 
@@ -236,17 +240,17 @@ fn append_prepend_path() {
 
     // Add a path 3 -> 5
 
-    let p1 = graph.create_path_handle(b"path-1", false);
-    graph.append_step(&p1, H3);
-    graph.append_step(&p1, H5);
+    let p1 = graph.create_path(b"path-1", false).unwrap();
+    graph.path_append_step(p1, H3);
+    graph.path_append_step(p1, H5);
 
     // Add another path 1 -> 3 -> 4 -> 6
 
-    let p2 = graph.create_path_handle(b"path-2", false);
-    graph.append_step(&p2, H1);
-    let p2_3 = graph.append_step(&p2, H3);
-    let p2_4 = graph.append_step(&p2, H4);
-    graph.append_step(&p2, H6);
+    let p2 = graph.create_path(b"path-2", false).unwrap();
+    graph.path_append_step(p2, H1);
+    let p2_3 = graph.path_append_step(p2, H3).unwrap();
+    let p2_4 = graph.path_append_step(p2, H4).unwrap();
+    graph.path_append_step(p2, H6);
 
     let test_node = |graph: &HashGraph,
                      nid: u64,
@@ -269,7 +273,7 @@ fn append_prepend_path() {
 
     // Now, append node 6 to path 1
 
-    graph.append_step(&p1, H6);
+    graph.path_append_step(p1, H6);
 
     // Node 6 should also occur at the end of path 1
     test_node(&graph, 6, Some(&2), Some(&3));
@@ -282,7 +286,7 @@ fn append_prepend_path() {
     test_node(&graph, 5, Some(&1), None);
 
     // Now, prepend node 1 to path 1
-    graph.prepend_step(&p1, H1);
+    graph.path_prepend_step(p1, H1);
 
     // Node 1 should be the first in both paths
     test_node(&graph, 1, Some(&0), Some(&0));
@@ -298,7 +302,7 @@ fn append_prepend_path() {
 
     // At this point path 1 is 1 -> 3 -> 5 -> 6, path 2 is unmodified
     // Rewrite the segment 3 -> 4 in path 2 with the empty path
-    graph.rewrite_segment(&p2_3, &p2_4, vec![]);
+    graph.path_rewrite_segment(p2, p2_3, p2_4, &[]);
 
     // Node 1 should be the same
     test_node(&graph, 1, Some(&0), Some(&0));
@@ -312,10 +316,11 @@ fn append_prepend_path() {
 
     // Rewrite the segment 1 -> 6 in path 2 with the segment
     // 6 -> 4 -> 5 -> 3 -> 1 -> 2
-    graph.rewrite_segment(
-        &PathStep::Step(1, 0),
-        &PathStep::Step(1, 1),
-        vec![H6, H4, H5, H3, H1, H2],
+    graph.path_rewrite_segment(
+        p2,
+        StepIx::Step(0),
+        StepIx::Step(1),
+        &vec![H6, H4, H5, H3, H1, H2],
     );
 
     // The path 2 occurrences should be correctly updated for all nodes
@@ -327,10 +332,11 @@ fn append_prepend_path() {
     test_node(&graph, 6, Some(&3), Some(&0));
 
     // Rewrite the segment Front(_) .. 5 in path 1 with the segment [2, 3]
-    graph.rewrite_segment(
-        &PathStep::Front(0),
-        &PathStep::Step(0, 2),
-        vec![H2, H3],
+    graph.path_rewrite_segment(
+        p1,
+        StepIx::Front,
+        StepIx::Step(2),
+        &vec![H2, H3],
     );
 
     // Now path 1 is 2 -> 3 -> 6
@@ -341,7 +347,7 @@ fn append_prepend_path() {
     test_node(&graph, 6, Some(&2), Some(&0));
 
     // Rewrite the segment 3 .. End(_) in path 2 with the segment [1]
-    graph.rewrite_segment(&PathStep::Step(1, 3), &PathStep::End(1), vec![H1]);
+    graph.path_rewrite_segment(p2, StepIx::Step(3), StepIx::End, &vec![H1]);
 
     // Now path 2 is 6 -> 4 -> 5 -> 1
     test_node(&graph, 1, None, Some(&3));
@@ -359,22 +365,21 @@ fn append_prepend_path() {
 
 #[test]
 fn graph_path_steps_iter() {
-    use handlegraph::hashgraph::PathStep::*;
-
     let mut graph = path_graph();
 
-    let p1 = graph.create_path_handle(b"path-1", false);
-    graph.append_step(&p1, H1);
-    graph.append_step(&p1, H2);
-    graph.append_step(&p1, H5);
-    graph.append_step(&p1, H6);
+    let p1 = graph.create_path(b"path-1", false).unwrap();
+    graph.path_append_step(p1, H1);
+    graph.path_append_step(p1, H2);
+    graph.path_append_step(p1, H5);
+    graph.path_append_step(p1, H6);
 
-    let mut iter = graph.steps_iter(&p1);
+    let path = graph.get_path_ref(p1).unwrap();
+    let mut iter = path.steps();
 
-    assert_eq!(Some(Step(p1, 0)), iter.next());
-    assert_eq!(Some(Step(p1, 1)), iter.next());
-    assert_eq!(Some(Step(p1, 2)), iter.next());
-    assert_eq!(Some(Step(p1, 3)), iter.next());
+    assert_eq!(Some(Step(StepIx::Step(0), H1)), iter.next());
+    assert_eq!(Some(Step(StepIx::Step(1), H2)), iter.next());
+    assert_eq!(Some(Step(StepIx::Step(2), H5)), iter.next());
+    assert_eq!(Some(Step(StepIx::Step(3), H6)), iter.next());
     assert_eq!(None, iter.next());
 }
 
@@ -388,22 +393,16 @@ fn graph_divide_handle() {
     graph.create_edge(Edge(H1, H2));
     graph.create_edge(Edge(H2, H3));
 
-    let path = graph.create_path_handle(b"path-1", false);
+    let path = graph.create_path(b"path-1", false).unwrap();
 
     let walk_path = |graph: &HashGraph| {
-        let mut last = graph.path_front_end(&path);
-        let mut handles = vec![];
-        for _ in 0..graph.step_count(&path) {
-            let next = graph.next_step(&last);
-            handles.push(graph.handle_of_step(&next));
-            last = next;
-        }
-        handles
+        let path_ref = graph.get_path_ref(path).unwrap();
+        path_ref.steps().map(|Step(_, h)| h).collect::<Vec<_>>()
     };
 
-    graph.append_step(&path, H1);
-    graph.append_step(&path, H2);
-    graph.append_step(&path, H3);
+    graph.path_append_step(path, H1);
+    graph.path_append_step(path, H2);
+    graph.path_append_step(path, H3);
 
     assert_eq!(b"ABCD", graph.sequence(H1).as_slice());
     assert_eq!(b"EFGHIJKLMN", graph.sequence(H2).as_slice());
@@ -414,8 +413,7 @@ fn graph_divide_handle() {
 
     let handles = walk_path(&graph);
 
-    let expected_handles: Vec<_> =
-        [H1, H2, H3].iter().map(|h| Some(*h)).collect();
+    let expected_handles: Vec<_> = vec![H1, H2, H3];
 
     assert_eq!(expected_handles, handles);
 
@@ -448,8 +446,7 @@ fn graph_divide_handle() {
     // The path is correctly updated
     let handles = walk_path(&graph);
 
-    let expected_handles: Vec<_> =
-        [H1, H2, H4, H5, H6, H3].iter().map(|h| Some(*h)).collect();
+    let expected_handles: Vec<_> = vec![H1, H2, H4, H5, H6, H3];
 
     assert_eq!(expected_handles, handles);
 }

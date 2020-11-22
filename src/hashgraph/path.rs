@@ -154,7 +154,7 @@ impl<'a> Iterator for StepsIter<'a> {
         let index = StepIx::Step(self.left);
 
         self.left += 1;
-        if self.left >= self.right {
+        if self.left > self.right {
             self.finished = true;
         }
 
@@ -173,7 +173,7 @@ impl<'a> DoubleEndedIterator for StepsIter<'a> {
         let index = StepIx::Step(self.right);
 
         self.right -= 1;
-        if self.left >= self.right {
+        if self.left > self.right {
             self.finished = true;
         }
 

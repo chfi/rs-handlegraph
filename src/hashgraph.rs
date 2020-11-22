@@ -523,10 +523,11 @@ impl MutableGraphPaths for HashGraph {
 
         path.nodes.insert(0, handle);
 
-        let step_offset = path.nodes.len() - 1;
+        let step_offset = 0;
         let node: &mut Node = self.graph.get_mut(&handle.id())?;
 
         node.occurrences.insert(id, step_offset);
+
         Some(path::StepIx::Step(step_offset))
     }
 
@@ -637,8 +638,8 @@ impl MutableGraphPaths for HashGraph {
 
             path.nodes
                 .iter()
-                .skip(start - 1)
-                .take(end - start)
+                .skip(start)
+                .take(end - start + 1)
                 .for_each(|handle| {
                     let node = graph.get_mut(&handle.id()).unwrap();
                     node.occurrences.remove(&id);

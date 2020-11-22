@@ -5,6 +5,7 @@ use gfa::{
     optfields::OptFields,
 };
 
+use crate::pathhandlegraph::MutableGraphPaths;
 use crate::{
     handle::{Edge, Handle, NodeId},
     handlegraph::*,
@@ -41,7 +42,6 @@ impl HashGraph {
         Default::default()
     }
 
-    /*
     fn add_gfa_segment<'a, 'b, T: OptFields>(
         &'a mut self,
         seg: &'b Segment<usize, T>,
@@ -57,9 +57,9 @@ impl HashGraph {
     }
 
     fn add_gfa_path<T: OptFields>(&mut self, path: &gfa::gfa::Path<usize, T>) {
-        let path_id = self.create_path_handle(&path.path_name, false);
+        let path_id = self.create_path(&path.path_name, false).unwrap();
         for (name, orient) in path.iter() {
-            self.append_step(&path_id, Handle::new(name as u64, orient));
+            self.path_append_step(path_id, Handle::new(name as u64, orient));
         }
     }
 
@@ -70,12 +70,10 @@ impl HashGraph {
         gfa.paths.iter().for_each(|p| graph.add_gfa_path(p));
         graph
     }
-    */
 
-    /*
     pub fn print_path(&self, path_id: &PathId) {
         let path = self.paths.get(&path_id).unwrap();
-        println!("Path\t{}", path_id);
+        println!("Path\t{}", path_id.0);
         for (ix, handle) in path.nodes.iter().enumerate() {
             let node = self.get_node(&handle.id()).unwrap();
             if ix != 0 {
@@ -93,7 +91,6 @@ impl HashGraph {
             println!("{} - {:?}", node.sequence, node.occurrences);
         });
     }
-    */
 
     pub fn get_node(&self, node_id: &NodeId) -> Option<&Node> {
         self.graph.get(node_id)
