@@ -3,52 +3,98 @@ use crate::handle::Handle;
 use super::{
     MutPath, PathBase, PathId, PathStep, PathSteps, StepHandle, StepUpdate,
 };
-pub trait GraphPaths: Sized {
-    // type Step: PathStep;
 
+/// A handlegraph with embedded paths. The step for any given path is
+/// indexed by the associated type `StepIx`.
+///
+/// Provides methods for basic querying of the graph's paths, and
+/// steps on a path. For a more ergonomic way of iterating through the
+/// steps of a path, see the traits `GraphPathsRef`, and `PathSteps`.
+pub trait GraphPaths: Sized {
     type StepIx: Sized + Copy + Eq;
 
+    /// Return the number of paths in this graph.
     fn path_count(&self) -> usize;
 
+    /// Return the number of steps of the path `id`, if it exists.
     fn path_len(&self, id: PathId) -> Option<usize>;
 
+    /// Return the circularity of the path `id`, if it exists.
     fn path_circular(&self, id: PathId) -> Option<bool>;
 
+    /// Find the handle at step `index` in path `id`, if both the path
+    /// exists, and the step in the path.
     fn path_handle_at_step(
         &self,
         id: PathId,
         index: Self::StepIx,
     ) -> Option<Handle>;
 
+    /// Return the index to the first step of path `id`, if the path
+    /// exists and is not empty.
+    ///
+    /// The resulting `StepIx` should point to the first step of the
+    /// path's `Steps` iterator.
     fn path_first_step(&self, id: PathId) -> Option<Self::StepIx>;
 
+    /// Return the index to the last step of path `id`, if the path
+    /// exists and is not empty.
+    ///
+    /// The resulting `StepIx` should point to the last step of the
+    /// path's `Steps` iterator.
     fn path_last_step(&self, id: PathId) -> Option<Self::StepIx>;
 
+    /// Return the index to the step after `index` on path `id`, if
+    /// the path exists and `index` both exists on the path, and is
+    /// not the last step of the path.
+    ///
+    /// The resulting `StepIx` should point to the same step as would
+    /// calling `next` on the path's corresponding `Steps` iterator,
+    /// if `index` was the last produced step.
     fn path_next_step(
         &self,
         id: PathId,
-        step: Self::StepIx,
+        index: Self::StepIx,
     ) -> Option<Self::StepIx>;
 
+    /// Return the index to the step before `index` on path `id`, if
+    /// the path exists and `index` both exists on the path, and is
+    /// not the first step of the path.
+    ///
+    /// The resulting `StepIx` should point to the same step as would
+    /// calling `next_back` on the path's corresponding `Steps` iterator,
+    /// if `index` was the last produced step.
     fn path_prev_step(
         &self,
         id: PathId,
-        step: Self::StepIx,
+        index: Self::StepIx,
     ) -> Option<Self::StepIx>;
 }
 
+/// Trait for retrieving the `PathId` for a path by name, and vice
+/// versa.
+///
+/// Names are represented as an iterator over `u8`s for flexibility in
+/// underlying storage.
 pub trait GraphPathNames: Sized {
+    /// The iterator on the name of a path.
     type PathName: Iterator<Item = u8>;
 
+    /// Returns the `PathId` that the provided `name` points to, if
+    /// there exists a path with that name.
     fn get_path_id(self, name: &[u8]) -> Option<PathId>;
 
+    /// Returns an iterator that produced the name of the path `id`,
+    /// if that path exists in the graph.
     fn get_path_name(self, id: PathId) -> Option<Self::PathName>;
 
+    /// Convenience method for retrieving a path name as a `Vec<u8>`.
     #[inline]
     fn get_path_name_vec(self, id: PathId) -> Option<Vec<u8>> {
         self.get_path_name(id).map(|name| name.collect())
     }
 
+    /// Convenience method for checking whether a path exists by name.
     #[inline]
     fn has_path(self, name: &[u8]) -> bool {
         self.get_path_id(name).is_some()
@@ -132,14 +178,12 @@ pub trait PathSequences: GraphPaths {
 }
 
 pub trait GraphPathsRef: GraphPaths {
-    // type PathRef: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
     type PathRef: PathBase<StepIx = Self::StepIx>;
 
     fn get_path_ref(self, id: PathId) -> Option<Self::PathRef>;
 }
 
 pub trait GraphPathsRefMut: GraphPaths {
-    // type PathMut: PathBase<Step = Self::Step, StepIx = Self::StepIx>;
     type PathMut: PathBase<StepIx = Self::StepIx>;
 
     fn get_path_mut_ref<'a>(
@@ -152,7 +196,6 @@ impl<'a, T> GraphPaths for &'a T
 where
     T: GraphPaths,
 {
-    // type Step = T::Step;
     type StepIx = T::StepIx;
 
     fn path_count(&self) -> usize {
@@ -174,14 +217,6 @@ where
     ) -> Option<Handle> {
         T::path_handle_at_step(self, id, index)
     }
-
-    // fn path_step_at(
-    //     &self,
-    //     id: PathId,
-    //     index: Self::StepIx,
-    // ) -> Option<Handle> {
-    //     T::path_step_at(self, id, index)
-    // }
 
     fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
         T::path_first_step(self, id)
@@ -235,14 +270,6 @@ where
         T::path_handle_at_step(self, id, index)
     }
 
-    // fn path_step_at(
-    //     &self,
-    //     id: PathId,
-    //     index: Self::StepIx,
-    // ) -> Option<Self::Step> {
-    //     T::path_step_at(self, id, index)
-    // }
-
     fn path_first_step(&self, id: PathId) -> Option<Self::StepIx> {
         T::path_first_step(self, id)
     }
@@ -266,22 +293,4 @@ where
     ) -> Option<Self::StepIx> {
         T::path_prev_step(self, id, step)
     }
-}
-
-pub trait AllPathIds: Sized {
-    type PathIds: Iterator<Item = PathId>;
-
-    fn all_path_ids(self) -> Self::PathIds;
-}
-
-pub trait PathNames: Sized {
-    type PathName: Iterator<Item = u8>;
-
-    fn get_path_name(self, id: PathId) -> Option<Self::PathName>;
-
-    fn get_path_id(self, name: &[u8]) -> Option<PathId>;
-}
-
-pub trait PathNamesMut: Sized {
-    fn insert_name(self, name: &[u8]) -> Option<PathId>;
 }
