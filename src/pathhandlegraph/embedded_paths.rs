@@ -1,8 +1,35 @@
+/*!
+
+Traits that cover interacting with and manipulating paths in a graph.
+
+* [`GraphPaths`] has the basic interface
+* [`GraphPathNames`] supports retrieving the ID of a path by name, or vice versa
+* [`MutableGraphPaths`] includes creating and destroying paths, and methods for manipulating the steps on a path
+* [`PathSequences`] is for going between path step indices and sequence positions
+* [`GraphPathsRef`] provides a reference to a specific path, which can then be queried using the traits in [`super::path`]
+* [`IntoPathIds`] provides an iterator on the paths by ID
+* [`IntoNodeOccurrences`] provides an iterator on the steps that are on a given node
+
+*/
+
 use crate::handle::Handle;
 
-use super::{
-    MutPath, PathBase, PathId, PathStep, PathSteps, StepHandle, StepUpdate,
-};
+use super::{MutPath, PathBase, PathId, PathStep, PathSteps, StepUpdate};
+
+/// Trait for iterating through all `PathIds` in a graph.
+pub trait IntoPathIds {
+    type PathIds: Iterator<Item = PathId>;
+
+    fn into_path_ids(self) -> Self::PathIds;
+}
+
+/// Trait for iterating through all the path steps on a handle in a graph.
+pub trait IntoNodeOccurrences: GraphPaths {
+    /// An iterator through the steps on a path, by `PathId` and `StepIx`.
+    type Occurrences: Iterator<Item = (PathId, Self::StepIx)>;
+
+    fn into_steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences>;
+}
 
 /// A handlegraph with embedded paths. The step for any given path is
 /// indexed by the associated type `StepIx`.
@@ -99,21 +126,6 @@ pub trait GraphPathNames: Sized {
     fn has_path(self, name: &[u8]) -> bool {
         self.get_path_id(name).is_some()
     }
-}
-
-/// Trait for iterating through all `PathIds` in a graph.
-pub trait IntoPathIds {
-    type PathIds: Iterator<Item = PathId>;
-
-    fn into_path_ids(self) -> Self::PathIds;
-}
-
-/// Trait for iterating through all the path steps on a handle in a graph.
-pub trait IntoNodeOccurrences: GraphPaths {
-    /// An iterator through the steps on a path, by `PathId` and `StepIx`.
-    type Occurrences: Iterator<Item = (PathId, Self::StepIx)>;
-
-    fn into_steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences>;
 }
 
 /// A handlegraph with embedded paths that can be created, destroyed,

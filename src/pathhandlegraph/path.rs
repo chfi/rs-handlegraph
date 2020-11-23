@@ -1,3 +1,19 @@
+/*!
+Traits and types to use when working with a single specific path in a
+graph.
+
+For simple queries and manipulation of embedded paths, the traits in
+[`embedded_paths`](crate::pathhandlegraph::embedded_paths) may be good
+enough.
+
+* [`PathBase`] defines the fundamental path interface, and provides a simple interface for working with steps on a path
+* [`PathSteps`] extends `PathBase` with an iterator on the path's steps
+
+The [`MutPath`] trait is more experimental, and is unlikely to be used
+directly.
+
+*/
+
 use crate::handle::Handle;
 
 /// A unique identifier for a single path.
@@ -19,6 +35,7 @@ impl crate::packed::PackedElement for PathId {
     }
 }
 
+/// Anything that holds a `Handle` can be a step on a path
 pub trait PathStep: Sized + Copy + Eq {
     fn handle(&self) -> Handle;
 }
@@ -103,25 +120,19 @@ pub trait PathSteps: PathBase {
     }
 }
 
-/// A path whose steps are annotated with their sequence position.
-///
-/// WIP -- will probably change substantially to encode the decoupling
-/// between paths and sequences
-pub trait PathSequence: PathBase {
-    /// The length of the sequence encoded by the path.
-    fn bases_len(&self) -> usize;
-
-    /// The step that contains the base at `pos`, if the position is
-    /// not beyond the end of the path.
-    fn step_at_base(&self, pos: usize) -> Option<Self::Step>;
-
-    /// The sequence offset of the step at `index`, if the path
-    /// contains that step.
-    fn step_base_offset(&self, index: Self::StepIx) -> Option<usize>;
-}
-
 /// An embedded path that can also be mutated by appending or
 /// prepending steps, or rewriting parts of it.
+///
+/// This is not intended to be used for manipulating paths in general,
+/// which is why the functions return
+/// [`StepUpdate`s](super::StepUpdate). Instead, this can be used as a
+/// simple "DSL" for path manipulation in a lazy way, producing
+/// operations that can be efficiently applied in a batched (and
+/// possibly parallel) manner.
+///
+/// See the impl on
+/// [`PackedPath`](crate::packedgraph::paths::packedpath::PackedPath) for
+/// an example on how it can be used.
 pub trait MutPath: PathBase {
     /// Extend the path by append a step on `handle` to the end,
     /// returning a `StepUpdate` that includes the new step index.
