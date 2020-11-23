@@ -4,7 +4,7 @@ use rayon::prelude::*;
 
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
-    handlegraph::HandleNeighbors,
+    handlegraph::IntoNeighbors,
     packed::traits::*,
     pathhandlegraph::PathId,
 };

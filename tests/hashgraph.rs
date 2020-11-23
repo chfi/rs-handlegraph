@@ -178,10 +178,10 @@ fn graph_neighbors_iter() {
 }
 
 #[test]
-fn graph_all_handles_iter() {
+fn graph_handles_iter() {
     let graph = path_graph();
 
-    let iter = graph.all_handles();
+    let iter = graph.handles();
 
     let nodes: Vec<_> = vec![H1, H2, H3, H4, H5, H6]
         .into_iter()
@@ -200,7 +200,7 @@ fn graph_all_handles_iter() {
 }
 
 #[test]
-fn graph_all_edges_iter() {
+fn graph_edges_iter() {
     let mut graph = path_graph();
 
     graph.create_edge(Edge(H1, H4));
@@ -211,7 +211,7 @@ fn graph_all_edges_iter() {
 
     graph.create_edge(Edge(H3, H5));
 
-    let mut edges_found: Vec<_> = graph.all_edges().collect();
+    let mut edges_found: Vec<_> = graph.edges().collect();
 
     edges_found.sort();
 
@@ -404,9 +404,9 @@ fn graph_divide_handle() {
     graph.path_append_step(path, H2);
     graph.path_append_step(path, H3);
 
-    assert_eq!(b"ABCD", graph.sequence(H1).as_slice());
-    assert_eq!(b"EFGHIJKLMN", graph.sequence(H2).as_slice());
-    assert_eq!(b"OPQ", graph.sequence(H3).as_slice());
+    assert_eq!(b"ABCD", graph.sequence_vec(H1).as_slice());
+    assert_eq!(b"EFGHIJKLMN", graph.sequence_vec(H2).as_slice());
+    assert_eq!(b"OPQ", graph.sequence_vec(H3).as_slice());
 
     assert!(graph.has_edge(H1, H2));
     assert!(graph.has_edge(H2, H3));
@@ -432,16 +432,16 @@ fn graph_divide_handle() {
     assert!(graph.has_edge(H6, H3));
 
     // The other handles are untouched
-    assert_eq!(graph.sequence(H1), b"ABCD");
-    assert_eq!(graph.sequence(H3), b"OPQ");
+    assert_eq!(graph.sequence_vec(H1), b"ABCD");
+    assert_eq!(graph.sequence_vec(H3), b"OPQ");
 
     // The split handle has a corresponding subsequence
-    assert_eq!(graph.sequence(H2), b"EFG");
+    assert_eq!(graph.sequence_vec(H2), b"EFG");
 
     // The new handles are correctly constructed
-    assert_eq!(graph.sequence(H4), b"HIJK");
-    assert_eq!(graph.sequence(H5), b"LM");
-    assert_eq!(graph.sequence(H6), b"N");
+    assert_eq!(graph.sequence_vec(H4), b"HIJK");
+    assert_eq!(graph.sequence_vec(H5), b"LM");
+    assert_eq!(graph.sequence_vec(H6), b"N");
 
     // The path is correctly updated
     let handles = walk_path(&graph);

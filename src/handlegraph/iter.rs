@@ -7,7 +7,7 @@
 //! boilerplate.
 //!
 //! While it's possible to implement, for example,
-//! [`AllHandles`](super::AllHandles) using [`std::iter::Map`], it's
+//! [`IntoHandles`](super::IntoHandles) using [`std::iter::Map`], it's
 //! considerably slower (like, a million times slower) than using a
 //! struct, since the compiler can't inline the closure.
 //!
@@ -17,11 +17,11 @@
 
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
-use super::{AllHandles, HandleNeighbors};
+use super::{IntoHandles, IntoNeighbors};
 
 /// Iterator adapter to create an Iterator over `Handle`s from an
 /// iterator over &NodeId, in a way that can be used as the `Handles`
-/// type in implementations of [`AllHandles`](super::AllHandles).
+/// type in implementations of [`IntoHandles`](super::IntoHandles).
 pub struct NodeIdRefHandles<'a, I>
 where
     I: Iterator<Item = &'a NodeId> + 'a,
@@ -53,7 +53,7 @@ where
 
 /// Iterator adapter to create an Iterator over `Handle`s from an
 /// iterator over NodeId, in a way that can be used as the `Handles`
-/// type in implementations of [`AllHandles`](super::AllHandles).
+/// type in implementations of [`IntoHandles`](super::IntoHandles).
 pub struct NodeIdHandles<I>
 where
     I: Iterator<Item = NodeId>,
@@ -173,7 +173,7 @@ impl<I> std::iter::FusedIterator for HandleEdgesIter<I> where
 /// each handle.
 pub struct EdgesIter<G>
 where
-    G: HandleNeighbors + AllHandles + Copy,
+    G: IntoNeighbors + IntoHandles + Copy,
 {
     neighbors: Option<HandleEdgesIter<G::Neighbors>>,
     handles: G::Handles,
@@ -182,10 +182,10 @@ where
 
 impl<G> EdgesIter<G>
 where
-    G: HandleNeighbors + AllHandles + Copy,
+    G: IntoNeighbors + IntoHandles + Copy,
 {
     pub fn new(graph: G) -> Self {
-        let handles = graph.all_handles();
+        let handles = graph.handles();
         let mut edges_iter = Self {
             graph,
             handles,
@@ -213,7 +213,7 @@ where
 
 impl<G> Iterator for EdgesIter<G>
 where
-    G: HandleNeighbors + AllHandles + Copy,
+    G: IntoNeighbors + IntoHandles + Copy,
 {
     type Item = Edge;
 
@@ -234,7 +234,7 @@ where
 }
 
 impl<G> std::iter::FusedIterator for EdgesIter<G> where
-    G: HandleNeighbors + AllHandles + Copy
+    G: IntoNeighbors + IntoHandles + Copy
 {
 }
 
@@ -243,7 +243,7 @@ impl<G> std::iter::FusedIterator for EdgesIter<G> where
 /// on the setting of the iterator.
 ///
 /// Useful for ensuring that handles produced by a
-/// [`super::HandleNeighbors`] implementation are oriented correctly.
+/// [`super::IntoNeighbors`] implementation are oriented correctly.
 pub struct NeighborIter<'a, I>
 where
     I: Iterator<Item = &'a Handle>,
@@ -282,7 +282,7 @@ where
 /// form of ASCII-encoded nucleotides, into one that can produce the
 /// reverse complement, depending on how the iterator is configured.
 ///
-/// Useful for implementing [`super::HandleSequences`].
+/// Useful for implementing [`super::IntoSequences`].
 pub struct SequenceIter<I>
 where
     I: Iterator<Item = u8>,

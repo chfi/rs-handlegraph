@@ -1,3 +1,9 @@
+/*!
+
+A handlegraph implementation using `HashMap` to represent the graph
+topology and nodes, and each path as a `Vec` of nodes.
+*/
+
 use bstr::BString;
 
 use rayon::prelude::*;
@@ -13,11 +19,11 @@ use crate::{
     util::dna,
 };
 
-pub mod graph;
+mod graph;
 pub mod node;
 pub mod path;
 
-pub use self::graph::HashGraph;
+pub use self::graph::*;
 pub use self::node::Node;
 pub use self::path::Path;
 
@@ -31,23 +37,32 @@ impl HandleGraph for HashGraph {
     fn max_node_id(&self) -> NodeId {
         self.max_id
     }
+
+    #[inline]
+    fn node_count(&self) -> usize {
+        self.graph.len()
+    }
+
+    #[inline]
+    fn edge_count(&self) -> usize {
+        self.edges().count()
+    }
+
+    fn total_length(&self) -> usize {
+        self.handles().map(|h| self.node_len(h)).sum()
+    }
 }
 
-impl<'a> AllHandles for &'a HashGraph {
+impl<'a> IntoHandles for &'a HashGraph {
     type Handles = NodeIdRefHandles<
         'a,
         std::collections::hash_map::Keys<'a, NodeId, Node>,
     >;
 
     #[inline]
-    fn all_handles(self) -> Self::Handles {
+    fn handles(self) -> Self::Handles {
         let keys = self.graph.keys();
         NodeIdRefHandles::new(keys)
-    }
-
-    #[inline]
-    fn node_count(self) -> usize {
-        self.graph.len()
     }
 
     #[inline]
@@ -56,24 +71,24 @@ impl<'a> AllHandles for &'a HashGraph {
     }
 }
 
-// While this is a valid implementation of `AllHandles`, it's much
+// While this is a valid implementation of `IntoHandles`, it's much
 // slower as the compiler can't inline the closure.
 /*
-impl<'a> AllHandles for &'a HashGraph {
+impl<'a> IntoHandles for &'a HashGraph {
     type Handles = std::iter::Map<
         std::collections::hash_map::Keys<'a, NodeId, Node>,
         fn(&'a NodeId) -> Handle,
     >;
 
     #[inline]
-    fn all_handles(self) -> Self::Handles {
+    fn handles(self) -> Self::Handles {
         let keys = self.graph.keys();
         keys.map(|&n_id| Handle::pack(n_id, false))
     }
 }
 */
 
-impl<'a> AllHandlesPar for &'a HashGraph {
+impl<'a> IntoHandlesPar for &'a HashGraph {
     type HandlesPar = rayon::iter::IterBridge<
         NodeIdRefHandles<
             'a,
@@ -81,21 +96,21 @@ impl<'a> AllHandlesPar for &'a HashGraph {
         >,
     >;
 
-    fn all_handles_par(self) -> Self::HandlesPar {
-        self.all_handles().par_bridge()
+    fn handles_par(self) -> Self::HandlesPar {
+        self.handles().par_bridge()
     }
 }
 
-impl<'a> AllEdges for &'a HashGraph {
+impl<'a> IntoEdges for &'a HashGraph {
     type Edges = EdgesIter<&'a HashGraph>;
 
     #[inline]
-    fn all_edges(self) -> Self::Edges {
+    fn edges(self) -> Self::Edges {
         EdgesIter::new(self)
     }
 }
 
-impl<'a> HandleNeighbors for &'a HashGraph {
+impl<'a> IntoNeighbors for &'a HashGraph {
     type Neighbors = NeighborIter<'a, std::slice::Iter<'a, Handle>>;
 
     #[inline]
@@ -122,17 +137,17 @@ impl<'a> HandleNeighbors for &'a HashGraph {
     }
 }
 
-impl<'a> HandleSequences for &'a HashGraph {
+impl<'a> IntoSequences for &'a HashGraph {
     type Sequence = SequenceIter<std::iter::Copied<std::slice::Iter<'a, u8>>>;
 
     #[inline]
-    fn sequence_iter(self, handle: Handle) -> Self::Sequence {
+    fn sequence(self, handle: Handle) -> Self::Sequence {
         let seq: &[u8] =
             &self.get_node_unchecked(&handle.id()).sequence.as_ref();
         SequenceIter::new(seq.iter().copied(), handle.is_reverse())
     }
 
-    fn sequence(self, handle: Handle) -> Vec<u8> {
+    fn sequence_vec(self, handle: Handle) -> Vec<u8> {
         let seq: &[u8] =
             &self.get_node_unchecked(&handle.id()).sequence.as_ref();
         if handle.is_reverse() {
@@ -145,14 +160,6 @@ impl<'a> HandleSequences for &'a HashGraph {
     #[inline]
     fn node_len(self, handle: Handle) -> usize {
         self.get_node_unchecked(&handle.id()).sequence.len()
-    }
-}
-
-impl<'a> HandleGraphRef for &'a HashGraph {
-    type Owned = HashGraph;
-
-    fn total_length(self) -> usize {
-        self.graph.values().map(|n| n.sequence.len()).sum()
     }
 }
 
@@ -220,7 +227,7 @@ impl MutableHandles for HashGraph {
     ) -> Vec<Handle> {
         let mut result = vec![handle];
         let node_len = self.node_len(handle);
-        let sequence = self.sequence(handle);
+        let sequence = self.sequence_vec(handle);
 
         let fwd_handle = handle.forward();
 
@@ -456,7 +463,7 @@ impl<'a> IntoPathIds for &'a HashGraph {
     type PathIds =
         std::iter::Copied<std::collections::hash_map::Keys<'a, PathId, Path>>;
 
-    fn into_path_ids(self) -> Self::PathIds {
+    fn path_ids(self) -> Self::PathIds {
         self.paths.keys().copied()
     }
 }
@@ -464,7 +471,7 @@ impl<'a> IntoPathIds for &'a HashGraph {
 impl<'a> IntoNodeOccurrences for &'a HashGraph {
     type Occurrences = node::OccurIter<'a>;
 
-    fn into_steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences> {
+    fn steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences> {
         let node = self.get_node(&handle.id())?;
         let iter = node.occurrences.iter();
         Some(node::OccurIter { iter })

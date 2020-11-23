@@ -1,3 +1,10 @@
+/*!
+
+A handlegraph implementation using [`packed`](crate::packed) vector
+representations to minimize memory usage.
+
+*/
+
 #[allow(unused_imports)]
 use crate::{
     handle::{Direction, Edge, Handle, NodeId},
@@ -6,17 +13,10 @@ use crate::{
         AdditiveHandleGraph, MutableHandleGraph, MutableHandles,
         SubtractiveHandleGraph, TransformNodeIds,
     },
-
     pathhandlegraph::{
         GraphPathNames, GraphPathsRef, IntoNodeOccurrences, IntoPathIds,
         MutPath, MutableGraphPaths, PathId, PathSequences, PathSteps,
     },
-    // pathhandlegraph::{
-    //     AllPathIds, AllPathRefs, AllPathRefsMut,
-    //     HandleOccurrences, MutHandleOccurrences, MutPath,
-    //     OccurBase, PathId, PathNames, PathNamesMut, PathRefs, PathRefsMut,
-    //     PathSteps,
-    // },
 };
 
 use self::graph::SeqRecordIx;
@@ -33,41 +33,65 @@ pub mod sequence;
 
 pub use graph::PackedGraph;
 
-pub use edges::{EdgeListIx, EdgeLists, EdgeRecord};
+use edges::{EdgeListIx, EdgeLists, EdgeRecord};
+// pub use edges::{EdgeListIx, EdgeLists, EdgeRecord};
 
-pub use index::{
+// pub use index::{
+//     list::{self, PackedDoubleList, PackedList, PackedListMut},
+//     NodeRecordId, OneBasedIndex, RecordIndex,
+// };
+
+use index::{
     list::{self, PackedDoubleList, PackedList, PackedListMut},
     NodeRecordId, OneBasedIndex, RecordIndex,
 };
 
-pub use iter::EdgeListHandleIter;
+// pub use iter::EdgeListHandleIter;
+use iter::EdgeListHandleIter;
 
-pub use nodes::{IndexMapIter, NodeIdIndexMap, NodeRecords};
-pub use sequence::{PackedSeqIter, Sequences};
+// pub use nodes::{IndexMapIter, NodeIdIndexMap, NodeRecords};
+use nodes::{IndexMapIter, NodeIdIndexMap, NodeRecords};
+// pub use sequence::{PackedSeqIter, Sequences};
+use sequence::{PackedSeqIter, Sequences};
 
-pub use occurrences::{NodeOccurrences, OccurRecord, OccurrencesIter};
+// pub use occurrences::{NodeOccurrences, OccurRecord, OccurrencesIter};
+use occurrences::{NodeOccurrences, OccurRecord, OccurrencesIter};
 
-pub use paths::{
-    packedpath::{
-        PackedPath, PackedPathMut, PackedPathRef, PackedStep, StepList,
-        StepListMut, StepListRef, StepPtr, StepUpdate,
-    },
-    properties::{PathProperties, PathPropertyRecord},
-    PackedGraphPaths, PackedPathNames, PathsMutationCtx,
-};
+// pub use paths::{
+use paths::packedpath::StepPtr;
 
-impl<'a> AllHandles for &'a PackedGraph {
-    type Handles = NodeIdHandles<IndexMapIter<'a>>;
-
+impl HandleGraph for PackedGraph {
     #[inline]
-    fn all_handles(self) -> Self::Handles {
-        let iter = self.nodes.node_ids_iter();
-        NodeIdHandles::new(iter)
+    fn min_node_id(&self) -> NodeId {
+        self.nodes.min_id().into()
+    }
+    #[inline]
+    fn max_node_id(&self) -> NodeId {
+        self.nodes.max_id().into()
     }
 
     #[inline]
-    fn node_count(self) -> usize {
+    fn node_count(&self) -> usize {
         self.nodes.node_count()
+    }
+
+    #[inline]
+    fn edge_count(&self) -> usize {
+        self.edges.len()
+    }
+
+    fn total_length(&self) -> usize {
+        self.nodes.sequences().total_length()
+    }
+}
+
+impl<'a> IntoHandles for &'a PackedGraph {
+    type Handles = NodeIdHandles<IndexMapIter<'a>>;
+
+    #[inline]
+    fn handles(self) -> Self::Handles {
+        let iter = self.nodes.node_ids_iter();
+        NodeIdHandles::new(iter)
     }
 
     #[inline]
@@ -76,20 +100,15 @@ impl<'a> AllHandles for &'a PackedGraph {
     }
 }
 
-impl<'a> AllEdges for &'a PackedGraph {
+impl<'a> IntoEdges for &'a PackedGraph {
     type Edges = EdgesIter<&'a PackedGraph>;
 
-    fn all_edges(self) -> Self::Edges {
+    fn edges(self) -> Self::Edges {
         EdgesIter::new(self)
-    }
-
-    #[inline]
-    fn edge_count(self) -> usize {
-        self.edges.len()
     }
 }
 
-impl<'a> HandleNeighbors for &'a PackedGraph {
+impl<'a> IntoNeighbors for &'a PackedGraph {
     type Neighbors = EdgeListHandleIter<'a>;
 
     #[inline]
@@ -118,11 +137,11 @@ impl<'a> HandleNeighbors for &'a PackedGraph {
     }
 }
 
-impl<'a> HandleSequences for &'a PackedGraph {
+impl<'a> IntoSequences for &'a PackedGraph {
     type Sequence = PackedSeqIter<'a>;
 
     #[inline]
-    fn sequence_iter(self, handle: Handle) -> Self::Sequence {
+    fn sequence(self, handle: Handle) -> Self::Sequence {
         let rec_id = self.nodes.handle_record(handle).unwrap();
         let seq_ix = SeqRecordIx::from_one_based_ix(rec_id);
         self.nodes
@@ -137,29 +156,9 @@ impl<'a> HandleSequences for &'a PackedGraph {
     }
 }
 
-impl HandleGraph for PackedGraph {
-    #[inline]
-    fn min_node_id(&self) -> NodeId {
-        self.nodes.min_id().into()
-    }
-    #[inline]
-    fn max_node_id(&self) -> NodeId {
-        self.nodes.max_id().into()
-    }
-}
-
-impl<'a> HandleGraphRef for &'a PackedGraph {
-    type Owned = PackedGraph;
-
-    #[inline]
-    fn total_length(self) -> usize {
-        self.nodes.sequences().total_length()
-    }
-}
-
 impl<'a> IntoNodeOccurrences for &'a PackedGraph {
     type Occurrences = OccurrencesIter<'a>;
-    fn into_steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences> {
+    fn steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences> {
         let occ_ix = self.nodes.handle_occur_record(handle)?;
         let iter = self.occurrences.iter(occ_ix);
         Some(OccurrencesIter::new(iter))
@@ -682,7 +681,7 @@ mod tests {
             Direction::Right,
         );
 
-        let _path_ids = graph.into_path_ids().collect::<Vec<_>>();
+        let _path_ids = graph.path_ids().collect::<Vec<_>>();
 
         let path_1 = graph.get_path_id(b"path1").unwrap();
         let path_4 = graph.get_path_id(b"path4").unwrap();
@@ -867,8 +866,9 @@ mod tests {
             .map(|b| graph.append_handle(b))
             .collect::<Vec<_>>();
 
-        let bseq =
-            |g: &PackedGraph, x: u64| -> BString { g.sequence(hnd(x)).into() };
+        let bseq = |g: &PackedGraph, x: u64| -> BString {
+            g.sequence_vec(hnd(x)).into()
+        };
 
         /*
            1-
@@ -890,13 +890,15 @@ mod tests {
 
         assert_eq!(bseq(&graph, 2), B("AAG"));
 
-        let new_seqs: Vec<BString> =
-            new_hs.iter().map(|h| graph.sequence(*h).into()).collect();
+        let new_seqs: Vec<BString> = new_hs
+            .iter()
+            .map(|h| graph.sequence_vec(*h).into())
+            .collect();
 
         // The sequence is correctly split
         assert_eq!(new_seqs, vec![B("AAG"), B("TGCT"), B("AG"), B("T")]);
 
-        let mut edges = graph.all_edges().collect::<Vec<_>>();
+        let mut edges = graph.edges().collect::<Vec<_>>();
         edges.sort();
 
         // The edges are all correct

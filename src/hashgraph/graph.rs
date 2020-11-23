@@ -11,11 +11,12 @@ use crate::{
     handlegraph::*,
     mutablehandlegraph::*,
     pathhandlegraph::PathId,
-    // pathgraph::PathHandleGraph,
 };
 
 use super::{Node, Path};
 
+/// A handlegraph implementation using `HashMap` to represent the
+/// graph topology and nodes, and each path as a `Vec` of nodes.
 #[derive(Debug)]
 pub struct HashGraph {
     pub max_id: NodeId,
@@ -86,7 +87,7 @@ impl HashGraph {
     }
 
     pub fn print_occurrences(&self) {
-        self.all_handles().for_each(|h| {
+        self.handles().for_each(|h| {
             let node = self.get_node(&h.id()).unwrap();
             println!("{} - {:?}", node.sequence, node.occurrences);
         });

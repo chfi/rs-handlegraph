@@ -1,5 +1,11 @@
-#![allow(dead_code)]
+/*!
 
+`HashGraph` paths, and steps on paths
+
+
+*/
+
+#![allow(dead_code)]
 use bstr::BString;
 use fnv::FnvHashMap;
 

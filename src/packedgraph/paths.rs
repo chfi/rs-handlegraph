@@ -8,6 +8,8 @@ use crate::{
     pathhandlegraph::*,
 };
 
+use crate::handlegraph::IntoSequences;
+
 use super::{defragment::Defragment, OneBasedIndex, RecordIndex};
 
 pub(crate) mod packedpath;
@@ -703,7 +705,7 @@ impl<'a> IntoPathIds for &'a super::PackedGraph {
         std::collections::hash_map::Values<'a, Vec<u8>, PathId>,
     >;
 
-    fn into_path_ids(self) -> Self::PathIds {
+    fn path_ids(self) -> Self::PathIds {
         self.paths.names.name_id_map.values().copied()
     }
 }
@@ -718,8 +720,6 @@ impl<'a> GraphPathsRef for &'a super::PackedGraph {
 
 impl PathSequences for super::PackedGraph {
     fn path_bases_len(&self, id: PathId) -> Option<usize> {
-        use crate::handlegraph::HandleSequences;
-
         let path = self.paths.path_ref(id)?;
         let len = path
             .steps()
@@ -734,8 +734,6 @@ impl PathSequences for super::PackedGraph {
         id: PathId,
         pos: usize,
     ) -> Option<Self::StepIx> {
-        use crate::handlegraph::HandleSequences;
-
         let path = self.paths.path_ref(id)?;
 
         let mut remaining = pos;
@@ -756,8 +754,6 @@ impl PathSequences for super::PackedGraph {
         id: PathId,
         index: Self::StepIx,
     ) -> Option<usize> {
-        use crate::handlegraph::HandleSequences;
-
         let path = self.paths.path_ref(id)?;
 
         let mut offset = 0usize;

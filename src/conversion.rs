@@ -88,9 +88,9 @@ where
 {
     let mut gfa = GFA::new();
 
-    for handle in graph.all_handles() {
+    for handle in graph.handles() {
         let name = usize::from(handle.id());
-        let sequence: Vec<_> = graph.sequence_iter(handle.forward()).collect();
+        let sequence: Vec<_> = graph.sequence(handle.forward()).collect();
 
         let segment = Segment {
             name,
@@ -108,7 +108,7 @@ where
         }
     };
 
-    for edge in graph.all_edges() {
+    for edge in graph.edges() {
         let Edge(left, right) = edge;
         let from_segment: usize = usize::from(left.id());
         let from_orient = orient(left.is_reverse());
@@ -128,7 +128,7 @@ where
         gfa.links.push(link);
     }
 
-    for path_id in graph.into_path_ids() {
+    for path_id in graph.path_ids() {
         let path_name: Vec<_> = graph.get_path_name(path_id).unwrap().collect();
         let overlaps = Vec::new();
         let mut segment_names: Vec<Vec<u8>> = Vec::new();
