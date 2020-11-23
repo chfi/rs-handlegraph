@@ -31,18 +31,29 @@ pub mod occurrences;
 pub mod paths;
 pub mod sequence;
 
-pub use self::{
-    edges::{EdgeListIx, EdgeLists, EdgeRecord, EdgeVecIx},
-    graph::PackedGraph,
-    index::{
-        list, NodeRecordId, OneBasedIndex, PackedDoubleList, PackedList,
-        PackedListMut, RecordIndex,
+pub use graph::PackedGraph;
+
+pub use edges::{EdgeListIx, EdgeLists, EdgeRecord};
+
+pub use index::{
+    list::{self, PackedDoubleList, PackedList, PackedListMut},
+    NodeRecordId, OneBasedIndex, RecordIndex,
+};
+
+pub use iter::EdgeListHandleIter;
+
+pub use nodes::{IndexMapIter, NodeIdIndexMap, NodeRecords};
+pub use sequence::{PackedSeqIter, Sequences};
+
+pub use occurrences::{NodeOccurrences, OccurRecord, OccurrencesIter};
+
+pub use paths::{
+    packedpath::{
+        PackedPath, PackedPathMut, PackedPathRef, PackedStep, StepList,
+        StepListMut, StepListRef, StepPtr, StepUpdate,
     },
-    iter::EdgeListHandleIter,
-    nodes::{GraphVecIx, IndexMapIter, NodeIdIndexMap, NodeRecords},
-    occurrences::{NodeOccurrences, OccurListIx, OccurRecord, OccurrencesIter},
-    paths::*,
-    sequence::{PackedSeqIter, Sequences},
+    properties::{PathProperties, PathPropertyRecord},
+    PackedGraphPaths, PackedPathNames, PathsMutationCtx,
 };
 
 impl<'a> AllHandles for &'a PackedGraph {
@@ -433,54 +444,6 @@ impl TransformNodeIds for PackedGraph {
     }
 }
 
-/*
-impl MutEmbeddedPaths for PackedGraph {
-    type StepIx = StepPtr;
-
-    fn create_path(&mut self, name: &[u8], _circular: bool) -> PathId {
-        self.paths.create_path(name)
-    }
-
-    fn remove_path(&mut self, id: PathId) {
-        self.remove_path_impl(id);
-    }
-    fn append_step_on(
-        &mut self,
-        id: PathId,
-        handle: Handle,
-    ) -> Option<Self::StepIx> {
-        let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
-            vec![path_mut.append_step(handle)]
-        })?;
-        let step_ix = steps.first()?.step();
-        self.apply_node_occurrences_iter(id, steps);
-        Some(step_ix)
-    }
-
-    fn prepend_step_on(
-        &mut self,
-        id: PathId,
-        handle: Handle,
-    ) -> Option<Self::StepIx> {
-        let steps = self.paths.with_path_mut_ctx(id, |path_mut| {
-            vec![path_mut.prepend_step(handle)]
-        })?;
-        let step_ix = steps.first()?.step();
-        self.apply_node_occurrences_iter(id, steps);
-        Some(step_ix)
-    }
-
-    fn rewrite_segment_on(
-        &mut self,
-        _id: PathId,
-        _begin: Self::StepIx,
-        _end: Self::StepIx,
-    ) -> Option<(Self::StepIx, Self::StepIx)> {
-        unimplemented!();
-    }
-}
-*/
-
 #[cfg(test)]
 mod tests {
     use rayon::prelude::*;
@@ -665,7 +628,7 @@ mod tests {
 
         let prep_path =
             |graph: &mut PackedGraph, name: &[u8], steps: Vec<u64>| {
-                let path = graph.paths.create_path(name);
+                let path = graph.paths.create_path(name, false);
                 let hnds = vec_hnd(steps);
                 (path, hnds)
             };
@@ -981,7 +944,7 @@ mod tests {
 
         let _path_ids = path_names
             .iter()
-            .map(|n| graph.paths.create_path(n))
+            .map(|n| graph.paths.create_path(n, false))
             .collect::<Vec<_>>();
 
         /* Paths

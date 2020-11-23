@@ -81,7 +81,7 @@ pub fn to_gfa<G>(graph: &G) -> GFA<usize, ()>
 where
     G: HandleGraphRef
         + GraphPaths
-        + AllPathIds
+        + IntoPathIds
         + GraphPathNames
         + GraphPathsRef,
     G::PathRef: PathSteps,
@@ -128,7 +128,7 @@ where
         gfa.links.push(link);
     }
 
-    for path_id in graph.all_path_ids() {
+    for path_id in graph.into_path_ids() {
         let path_name: Vec<_> = graph.get_path_name(path_id).unwrap().collect();
         let overlaps = Vec::new();
         let mut segment_names: Vec<Vec<u8>> = Vec::new();

@@ -494,40 +494,6 @@ impl PackedGraphPaths {
     }
     */
 }
-impl<'a> AllPathIds for &'a PackedPathNames {
-    type PathIds = std::iter::Copied<
-        std::collections::hash_map::Values<'a, Vec<u8>, PathId>,
-    >;
-
-    fn all_path_ids(self) -> Self::PathIds {
-        self.name_id_map.values().copied()
-    }
-}
-
-impl<'a> PathNames for &'a PackedPathNames {
-    type PathName = packed::vector::IterView<'a, u8>;
-
-    #[inline]
-    fn get_path_name(self, id: PathId) -> Option<Self::PathName> {
-        self.name_iter(id)
-    }
-
-    #[inline]
-    fn get_path_id(self, name: &[u8]) -> Option<PathId> {
-        self.name_id_map.get(name).copied()
-    }
-}
-
-impl<'a> PathNamesMut for &'a mut PackedPathNames {
-    fn insert_name(self, name: &[u8]) -> Option<PathId> {
-        if self.get_path_id(name).is_some() {
-            None
-        } else {
-            Some(self.add_name(name))
-        }
-    }
-}
-
 impl<'a> GraphPathNames for &'a super::PackedGraph {
     type PathName = packed::vector::IterView<'a, u8>;
 
@@ -960,7 +926,7 @@ pub(crate) mod tests {
 
         let mut paths = PackedGraphPaths::default();
 
-        let path_1 = paths.create_path(b"path1");
+        let path_1 = paths.create_path(b"path1", false);
 
         let pre_record = paths.properties.get_record(path_1);
 
@@ -1019,7 +985,7 @@ pub(crate) mod tests {
 
         let mut paths = PackedGraphPaths::default();
 
-        let path_1 = paths.create_path(b"path1");
+        let path_1 = paths.create_path(b"path1", false);
 
         let _steps = paths.with_path_mut_ctx(path_1, |ref_mut| {
             vec![1, 2, 3, 4, 3, 5]
@@ -1051,9 +1017,9 @@ pub(crate) mod tests {
 
         let mut paths = PackedGraphPaths::default();
 
-        let path_1 = paths.create_path(b"path1");
-        let path_2 = paths.create_path(b"path2");
-        let path_3 = paths.create_path(b"path3");
+        let path_1 = paths.create_path(b"path1", false);
+        let path_2 = paths.create_path(b"path2", false);
+        let path_3 = paths.create_path(b"path3", false);
 
         let nodes_1 = vec_hnd(vec![1, 2, 3, 4, 5]);
         let nodes_2 = vec_hnd(vec![6, 2, 3, 7, 5]);
@@ -1158,9 +1124,9 @@ pub(crate) mod tests {
 
         let mut paths = PackedGraphPaths::default();
 
-        let path_1 = paths.create_path(b"path1");
-        let path_2 = paths.create_path(b"path2");
-        let path_3 = paths.create_path(b"path3");
+        let path_1 = paths.create_path(b"path1", false);
+        let path_2 = paths.create_path(b"path2", false);
+        let path_3 = paths.create_path(b"path3", false);
 
         let vec_hnd = |v: Vec<u64>| v.into_iter().map(hnd).collect::<Vec<_>>();
 
@@ -1307,7 +1273,7 @@ pub(crate) mod tests {
 
         let _path_ids = names
             .iter()
-            .map(|n| paths.create_path(n))
+            .map(|n| paths.create_path(n, false))
             .collect::<Vec<_>>();
 
         /*
