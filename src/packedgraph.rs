@@ -353,8 +353,9 @@ impl MutableHandles for PackedGraph {
             }
         }
 
-        /*
-        let occurrences = self.handle_occurrences(handle).collect::<Vec<_>>();
+        let occurrences =
+            self.steps_on_handle(handle).unwrap().collect::<Vec<_>>();
+
         for (path_id, step_ix) in occurrences {
             self.with_path_mut_ctx(path_id, |path_mut| {
                 let last_step = step_ix;
@@ -365,14 +366,11 @@ impl MutableHandles for PackedGraph {
                     .collect()
             });
         }
-        */
 
         result
     }
 
     fn apply_orientation(&mut self, handle: Handle) -> Handle {
-        unimplemented!();
-        /*
         if !handle.is_reverse() {
             return handle;
         }
@@ -380,7 +378,7 @@ impl MutableHandles for PackedGraph {
         let g_ix = self.nodes.handle_record(handle).unwrap();
 
         // Overwrite the sequence with its reverse complement
-        let rev_seq = self.sequence(handle);
+        let rev_seq = self.sequence_vec(handle);
         self.nodes
             .sequences_mut()
             .overwrite_sequence(g_ix, &rev_seq);
@@ -411,7 +409,9 @@ impl MutableHandles for PackedGraph {
             .update_node_edge_lists(g_ix, |l, r| (r, l))
             .unwrap();
 
-        let occurrences = self.handle_occurrences(handle).collect::<Vec<_>>();
+        let occurrences =
+            self.steps_on_handle(handle).unwrap().collect::<Vec<_>>();
+
         for (path_id, step_ix) in occurrences {
             self.with_path_mut_ctx(path_id, |path_mut| {
                 path_mut
@@ -423,7 +423,6 @@ impl MutableHandles for PackedGraph {
         }
 
         handle.flip()
-            */
     }
 }
 
@@ -857,36 +856,31 @@ mod tests {
     }
 
     #[test]
-    fn packedgraph_divide_handle() {
+    fn divide_handle() {
         use bstr::{BString, B};
-
-        let mut graph = PackedGraph::new();
-        let _handles = [B("GTCA"), B("AAGTGCTAGT"), B("ATA"), B("AA"), B("GG")]
-            .iter()
-            .map(|b| graph.append_handle(b))
-            .collect::<Vec<_>>();
 
         let bseq = |g: &PackedGraph, x: u64| -> BString {
             g.sequence_vec(hnd(x)).into()
         };
 
-        /*
-           1-
-             \ /-----3
-              2     /
-             / \   /
-           4-   -5-
-        */
+        let mut graph = test_graph_with_paths();
 
-        graph.create_edge(edge(1, 2));
-        graph.create_edge(edge(4, 2));
-
-        graph.create_edge(edge(2, 3));
-        graph.create_edge(edge(2, 5));
-
-        graph.create_edge(edge(5, 3));
+        let pre_divide_occurrences =
+            (1..=9).map(|n| get_occurs(&graph, n)).collect::<Vec<_>>();
 
         let new_hs = graph.divide_handle(hnd(2), vec![3, 7, 9]);
+
+        assert_eq!(graph.node_count(), 12);
+
+        let post_divide_occurrences =
+            (1..=12).map(|n| get_occurs(&graph, n)).collect::<Vec<_>>();
+
+        assert_eq!(&pre_divide_occurrences[..], &post_divide_occurrences[0..9]);
+
+        assert_eq!(
+            &post_divide_occurrences[9..],
+            &[[(1, 6), (2, 7)], [(1, 7), (2, 8)], [(1, 8), (2, 9)]]
+        );
 
         assert_eq!(bseq(&graph, 2), B("AAG"));
 
@@ -901,18 +895,25 @@ mod tests {
         let mut edges = graph.edges().collect::<Vec<_>>();
         edges.sort();
 
-        // The edges are all correct
         assert_eq!(
             edges,
             vec![
                 edge(1, 2),
-                edge(2, 6),
-                r_edge(2, 4),
-                r_edge(3, 5),
+                edge(1, 8),
+                edge(2, 10),
+                r_edge(2, 5),
+                edge(3, 9),
+                r_edge(3, 7),
                 r_edge(3, 8),
-                r_edge(5, 8),
-                edge(6, 7),
-                edge(7, 8)
+                edge(4, 6),
+                edge(4, 9),
+                r_edge(4, 8),
+                edge(5, 7),
+                r_edge(6, 9),
+                r_edge(7, 12),
+                r_edge(8, 12),
+                edge(10, 11),
+                edge(11, 12),
             ]
         );
     }

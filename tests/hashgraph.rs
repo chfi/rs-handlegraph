@@ -7,7 +7,6 @@ use handlegraph::{
     },
     mutablehandlegraph::*,
     pathhandlegraph::*,
-    // pathgraph::PathHandleGraph,
 };
 
 static H1: Handle = Handle::from_integer(2);
