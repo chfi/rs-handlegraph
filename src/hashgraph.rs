@@ -21,6 +21,18 @@ pub use self::graph::HashGraph;
 pub use self::node::Node;
 pub use self::path::Path;
 
+impl HandleGraph for HashGraph {
+    #[inline]
+    fn min_node_id(&self) -> NodeId {
+        self.min_id
+    }
+
+    #[inline]
+    fn max_node_id(&self) -> NodeId {
+        self.max_id
+    }
+}
+
 impl<'a> AllHandles for &'a HashGraph {
     type Handles = NodeIdRefHandles<
         'a,
@@ -136,19 +148,9 @@ impl<'a> HandleSequences for &'a HashGraph {
     }
 }
 
-impl HandleGraph for HashGraph {
-    #[inline]
-    fn min_node_id(&self) -> NodeId {
-        self.min_id
-    }
-
-    #[inline]
-    fn max_node_id(&self) -> NodeId {
-        self.max_id
-    }
-}
-
 impl<'a> HandleGraphRef for &'a HashGraph {
+    type Owned = HashGraph;
+
     fn total_length(self) -> usize {
         self.graph.values().map(|n| n.sequence.len()).sum()
     }

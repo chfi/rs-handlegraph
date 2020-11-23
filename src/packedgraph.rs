@@ -149,6 +149,8 @@ impl HandleGraph for PackedGraph {
 }
 
 impl<'a> HandleGraphRef for &'a PackedGraph {
+    type Owned = PackedGraph;
+
     #[inline]
     fn total_length(self) -> usize {
         self.nodes.sequences().total_length()

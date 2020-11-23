@@ -171,22 +171,24 @@ pub trait HandleSequences: Sized {
 pub trait HandleGraphRef:
     AllEdges + AllHandles + HandleNeighbors + HandleSequences + Copy
 {
+    type Owned: HandleGraph;
+
     /// Returns the sum of the sequence lengths of all nodes in the
     /// graph. The default implementation maps
     /// [`HandleSequences::node_len`] over
-    /// [`AllHandles::all_handles`].
+    /// [`HandleSequences::all_handles`].
     fn total_length(self) -> usize {
         self.all_handles().map(|h| self.node_len(h)).sum()
     }
 }
 
-/// NB: this trait is going to change, ignore the docs
+/// Contains some methods that don't fit into any of the other
+/// traits.
+///
+/// NB: this trait is going to change, ignore the following docs
 ///
 /// Trait denoting that shared references of an implementor has access
 /// to all the HandleGraph methods.
-///
-/// Also contains some methods that don't fit into any of the other
-/// traits.
 pub trait HandleGraph {
     /// Return the minimum `NodeId` that exists in the graph.
     fn min_node_id(&self) -> NodeId;

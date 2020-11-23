@@ -1,6 +1,12 @@
+/*!
+
+Traits for manipulating the nodes and edges of a graph.
+
+*/
+
 use crate::handle::{Edge, Handle, NodeId};
 
-/// Encapsulates adding handles and edges to a handlegraph.
+/// Methods for adding handles and edges to a graph.
 pub trait AdditiveHandleGraph {
     /// Add a node with the provided sequence to the graph, letting
     /// the graph pick the node ID.
@@ -18,8 +24,7 @@ pub trait AdditiveHandleGraph {
     fn create_edge(&mut self, edge: Edge);
 }
 
-/// Encapsulates removing handles and edges to a handlegraph, and
-/// clearing the entire graph.
+/// Methods for removing handles and edges from a graph.
 pub trait SubtractiveHandleGraph {
     /// Remove a handle from the graph, returning `true` if the handle
     /// existed.
@@ -35,8 +40,7 @@ pub trait SubtractiveHandleGraph {
     fn clear_graph(&mut self);
 }
 
-/// Encapsulates mutating specific handles in a graph, and splitting
-/// handles.
+/// Methods for manipulating handles that already exist in a graph.
 pub trait MutableHandles: AdditiveHandleGraph {
     /// Divide the given handle at the provided `offsets`, in terms of
     /// the node's sequence. Creates `offsets.len() - 1` new handles,
@@ -72,8 +76,7 @@ pub trait MutableHandles: AdditiveHandleGraph {
     fn apply_orientation(&mut self, handle: Handle) -> Handle;
 }
 
-/// A graph that allows transforming node IDs, and reordering the
-/// internal structure, for example when applying a sorting order.
+/// Applying transformations to all IDs in a graph, and applying sort orders.
 pub trait TransformNodeIds {
     /// Reassign all node IDs in the graph using the provided
     /// `transform` function. `transform` is `Copy + Send + Sync` as
@@ -91,8 +94,8 @@ pub trait TransformNodeIds {
 /// A graph that supports all forms of handle- and edge-related
 /// mutation.
 ///
-/// Is automatically implemented for any graph that implements all of
-/// the mutation traits.
+/// Has a blanket implementation for all graphs that implement the
+/// other traits in this module.
 pub trait MutableHandleGraph:
     AdditiveHandleGraph + SubtractiveHandleGraph + MutableHandles + TransformNodeIds
 {
