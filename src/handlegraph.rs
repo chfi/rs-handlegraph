@@ -174,7 +174,7 @@ pub trait HandleGraphRef:
     /// Returns the sum of the sequence lengths of all nodes in the
     /// graph. The default implementation maps
     /// [`HandleSequences::node_len`] over
-    /// [`HandleSequences::all_handles`].
+    /// [`AllHandles::all_handles`].
     fn total_length(self) -> usize {
         self.all_handles().map(|h| self.node_len(h)).sum()
     }

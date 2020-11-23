@@ -44,6 +44,23 @@ impl<'a> AllHandles for &'a HashGraph {
     }
 }
 
+// While this is a valid implementation of `AllHandles`, it's much
+// slower as the compiler can't inline the closure.
+/*
+impl<'a> AllHandles for &'a HashGraph {
+    type Handles = std::iter::Map<
+        std::collections::hash_map::Keys<'a, NodeId, Node>,
+        fn(&'a NodeId) -> Handle,
+    >;
+
+    #[inline]
+    fn all_handles(self) -> Self::Handles {
+        let keys = self.graph.keys();
+        keys.map(|&n_id| Handle::pack(n_id, false))
+    }
+}
+*/
+
 impl<'a> AllHandlesPar for &'a HashGraph {
     type HandlesPar = rayon::iter::IterBridge<
         NodeIdRefHandles<

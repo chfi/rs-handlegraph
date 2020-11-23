@@ -1,10 +1,27 @@
+//! This module defines some utility iterators that make it easier to
+//! implement the iterator-centric traits in the
+//! [`handlegraph`](crate::handlegraph) module.
+//!
+//! Many of these are very simple, and essentially only map a function
+//! over a wrapped iterator. In other words, this module is full of
+//! boilerplate.
+//!
+//! While it's possible to implement, for example,
+//! [`AllHandles`](super::AllHandles) using [`std::iter::Map`], it's
+//! considerably slower (like, a million times slower) than using a
+//! struct, since the compiler can't inline the closure.
+//!
+//! These may end up being rewritten to use workarounds similar to
+//! what's described in [this blog
+//! post](http://troubles.md/rust-optimization/#avoid-boxtrait).
+
 use crate::handle::{Direction, Edge, Handle, NodeId};
 
 use super::{AllHandles, HandleNeighbors};
 
 /// Iterator adapter to create an Iterator over `Handle`s from an
 /// iterator over &NodeId, in a way that can be used as the `Handles`
-/// type in an `AllHandles` implementation.
+/// type in implementations of [`AllHandles`](super::AllHandles).
 pub struct NodeIdRefHandles<'a, I>
 where
     I: Iterator<Item = &'a NodeId> + 'a,
@@ -35,8 +52,8 @@ where
 }
 
 /// Iterator adapter to create an Iterator over `Handle`s from an
-/// iterator over `NodeId`s, in a way that can be used as the `Handles`
-/// type in an `AllHandles` implementation.
+/// iterator over NodeId, in a way that can be used as the `Handles`
+/// type in implementations of [`AllHandles`](super::AllHandles).
 pub struct NodeIdHandles<I>
 where
     I: Iterator<Item = NodeId>,
@@ -67,7 +84,7 @@ where
 }
 
 /// Utility struct for iterating through the edges of a single handle,
-/// for use with EdgesIter
+/// for use with [`super::EdgesIter`].
 struct HandleEdgesIter<I>
 where
     I: Iterator<Item = Handle>,
@@ -151,8 +168,9 @@ impl<I> std::iter::FusedIterator for HandleEdgesIter<I> where
 {
 }
 
-/// Utility struct for iterating over all edges of a HandleGraph for
-/// which we can already iterate over all handles and their neighbors.
+/// Utility struct for iterating over all edges of a graph that
+/// already supports iteration over all handles, and the neighbors of
+/// each handle.
 pub struct EdgesIter<G>
 where
     G: HandleNeighbors + AllHandles + Copy,
@@ -220,8 +238,12 @@ impl<G> std::iter::FusedIterator for EdgesIter<G> where
 {
 }
 
-/// Wrapper struct for ensuring handles are flipped correctly when
-/// iterating over the neighbors of a handle
+/// Iterator adapter over an iterator of (borrowed) `Handle`s,
+/// producing owned `Handle`s with their orientation flipped depending
+/// on the setting of the iterator.
+///
+/// Useful for ensuring that handles produced by a
+/// [`super::HandleNeighbors`] implementation are oriented correctly.
 pub struct NeighborIter<'a, I>
 where
     I: Iterator<Item = &'a Handle>,
@@ -256,9 +278,11 @@ where
     }
 }
 
-/// Iterator adapter that transforms an iterator over ASCII-encoded
-/// bases into an iterator over the sequence or its reverse
-/// complement.
+/// Iterator adapter that transforms an iterator on a sequence, in the
+/// form of ASCII-encoded nucleotides, into one that can produce the
+/// reverse complement, depending on how the iterator is configured.
+///
+/// Useful for implementing [`super::HandleSequences`].
 pub struct SequenceIter<I>
 where
     I: Iterator<Item = u8>,
@@ -294,6 +318,7 @@ where
     }
 }
 
+/*
 // This one might be more efficient? Probably not, but it'd be
 // interesting to compare this solution to NeighborIter.
 pub enum NeighborIterAlt<'a, I>
@@ -330,3 +355,4 @@ where
         }
     }
 }
+*/
