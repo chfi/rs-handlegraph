@@ -6,7 +6,6 @@
 */
 
 #![allow(dead_code)]
-use bstr::BString;
 use fnv::FnvHashMap;
 
 use crate::handle::{Handle, NodeId};
@@ -44,7 +43,7 @@ impl PathStep for Step {
 #[derive(Debug)]
 pub struct Path {
     pub path_id: PathId,
-    pub name: BString,
+    pub name: Vec<u8>,
     pub is_circular: bool,
     pub nodes: Vec<Handle>,
 }
@@ -188,11 +187,7 @@ impl<'a> DoubleEndedIterator for StepsIter<'a> {
 }
 
 impl Path {
-    pub fn new<T: Into<BString>>(
-        name: T,
-        path_id: PathId,
-        is_circular: bool,
-    ) -> Self {
+    pub fn new(name: &[u8], path_id: PathId, is_circular: bool) -> Self {
         Path {
             name: name.into(),
             path_id,

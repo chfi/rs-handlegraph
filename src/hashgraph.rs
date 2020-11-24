@@ -4,8 +4,6 @@ A handlegraph implementation using `HashMap` to represent the graph
 topology and nodes, and each path as a `Vec` of nodes.
 */
 
-use bstr::BString;
-
 use rayon::prelude::*;
 
 use crate::{
@@ -250,9 +248,8 @@ impl MutableHandles for HashGraph {
 
         // TODO it should be possible to do this without creating new
         // strings and collecting into a vec
-
-        let subseqs: Vec<BString> =
-            ranges.into_iter().map(|r| sequence[r].into()).collect();
+        let subseqs: Vec<Vec<u8>> =
+            ranges.into_iter().map(|r| sequence[r].to_owned()).collect();
 
         for seq in subseqs {
             let h = self.append_handle(&seq);

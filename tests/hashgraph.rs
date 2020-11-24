@@ -77,7 +77,6 @@ fn read_test_gfa() -> HashGraph {
 
 #[test]
 fn construct_from_gfa() {
-    use bstr::BStr;
     use gfa::gfa::GFA;
     use gfa::parser::GFAParser;
 
@@ -94,8 +93,8 @@ fn construct_from_gfa() {
         println!("Nodes & edges");
         for id in node_ids.iter() {
             let node = graph.graph.get(id).unwrap();
-            let seq: &BStr = node.sequence.as_ref();
-            println!("  {:2}\t{}", u64::from(**id), seq);
+            let seq_str = std::str::from_utf8(&node.sequence).unwrap();
+            println!("  {:2}\t{}", u64::from(**id), seq_str);
             let lefts: Vec<_> =
                 node.left_edges.iter().map(|x| u64::from(x.id())).collect();
             println!("  Left edges:  {:?}", lefts);

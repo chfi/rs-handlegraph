@@ -13,10 +13,10 @@ categories = ["science"]
 
 [dependencies]
 gfa = "0.9"
-bstr = "0.2"
 fnv = "1.0"
 succinct = "0.5"
 rayon = "1.5"
 
 [dev-dependencies]
 quickcheck = "0.9"
+bstr = "0.2"

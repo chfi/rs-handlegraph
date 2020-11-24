@@ -4,7 +4,6 @@
 
 */
 
-use bstr::BString;
 use fnv::FnvHashMap;
 
 use crate::handle::Handle;
@@ -14,7 +13,7 @@ use super::path::StepIx;
 
 #[derive(Debug, Clone)]
 pub struct Node {
-    pub sequence: BString,
+    pub sequence: Vec<u8>,
     pub left_edges: Vec<Handle>,
     pub right_edges: Vec<Handle>,
     pub occurrences: FnvHashMap<PathId, usize>,

@@ -11,8 +11,6 @@ use gfa::{
     parser::GFAResult,
 };
 
-use bstr::ByteVec;
-
 pub fn from_gfa<G, T>(gfa: &GFA<usize, T>) -> G
 where
     G: Default + AdditiveHandleGraph + MutableGraphPaths,
@@ -114,7 +112,7 @@ where
         let from_orient = orient(left.is_reverse());
         let to_segment: usize = usize::from(right.id());
         let to_orient = orient(right.is_reverse());
-        let overlap = Vec::from_slice(b"0M");
+        let overlap = vec![b'0', b'M'];
 
         let link = Link {
             from_segment,

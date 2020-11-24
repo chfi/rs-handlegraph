@@ -80,7 +80,8 @@ impl HashGraph {
             if ix != 0 {
                 print!(" -> ");
             }
-            print!("{}", node.sequence);
+            let seq_str = std::str::from_utf8(&node.sequence).unwrap();
+            print!("{}", seq_str);
         }
 
         println!();
@@ -89,7 +90,8 @@ impl HashGraph {
     pub fn print_occurrences(&self) {
         self.handles().for_each(|h| {
             let node = self.get_node(&h.id()).unwrap();
-            println!("{} - {:?}", node.sequence, node.occurrences);
+            let seq_str = std::str::from_utf8(&node.sequence).unwrap();
+            println!("{} - {:?}", seq_str, node.occurrences);
         });
     }
 
