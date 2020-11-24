@@ -33,32 +33,13 @@ pub mod sequence;
 
 pub use graph::PackedGraph;
 
-use edges::{EdgeListIx, EdgeLists, EdgeRecord};
-// pub use edges::{EdgeListIx, EdgeLists, EdgeRecord};
-
-// pub use index::{
-//     list::{self, PackedDoubleList, PackedList, PackedListMut},
-//     NodeRecordId, OneBasedIndex, RecordIndex,
-// };
-
-use index::{
-    list::{self, PackedDoubleList, PackedList, PackedListMut},
-    NodeRecordId, OneBasedIndex, RecordIndex,
-};
-
-// pub use iter::EdgeListHandleIter;
+use edges::{EdgeListIx, EdgeLists};
+use index::{list, OneBasedIndex, RecordIndex};
 use iter::EdgeListHandleIter;
-
-// pub use nodes::{IndexMapIter, NodeIdIndexMap, NodeRecords};
-use nodes::{IndexMapIter, NodeIdIndexMap, NodeRecords};
-// pub use sequence::{PackedSeqIter, Sequences};
-use sequence::{PackedSeqIter, Sequences};
-
-// pub use occurrences::{NodeOccurrences, OccurRecord, OccurrencesIter};
-use occurrences::{NodeOccurrences, OccurRecord, OccurrencesIter};
-
-// pub use paths::{
+use nodes::IndexMapIter;
+use occurrences::OccurrencesIter;
 use paths::packedpath::StepPtr;
+use sequence::PackedSeqIter;
 
 impl HandleGraph for PackedGraph {
     #[inline]
@@ -448,6 +429,7 @@ impl TransformNodeIds for PackedGraph {
 mod tests {
     use rayon::prelude::*;
 
+    use super::index::list::*;
     use super::*;
 
     use crate::packed::PackedElement;

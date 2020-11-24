@@ -14,7 +14,7 @@ Traits that cover interacting with and manipulating paths in a graph.
 
 use crate::handle::Handle;
 
-use super::{MutPath, PathBase, PathId, PathStep, PathSteps, StepUpdate};
+use super::{PathBase, PathId};
 
 /// Trait for iterating through all `PathIds` in a graph.
 pub trait IntoPathIds {

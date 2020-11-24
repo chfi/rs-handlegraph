@@ -41,14 +41,6 @@ impl Default for PathProperties {
 }
 
 impl PathProperties {
-    pub(super) fn append_empty(&mut self) {
-        self.heads.append(0);
-        self.tails.append(0);
-        self.deleted.append(0);
-        self.circular.append(0);
-        self.deleted_steps.append(0);
-    }
-
     pub(super) fn append_new(&mut self, circular: bool) {
         self.heads.append(0);
         self.tails.append(0);
