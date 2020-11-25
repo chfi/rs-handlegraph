@@ -4,9 +4,9 @@ use super::traits::*;
 
 #[derive(Debug, Clone)]
 pub struct PackedIntVec {
-    vector: IntVector<u64>,
-    num_entries: usize,
-    width: usize,
+    pub vector: IntVector<u64>,
+    pub num_entries: usize,
+    pub width: usize,
 }
 
 impl PartialEq for PackedIntVec {
@@ -38,18 +38,30 @@ impl PackedIntVec {
         Default::default()
     }
 
+    pub fn new_with_width(width: usize) -> Self {
+        let vector = IntVector::new(width);
+        let num_entries = 0;
+        PackedIntVec {
+            vector,
+            num_entries,
+            width,
+        }
+    }
+
     #[inline]
     pub fn width(&self) -> usize {
         self.width
     }
 
-    pub fn resize(&mut self, size: usize) {
+    pub fn resize_with_width(&mut self, size: usize, width: usize) {
+        let width = width.max(self.width);
+
         if size < self.num_entries {
             let capacity = self.vector.len() as f64 / (Self::FACTOR.powi(2));
             let capacity = capacity as usize;
             if size < capacity {
                 let mut new_vec: IntVector<u64> =
-                    IntVector::with_capacity(self.width, self.vector.len());
+                    IntVector::with_capacity(width, self.vector.len());
                 for ix in 0..(self.num_entries as u64) {
                     new_vec.set(ix, self.vector.get(ix));
                 }
@@ -63,6 +75,16 @@ impl PackedIntVec {
         }
 
         self.num_entries = size;
+    }
+
+    pub fn reserve_with_width(&mut self, size: usize, width: usize) {
+        if size > self.vector.len() as usize || width > self.width {
+            self.resize_with_width(size, width);
+        }
+    }
+
+    pub fn resize(&mut self, size: usize) {
+        self.resize_with_width(size, self.width);
     }
 
     pub fn reserve(&mut self, size: usize) {

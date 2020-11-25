@@ -4,10 +4,11 @@ use super::traits::*;
 
 #[derive(Debug, Clone)]
 pub struct PagedIntVec {
-    page_size: usize,
-    num_entries: usize,
-    anchors: PackedIntVec,
-    pages: Vec<PackedIntVec>,
+    pub page_size: usize,
+    pub num_entries: usize,
+    pub anchors: PackedIntVec,
+    pub pages: Vec<PackedIntVec>,
+    initial_width: usize,
 }
 
 crate::impl_space_usage!(PagedIntVec, [anchors, pages]);
@@ -23,12 +24,46 @@ impl PagedIntVec {
         let num_entries = 0;
         let pages = Vec::new();
         let anchors = Default::default();
+        let initial_width = 1;
         PagedIntVec {
             page_size,
             num_entries,
             anchors,
             pages,
+            initial_width,
         }
+    }
+
+    pub fn new_with_width(page_size: usize, initial_width: usize) -> Self {
+        let num_entries = 0;
+        let pages = Vec::new();
+        let anchors = Default::default();
+        PagedIntVec {
+            page_size,
+            num_entries,
+            anchors,
+            pages,
+            initial_width,
+        }
+    }
+
+    pub fn resize_with_width(&mut self, new_size: usize, width: usize) {
+        #[allow(clippy::comparison_chain)]
+        if new_size < self.num_entries {
+            let num_pages = if new_size == 0 {
+                0
+            } else {
+                (new_size - 1) / self.page_size + 1
+            };
+
+            self.anchors.resize(num_pages);
+            self.pages
+                .resize_with(num_pages, || PackedIntVec::new_with_width(width));
+        } else if new_size > self.num_entries {
+            self.reserve(new_size);
+        }
+
+        self.num_entries = new_size;
     }
 
     pub fn resize(&mut self, new_size: usize) {

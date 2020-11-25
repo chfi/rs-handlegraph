@@ -17,6 +17,14 @@ impl PackedDeque {
         Default::default()
     }
 
+    pub fn new_with_width(width: usize) -> Self {
+        let vector = PackedIntVec::new_with_width(width);
+        Self {
+            vector,
+            ..Default::default()
+        }
+    }
+
     pub fn reserve(&mut self, capacity: usize) {
         if capacity > self.vector.len() {
             let mut vector = PackedIntVec::new();
