@@ -29,9 +29,9 @@ pub struct OccurRecord {
 
 #[derive(Debug, Clone)]
 pub struct NodeOccurrences {
-    pub(super) path_ids: PagedIntVec,
-    pub(super) node_occur_offsets: PagedIntVec,
-    pub(super) node_occur_next: PagedIntVec,
+    pub path_ids: PagedIntVec,
+    pub node_occur_offsets: PagedIntVec,
+    pub node_occur_next: PagedIntVec,
     removed_records: usize,
 }
 
@@ -158,6 +158,24 @@ impl NodeOccurrences {
 
             self.path_ids.set_pack(ix, *new_path_id);
         }
+    }
+
+    pub fn print_diagnostics(&self) {
+        println!("\n ~~ BEGIN NodeOccurrences diagnostics ~~ \n");
+
+        println!(" ----- {:^20} -----", "path_ids");
+        self.path_ids.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "node_occur_offsets");
+        self.node_occur_offsets.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "node_occur_next");
+        self.node_occur_next.print_diagnostics();
+        println!();
+
+        println!("\n ~~  END  NodeOccurrences diagnostics ~~ \n");
     }
 }
 

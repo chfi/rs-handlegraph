@@ -25,10 +25,10 @@ pub(crate) static WIDE_PAGE_WIDTH: usize = 1024;
 
 #[derive(Debug, Clone)]
 pub struct PackedGraph {
-    pub(super) nodes: NodeRecords,
-    pub(super) edges: EdgeLists,
-    pub(super) occurrences: NodeOccurrences,
-    pub(super) paths: PackedGraphPaths,
+    pub nodes: NodeRecords,
+    pub edges: EdgeLists,
+    pub occurrences: NodeOccurrences,
+    pub paths: PackedGraphPaths,
 }
 
 crate::impl_space_usage!(PackedGraph, [nodes, edges, occurrences, paths]);

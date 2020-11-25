@@ -42,10 +42,10 @@ impl RecordIndex for SeqRecordIx {
 
 #[derive(Debug, Clone)]
 pub struct Sequences {
-    sequences: PackedIntVec,
-    lengths: PackedIntVec,
-    offsets: PagedIntVec,
-    removed_records: Vec<SeqRecordIx>,
+    pub sequences: PackedIntVec,
+    pub lengths: PackedIntVec,
+    pub offsets: PagedIntVec,
+    pub removed_records: Vec<SeqRecordIx>,
 }
 
 crate::impl_space_usage!(
@@ -56,7 +56,7 @@ crate::impl_space_usage!(
 impl Default for Sequences {
     fn default() -> Self {
         Sequences {
-            sequences: Default::default(),
+            sequences: PackedIntVec::new_with_width(2),
             lengths: Default::default(),
             offsets: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
             removed_records: Vec::new(),
@@ -257,6 +257,7 @@ impl Defragment for Sequences {
         new_seqs
             .lengths
             .reserve(self.offsets.len() - self.removed_records.len());
+
         new_seqs
             .offsets
             .reserve(self.offsets.len() - self.removed_records.len());

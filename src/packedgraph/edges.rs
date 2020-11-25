@@ -67,7 +67,7 @@ impl RecordIndex for EdgeVecIx {
 /// record is indexed using `EdgeVecIx`.
 #[derive(Debug, Clone)]
 pub struct EdgeLists {
-    record_vec: PagedIntVec,
+    pub record_vec: PagedIntVec,
     removed_records: Vec<EdgeListIx>,
 }
 
@@ -278,6 +278,25 @@ impl EdgeLists {
                     .set_pack(tgt_ix, Handle::from(transform(n_id)));
             }
         }
+    }
+
+    pub fn print_diagnostics(&self) {
+        println!("\n ~~ BEGIN EdgeLists diagnostics ~~ \n");
+
+        println!(" ----- {:^20} -----", "record_vec");
+        self.record_vec.print_diagnostics();
+        println!();
+
+        println!("\n ~~  END  EdgeLists diagnostics ~~ \n");
+    }
+
+    pub fn save_diagnostics(&self, path: &str) -> std::io::Result<()> {
+        use std::fs::File;
+
+        let mut file = File::create(path)?;
+        self.record_vec.save_diagnostics(&mut file)?;
+
+        Ok(())
     }
 }
 

@@ -125,6 +125,54 @@ impl PackedDeque {
         //     ix - (self.vector.len() - self.start_ix)
         // }
     }
+
+    pub fn save_diagnostics<W: std::io::Write>(
+        &self,
+        mut w: W,
+    ) -> std::io::Result<()> {
+        let mut min = std::u64::MAX;
+        let mut max = 0u64;
+        let mut non_zero_elems = 0;
+
+        for v in self.vector.iter() {
+            if v != 0 {
+                min = min.min(v);
+                non_zero_elems += 1;
+            }
+
+            max = max.max(v);
+        }
+
+        writeln!(&mut w, "# non-zero elements {}", non_zero_elems)?;
+        writeln!(&mut w, "# width {}", self.vector.width())?;
+        writeln!(&mut w, "# min value {}", min)?;
+        writeln!(&mut w, "# max value {}", max)?;
+
+        Ok(())
+    }
+
+    pub fn print_diagnostics(&self) {
+        let mut min = std::u64::MAX;
+        let mut max = 0u64;
+        let mut non_zero_elems = 0;
+
+        for v in self.vector.iter() {
+            if v != 0 {
+                min = min.min(v);
+                non_zero_elems += 1;
+            }
+
+            max = max.max(v);
+        }
+
+        println!(
+            "Elements {:6}\tWidth {:2}\tMin {:6}\tMax {:6}",
+            non_zero_elems,
+            self.vector.width(),
+            min,
+            max
+        );
+    }
 }
 
 impl PackedCollection for PackedDeque {

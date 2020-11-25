@@ -57,9 +57,9 @@ impl GraphVecIx {
 
 #[derive(Debug, Clone)]
 pub struct NodeIdIndexMap {
-    deque: PackedDeque,
-    max_id: u64,
-    min_id: u64,
+    pub deque: PackedDeque,
+    pub max_id: u64,
+    pub min_id: u64,
 }
 
 crate::impl_space_usage!(NodeIdIndexMap, [deque]);
@@ -200,11 +200,11 @@ impl<'a> Iterator for IndexMapIter<'a> {
 
 #[derive(Debug, Clone)]
 pub struct NodeRecords {
-    records_vec: PagedIntVec,
-    pub(super) id_index_map: NodeIdIndexMap,
-    sequences: Sequences,
-    removed_nodes: Vec<NodeRecordId>,
-    pub(super) node_occurrence_map: PagedIntVec,
+    pub records_vec: PagedIntVec,
+    pub id_index_map: NodeIdIndexMap,
+    pub sequences: Sequences,
+    pub removed_nodes: Vec<NodeRecordId>,
+    pub node_occurrence_map: PagedIntVec,
 }
 
 crate::impl_space_usage!(
@@ -626,5 +626,50 @@ impl NodeRecords {
                 self.node_occurrence_map.set_pack(ix, *head);
             }
         }
+    }
+
+    pub fn save_diagnostics(&self, path: &str) -> std::io::Result<()> {
+        use std::fs::File;
+        use std::io::Write;
+
+        let mut file = File::create(path)?;
+
+        writeln!(&mut file, "# min_id {:6}", self.id_index_map.min_id)?;
+        writeln!(&mut file, "# max_id {:6}", self.id_index_map.max_id)?;
+        self.id_index_map.deque.save_diagnostics(&mut file)?;
+        self.records_vec.save_diagnostics(&mut file)?;
+
+        Ok(())
+    }
+
+    pub fn print_diagnostics(&self) {
+        println!("\n ~~ BEGIN NodeRecords diagnostics ~~ \n");
+
+        println!(" ----- {:^20} -----", "id_index_map");
+        println!(
+            "  min_id: {:8}\t max_id: {:8}",
+            self.id_index_map.min_id, self.id_index_map.max_id
+        );
+        self.id_index_map.deque.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "records_vec");
+        self.records_vec.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "sequences");
+        print!("  sequences: ");
+        self.sequences.sequences.print_diagnostics();
+        print!("  lengths:   ");
+        self.sequences.lengths.print_diagnostics();
+        println!("  offsets:");
+        self.sequences.offsets.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "node_occurrence_map");
+        self.node_occurrence_map.print_diagnostics();
+        println!();
+
+        println!("\n ~~  END  NodeRecords diagnostics ~~ \n");
     }
 }

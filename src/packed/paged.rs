@@ -129,6 +129,76 @@ impl PagedIntVec {
             anchor + diff - diff / 5 - 1
         }
     }
+
+    pub fn save_diagnostics<W: std::io::Write>(
+        &self,
+        mut w: W,
+    ) -> std::io::Result<()> {
+        writeln!(&mut w, "# Elements {:6}", self.num_entries)?;
+        writeln!(&mut w, "# Pages    {:6}", self.pages.len())?;
+
+        writeln!(
+            &mut w,
+            "{:<7},{:<5},{:<6},{:<6},{:<6}",
+            "PageIx", "Width", "Min", "Median", "Max"
+        )?;
+
+        for (page_ix, page) in self.pages.iter().enumerate() {
+            let mut min = std::u64::MAX;
+            let mut max = 0u64;
+            let mut median = 0u64;
+
+            for (i, v) in page.iter().enumerate() {
+                min = min.min(v);
+                max = max.max(v);
+                if i == page.len() / 2 {
+                    median = v;
+                }
+            }
+
+            writeln!(
+                &mut w,
+                "{:<7},{:<5},{:<6},{:<6},{:<6}",
+                page_ix,
+                page.width(),
+                min,
+                median,
+                max
+            )?;
+        }
+
+        Ok(())
+    }
+
+    pub fn print_diagnostics(&self) {
+        println!(
+            "Elements {:6}\tPage size {:4}\tPages {:6}",
+            self.num_entries,
+            self.page_size,
+            self.pages.len()
+        );
+        println!(
+            "{:>7}\t{:>5}\t{:>6}\t{:>6}",
+            "Page Ix", "Width", "Min", "Max"
+        );
+        for (page_ix, page) in self.pages.iter().enumerate() {
+            let mut min = std::u64::MAX;
+            let mut max = 0u64;
+
+            for v in page.iter() {
+                min = min.min(v);
+                max = max.max(v);
+            }
+
+            println!(
+                "{:>7}\t{:>5}\t{:>6}\t{:>6}",
+                page_ix,
+                page.width(),
+                min,
+                max
+            );
+        }
+    }
 }
 
 impl PackedCollection for PagedIntVec {
@@ -178,7 +248,7 @@ impl PackedCollection for PagedIntVec {
     #[inline]
     fn append(&mut self, value: u64) {
         if self.num_entries == self.pages.len() * self.page_size {
-            let mut new_page = PackedIntVec::new();
+            let mut new_page = PackedIntVec::new_with_width(self.initial_width);
             new_page.resize(self.page_size);
             self.anchors.append(0);
             self.pages.push(new_page);

@@ -102,6 +102,15 @@ impl PackedIntVec {
         let iter = self.vector.iter();
         Iter::offset_new(iter, offset, length)
     }
+
+    pub fn print_diagnostics(&self) {
+        use succinct::SpaceUsage;
+        let space = self.total_bytes();
+        println!(
+            "Elements {:6}\tWidth {:2}\tBytes {}",
+            self.num_entries, self.width, space
+        );
+    }
 }
 
 impl PackedCollection for PackedIntVec {

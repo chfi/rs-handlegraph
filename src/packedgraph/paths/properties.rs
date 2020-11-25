@@ -33,14 +33,24 @@ impl Default for PathProperties {
         Self {
             heads: PagedIntVec::new(WIDE_PAGE_WIDTH),
             tails: PagedIntVec::new(NARROW_PAGE_WIDTH),
-            deleted: Default::default(),
-            circular: Default::default(),
+            deleted: PackedIntVec::new_with_width(1),
+            circular: PackedIntVec::new_with_width(1),
             deleted_steps: Default::default(),
         }
     }
 }
 
 impl PathProperties {
+    pub(super) fn new_with_width(width: usize) -> Self {
+        let heads = PagedIntVec::new_with_width(WIDE_PAGE_WIDTH, width);
+        let tails = PagedIntVec::new_with_width(WIDE_PAGE_WIDTH, width);
+        Self {
+            heads,
+            tails,
+            ..Default::default()
+        }
+    }
+
     pub(super) fn append_new(&mut self, circular: bool) {
         self.heads.append(0);
         self.tails.append(0);
@@ -79,5 +89,31 @@ impl PathProperties {
             circular: self.circular.get_unpack(ix),
             deleted_steps: self.deleted_steps.get_unpack(ix),
         }
+    }
+
+    pub fn print_diagnostics(&self) {
+        println!("\n ~~ BEGIN PathProperties diagnostics ~~ \n");
+
+        println!(" ----- {:^20} -----", "heads");
+        self.heads.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "tails");
+        self.tails.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "deleted");
+        self.deleted.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "circular");
+        self.circular.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "deleted_steps");
+        self.deleted_steps.print_diagnostics();
+        println!();
+
+        println!("\n ~~  END  PathProperties diagnostics ~~ \n");
     }
 }

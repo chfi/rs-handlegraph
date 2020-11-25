@@ -23,10 +23,10 @@ pub use self::{
 #[derive(Debug, Clone)]
 pub struct PackedPathNames {
     // TODO compress the names; don't store entire Vec<u8>s
-    name_id_map: FnvHashMap<Vec<u8>, PathId>,
-    names: PackedIntVec,
-    lengths: PackedIntVec,
-    offsets: PagedIntVec,
+    pub name_id_map: FnvHashMap<Vec<u8>, PathId>,
+    pub names: PackedIntVec,
+    pub lengths: PackedIntVec,
+    pub offsets: PagedIntVec,
     removed: usize,
 }
 
@@ -171,9 +171,9 @@ impl PackedPathNames {
 
 #[derive(Debug, Clone)]
 pub struct PackedGraphPaths {
-    paths: Vec<StepList>,
-    pub(crate) properties: PathProperties,
-    pub(crate) names: PackedPathNames,
+    pub paths: Vec<StepList>,
+    pub properties: PathProperties,
+    pub names: PackedPathNames,
     removed: usize,
 }
 
@@ -473,6 +473,25 @@ impl PackedGraphPaths {
                 (path_id, steps)
             })
             .collect::<Vec<_>>()
+    }
+
+    pub fn print_diagnostics(&self) {
+        println!("\n ~~ BEGIN PackedGraphPaths diagnostics ~~ \n");
+
+        println!(" ----- {:^20} -----", "properties");
+        self.properties.print_diagnostics();
+        println!();
+
+        println!(" ----- {:^20} -----", "names");
+        print!("  names: ");
+        self.names.names.print_diagnostics();
+        print!("  lengths:   ");
+        self.names.lengths.print_diagnostics();
+        println!("  offsets:");
+        self.names.offsets.print_diagnostics();
+        println!();
+
+        println!("\n ~~  END  PackedGraphPaths diagnostics ~~ \n");
     }
 
     /*

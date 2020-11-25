@@ -44,6 +44,14 @@ impl RobustPagedIntVec {
     pub fn page_width(&self) -> usize {
         self.other_pages.page_width()
     }
+
+    pub fn print_diagnostics(&self) {
+        println!("First page");
+        print!(" -- ");
+        self.first_page.print_diagnostics();
+        println!("Other pages");
+        self.other_pages.print_diagnostics();
+    }
 }
 
 impl PackedCollection for RobustPagedIntVec {
