@@ -93,6 +93,14 @@ impl PackedGraph {
         Default::default()
     }
 
+    pub fn with_expected_node_count(nodes: usize) -> Self {
+        let nodes = NodeRecords::with_expected_node_count(nodes);
+        Self {
+            nodes,
+            ..Default::default()
+        }
+    }
+
     pub(super) fn transform_node_ids<F>(&mut self, transform: F)
     where
         F: Fn(NodeId) -> NodeId + Copy + Send + Sync,

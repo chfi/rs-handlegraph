@@ -67,7 +67,7 @@ crate::impl_space_usage!(NodeIdIndexMap, [deque]);
 impl Default for NodeIdIndexMap {
     fn default() -> Self {
         Self {
-            deque: Default::default(),
+            deque: PackedDeque::with_width(4),
             max_id: 0,
             min_id: std::u64::MAX,
         }
@@ -75,20 +75,23 @@ impl Default for NodeIdIndexMap {
 }
 
 impl NodeIdIndexMap {
-    #[cfg(test)]
-    #[allow(dead_code)]
-    pub(crate) fn debug_print(&self) {
-        println!("  NodeIdIndexMap storage");
-        println!("    min id {}\tmax id {}", self.min_id, self.max_id);
-        println!("{:6}  {:6}  {:6}", "Index", "Node", "Record");
-        for ix in self.min_id..self.max_id {
-            let node = ix + self.min_id;
-            let record = self.deque.get((ix - self.min_id) as usize);
-            if record != 0 {
-                println!("{:6}  {:6}  {:6}", ix, node, record);
-            }
+    pub(crate) fn with_width(width: usize) -> Self {
+        let deque = PackedDeque::with_width(width);
+        Self {
+            deque,
+            ..Default::default()
         }
-        println!();
+    }
+
+    pub(crate) fn with_width_and_capacity(
+        width: usize,
+        capacity: usize,
+    ) -> Self {
+        let deque = PackedDeque::with_width_and_capacity(width, capacity);
+        Self {
+            deque,
+            ..Default::default()
+        }
     }
 
     fn clear_node_id(&mut self, id: NodeId) {
@@ -290,12 +293,21 @@ impl Defragment for NodeRecords {
         self.node_occurrence_map = node_occurrence_map;
         self.sequences.defragment();
 
-        // Some(updates)
         Some(())
     }
 }
 
 impl NodeRecords {
+    pub(crate) fn with_expected_node_count(nodes: usize) -> Self {
+        let width = 64 - nodes.leading_zeros() as usize;
+        let id_index_map = NodeIdIndexMap::with_width(width);
+
+        Self {
+            id_index_map,
+            ..Default::default()
+        }
+    }
+
     pub(super) fn transform_node_ids<F>(&mut self, new_id_fn: F)
     where
         F: Fn(NodeId) -> NodeId,
