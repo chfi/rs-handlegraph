@@ -48,6 +48,18 @@ impl PackedIntVec {
         }
     }
 
+    pub fn with_width_and_capacity(width: usize, capacity: usize) -> Self {
+        let vector = IntVector::with_capacity(width, capacity as u64);
+        let num_entries = 0;
+        let mut packed = PackedIntVec {
+            vector,
+            num_entries,
+            width,
+        };
+        packed.reserve(capacity);
+        packed
+    }
+
     #[inline]
     pub fn width(&self) -> usize {
         self.width
@@ -75,12 +87,6 @@ impl PackedIntVec {
         }
 
         self.num_entries = size;
-    }
-
-    pub fn reserve_with_width(&mut self, size: usize, width: usize) {
-        if size > self.vector.len() as usize || width > self.width {
-            self.resize_with_width(size, width);
-        }
     }
 
     pub fn resize(&mut self, size: usize) {

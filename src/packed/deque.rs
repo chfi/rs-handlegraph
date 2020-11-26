@@ -17,7 +17,7 @@ impl PackedDeque {
         Default::default()
     }
 
-    pub fn new_with_width(width: usize) -> Self {
+    pub fn with_width(width: usize) -> Self {
         let vector = PackedIntVec::new_with_width(width);
         Self {
             vector,
@@ -25,9 +25,31 @@ impl PackedDeque {
         }
     }
 
+    pub fn with_width_and_capacity(width: usize, capacity: usize) -> Self {
+        let vector = PackedIntVec::with_width_and_capacity(width, capacity);
+        Self {
+            vector,
+            ..Default::default()
+        }
+    }
+
+    pub fn reserve_with_width(&mut self, width: usize, capacity: usize) {
+        if capacity > self.vector.len() {
+            let mut vector = PackedIntVec::new_with_width(width);
+            vector.resize(capacity);
+            for i in 0..self.num_entries {
+                vector.set(i, self.get(i));
+            }
+
+            std::mem::swap(&mut vector, &mut self.vector);
+            self.start_ix = 0;
+        }
+    }
+
     pub fn reserve(&mut self, capacity: usize) {
         if capacity > self.vector.len() {
-            let mut vector = PackedIntVec::new();
+            let width = self.vector.width();
+            let mut vector = PackedIntVec::new_with_width(width);
             vector.resize(capacity);
             for i in 0..self.num_entries {
                 vector.set(i, self.get(i));
