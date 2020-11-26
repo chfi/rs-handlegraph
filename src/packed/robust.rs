@@ -13,8 +13,9 @@ crate::impl_space_usage!(RobustPagedIntVec, [first_page, other_pages]);
 
 impl RobustPagedIntVec {
     pub fn new(page_size: usize) -> Self {
-        let first_page = PackedIntVec::new();
-        let other_pages = PagedIntVec::new(page_size);
+        let width = 64 - page_size.leading_zeros() as usize;
+        let first_page = PackedIntVec::new_with_width(width);
+        let other_pages = PagedIntVec::new_with_width(page_size, width);
         Self {
             first_page,
             other_pages,
