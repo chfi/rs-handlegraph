@@ -213,4 +213,39 @@ impl FlexPagedVec {
         std::mem::swap(page, &mut new_page);
         self.closed_pages.push(new_page);
     }
+
+    #[inline]
+    fn all_pages(&self) -> Vec<&Page> {
+        let mut res = self.closed_pages.iter().collect::<Vec<_>>();
+        res.push(&self.open_page);
+
+        res
+    }
+
+    #[inline]
+    pub fn append_slice(&mut self, items: &[u64]) {
+        let page = &mut self.open_page;
+        let closed = page.append_slice(items);
+        self.num_entries += items.len();
+
+        if closed {
+            self.close_page();
+        }
+    }
+
+    #[inline]
+    pub fn append_iter<I>(&mut self, width: usize, iter: I)
+    where
+        I: Iterator<Item = u64> + ExactSizeIterator,
+    {
+        let page = &mut self.open_page;
+
+        let len = iter.size_hint().1.unwrap();
+        let closed = page.append_iter(width, iter);
+        self.num_entries += len;
+
+        if closed {
+            self.close_page();
+        }
+    }
 }
