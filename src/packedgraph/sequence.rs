@@ -359,17 +359,18 @@ const fn encoded_complement_table() -> [u64; 5] {
     table
 }
 
-const DNA_ENCODING_TABLE: [u64; 256] = dna_encoding_table();
-const ENCODED_COMPLEMENT_TABLE: [u64; 5] = encoded_complement_table();
-const DNA_DECODING_TABLE: [u8; 5] = [b'A', b'C', b'G', b'T', b'N'];
+pub(crate) const DNA_ENCODING_TABLE: [u64; 256] = dna_encoding_table();
+pub(crate) const ENCODED_COMPLEMENT_TABLE: [u64; 5] =
+    encoded_complement_table();
+pub(crate) const DNA_DECODING_TABLE: [u8; 5] = [b'A', b'C', b'G', b'T', b'N'];
 
 #[inline]
-const fn encode_dna_base(base: u8) -> u64 {
+pub(crate) const fn encode_dna_base(base: u8) -> u64 {
     DNA_ENCODING_TABLE[base as usize]
 }
 
 #[inline]
-const fn encoded_complement(val: u64) -> u64 {
+pub(crate) const fn encoded_complement(val: u64) -> u64 {
     if val > 3 {
         ENCODED_COMPLEMENT_TABLE[4]
     } else {
@@ -379,7 +380,7 @@ const fn encoded_complement(val: u64) -> u64 {
 }
 
 #[inline]
-const fn decode_dna_base(val: u64) -> u8 {
+pub(crate) const fn decode_dna_base(val: u64) -> u8 {
     if val > 3 {
         DNA_DECODING_TABLE[4]
     } else {
