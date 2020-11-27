@@ -123,8 +123,8 @@ impl Sequences {
 
         self.set_record(seq_ix, offset, len);
 
-        seq.iter()
-            .for_each(|&b| self.sequences.append(encode_dna_base(b)));
+        self.sequences
+            .append_iter(3, seq.iter().map(|&b| encode_dna_base(b)));
 
         Some(seq_ix)
     }

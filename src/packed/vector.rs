@@ -158,6 +158,36 @@ impl PackedIntVec {
         Iter::offset_new(iter, offset, length)
     }
 
+    #[inline]
+    pub fn append_slice(&mut self, items: &[u64]) {
+        if let Some(width) = items.iter().copied().map(width_for).max() {
+            let offset = self.num_entries;
+            let indices = offset..(offset + items.len());
+
+            self.resize_with_width(self.num_entries + items.len(), width);
+
+            for (&value, ix) in items.iter().zip(indices) {
+                self.vector.set(ix as u64, value);
+            }
+        }
+    }
+
+    pub fn append_iter<I>(&mut self, width: usize, iter: I)
+    where
+        I: Iterator<Item = u64> + ExactSizeIterator,
+    {
+        if let Some(len) = iter.size_hint().1 {
+            let offset = self.num_entries;
+            let indices = offset..(offset + len);
+
+            self.resize_with_width(self.num_entries + len, width);
+
+            for (value, ix) in iter.zip(indices) {
+                self.vector.set(ix as u64, value);
+            }
+        }
+    }
+
     pub fn print_diagnostics(&self) {
         use succinct::SpaceUsage;
         let space = self.total_bytes();
