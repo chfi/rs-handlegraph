@@ -6,7 +6,7 @@ pub mod traits;
 pub mod vector;
 
 pub use self::{
-    deque::PackedDeque, flexpaged::FlexPagedIntVec, paged::PagedIntVec,
+    deque::PackedDeque, flexpaged::FlexPagedVec, paged::PagedIntVec,
     robust::RobustPagedIntVec, traits::*, vector::PackedIntVec,
 };
 
