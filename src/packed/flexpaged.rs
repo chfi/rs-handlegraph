@@ -137,3 +137,80 @@ impl Page {
         self.vector.set(index, value)
     }
 }
+
+crate::impl_space_usage!(FlexPagedVec, [open_page, closed_pages]);
+
+impl Default for FlexPagedVec {
+    fn default() -> Self {
+        let initial_width = 2;
+        let page_size_limit = 8_388_608;
+        Self::new(initial_width, page_size_limit)
+    }
+}
+
+impl FlexPagedVec {
+    fn new(initial_width: usize, page_size_limit: usize) -> Self {
+        let num_entries = 0;
+
+        let open_page = Page::with_width(initial_width, 0, page_size_limit);
+        let closed_pages = Vec::new();
+
+        Self {
+            initial_width,
+            page_size_limit,
+            num_entries,
+            open_page,
+            closed_pages,
+        }
+    }
+
+    #[inline]
+    fn page_for(&self, index: usize) -> Option<&Page> {
+        if index >= self.open_page.offset {
+            Some(&self.open_page)
+        } else {
+            self.closed_pages.iter().find(|page| index < page.end)
+        }
+    }
+
+    #[inline]
+    fn page_mut_for(&mut self, index: usize) -> Option<&mut Page> {
+        if index >= self.open_page.offset {
+            Some(&mut self.open_page)
+        } else {
+            self.closed_pages.iter_mut().find(|page| index < page.end)
+        }
+    }
+
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.num_entries
+    }
+
+    #[inline]
+    pub fn get(&self, index: usize) -> Option<u64> {
+        self.page_for(index)
+            .map(|page| page.get(index - page.offset))
+    }
+
+    #[inline]
+    pub fn set(&mut self, index: usize, value: u64) {
+        let page = self.page_mut_for(index).unwrap();
+        page.set(index - page.offset, value);
+    }
+
+    #[inline]
+    fn close_page(&mut self) {
+        let mut page = &mut self.open_page;
+        page.end = page.offset + page.vector.len();
+
+        let mut new_page = Page::with_width(
+            self.initial_width,
+            page.end,
+            self.page_size_limit,
+        );
+
+        std::mem::swap(page, &mut new_page);
+        self.closed_pages.push(new_page);
+    }
+}
