@@ -42,7 +42,7 @@ impl RecordIndex for SeqRecordIx {
 
 #[derive(Debug, Clone)]
 pub struct Sequences {
-    pub sequences: PackedIntVec,
+    pub sequences: FlexPagedVec,
     pub lengths: PackedIntVec,
     pub offsets: PagedIntVec,
     pub removed_records: Vec<SeqRecordIx>,
@@ -56,7 +56,7 @@ crate::impl_space_usage!(
 impl Default for Sequences {
     fn default() -> Self {
         Sequences {
-            sequences: PackedIntVec::new_with_width(2),
+            sequences: FlexPagedVec::new(2, 8_388_608),
             lengths: Default::default(),
             offsets: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
             removed_records: Vec::new(),
@@ -222,7 +222,7 @@ impl Sequences {
         len: usize,
         reverse: bool,
     ) -> PackedSeqIter<'_> {
-        let iter = self.sequences.iter_slice(offset, len);
+        let iter = self.sequences.iter_slice(offset, len).unwrap();
 
         PackedSeqIter {
             iter,
@@ -267,12 +267,14 @@ impl Defragment for Sequences {
             let (old_offset, length) = self.get_record(seq_ix);
             if length != 0 {
                 let new_offset = next_offset;
-                let seq_iter = self.iter_impl(old_offset, length, false);
+
                 new_seqs.lengths.append(length as u64);
                 new_seqs.offsets.append(new_offset as u64);
-                seq_iter.for_each(|b| {
-                    new_seqs.sequences.append(encode_dna_base(b))
-                });
+
+                let seq_iter = self.iter_impl(old_offset, length, false);
+                new_seqs
+                    .sequences
+                    .append_iter(3, seq_iter.map(encode_dna_base));
 
                 next_offset += length;
             }
@@ -310,6 +312,12 @@ impl<'a> Iterator for PackedSeqIter<'a> {
             Some(decode_dna_base(base))
         }
     }
+
+    #[inline]
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
+
 }
 
 impl<'a> std::iter::ExactSizeIterator for PackedSeqIter<'a> {

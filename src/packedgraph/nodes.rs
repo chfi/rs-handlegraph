@@ -672,8 +672,8 @@ impl NodeRecords {
         println!();
 
         println!(" ----- {:^20} -----", "sequences");
-        print!("  sequences: ");
-        self.sequences.sequences.print_diagnostics();
+        // print!("  sequences: ");
+        // self.sequences.sequences.print_diagnostics();
         print!("  lengths:   ");
         self.sequences.lengths.print_diagnostics();
         println!("  offsets:");

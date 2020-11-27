@@ -275,7 +275,7 @@ impl FlexPagedVec {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
 
     use bstr::{BStr, BString, ByteSlice, ByteVec, B};
@@ -293,7 +293,7 @@ mod tests {
         (offset, seq_len)
     }
 
-    fn print_pages(flex: &FlexPagedVec, as_seq: bool) {
+    pub fn print_pages(flex: &FlexPagedVec, as_seq: bool) {
         let pages = flex.all_pages();
         let num_pages = pages.len();
         println!("  pages        {:3}", num_pages);
