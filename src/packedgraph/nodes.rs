@@ -300,7 +300,9 @@ impl Defragment for NodeRecords {
 impl NodeRecords {
     pub(crate) fn with_expected_node_count(nodes: usize) -> Self {
         let width = 64 - nodes.leading_zeros() as usize;
-        let id_index_map = NodeIdIndexMap::with_width(width);
+        let id_index_map =
+            NodeIdIndexMap::with_width_and_capacity(width, nodes);
+        let records_vec = PagedIntVec::new_with_width(NARROW_PAGE_WIDTH, width);
 
         Self {
             id_index_map,

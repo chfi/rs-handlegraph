@@ -1,10 +1,11 @@
 use succinct::{IntVec, IntVecMut, IntVector};
 
 use super::traits::*;
+use super::width_for;
 
 #[derive(Debug, Clone)]
 pub struct PackedIntVec {
-    pub vector: IntVector<u64>,
+    pub(crate) vector: IntVector<u64>,
     pub num_entries: usize,
     pub width: usize,
 }
@@ -66,24 +67,46 @@ impl PackedIntVec {
     }
 
     pub fn resize_with_width(&mut self, size: usize, width: usize) {
-        let width = width.max(self.width);
-
         if size < self.num_entries {
             let capacity = self.vector.len() as f64 / (Self::FACTOR.powi(2));
             let capacity = capacity as usize;
+
             if size < capacity {
-                let mut new_vec: IntVector<u64> =
-                    IntVector::with_capacity(width, self.vector.len());
-                for ix in 0..(self.num_entries as u64) {
-                    new_vec.set(ix, self.vector.get(ix));
+                if width <= self.width {
+                    self.vector.resize(size as u64, 0);
+                } else {
+                    let mut new_vec: IntVector<u64> =
+                        IntVector::with_capacity(width, self.vector.len());
+                    for ix in 0..(self.num_entries as u64) {
+                        new_vec.push(self.vector.get(ix));
+                        // new_vec.set(ix, self.vector.get(ix));
+                    }
+                    std::mem::swap(&mut self.vector, &mut new_vec);
+                    self.width = width;
                 }
-                std::mem::swap(&mut self.vector, &mut new_vec);
             }
         } else if size > self.vector.len() as usize {
             let fac_size = self.vector.len() as f64 * Self::FACTOR;
             let fac_size = fac_size as usize + 1;
             let new_cap = size.max(fac_size);
-            self.reserve(new_cap);
+            self.reserve_with_width(new_cap, width);
+        } else if width > self.width {
+            let size = size.max(self.vector.len() as usize);
+            let mut new_vec: IntVector<u64> =
+                IntVector::with_capacity(width, size as u64);
+
+            for ix in 0..(self.num_entries as u64) {
+                new_vec.push(self.vector.get(ix));
+            }
+
+            new_vec.resize(size as u64, 0);
+            // for ix in self.num_entries..size {
+            //     new_vec.push(0);
+            // new_vec.set(ix as u64, 0);
+            // }
+
+            std::mem::swap(&mut self.vector, &mut new_vec);
+            self.width = width;
         }
 
         self.num_entries = size;
@@ -91,6 +114,32 @@ impl PackedIntVec {
 
     pub fn resize(&mut self, size: usize) {
         self.resize_with_width(size, self.width);
+    }
+
+    pub fn reserve_with_width(&mut self, size: usize, width: usize) {
+        if width > self.width {
+            let size = size.max(self.vector.len() as usize);
+            //     IntVector::with_fill(width, size as u64, 0);
+            let mut new_vec: IntVector<u64> =
+                IntVector::with_capacity(width, size as u64);
+
+            for ix in 0..(self.num_entries as u64) {
+                new_vec.push(self.vector.get(ix));
+                // new_vec.set(ix, self.vector.get(ix));
+            }
+
+            new_vec.resize(size as u64, 0);
+            // for ix in self.num_entries..size {
+            //     new_vec.push(0);
+            // new_vec.set(ix as u64, 0);
+            // }
+            std::mem::swap(&mut self.vector, &mut new_vec);
+            self.width = width;
+        } else {
+            if size > self.vector.len() as usize {
+                self.vector.resize(size as u64, 0);
+            }
+        }
     }
 
     pub fn reserve(&mut self, size: usize) {
@@ -135,7 +184,7 @@ impl PackedCollection for PackedIntVec {
     fn set(&mut self, index: usize, value: u64) {
         assert!(index < self.num_entries);
 
-        let new_width = 64 - value.leading_zeros() as usize;
+        let new_width = width_for(value);
 
         if new_width > self.width {
             self.width = new_width;
@@ -160,8 +209,9 @@ impl PackedCollection for PackedIntVec {
 
     #[inline]
     fn append(&mut self, value: u64) {
-        self.resize(self.num_entries + 1);
-        self.set(self.num_entries - 1, value);
+        let width = width_for(value);
+        self.resize_with_width(self.num_entries + 1, width);
+        self.vector.set((self.num_entries - 1) as u64, value);
     }
 
     #[inline]

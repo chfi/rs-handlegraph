@@ -9,6 +9,11 @@ pub use self::{
     traits::*, vector::PackedIntVec,
 };
 
+#[inline]
+pub fn width_for(value: u64) -> usize {
+    64 - value.leading_zeros() as usize
+}
+
 #[macro_export]
 macro_rules! impl_space_usage {
     ($for:ty, [$first:ident $(, $field:ident)*]) => {
