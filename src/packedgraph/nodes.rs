@@ -94,6 +94,7 @@ impl NodeIdIndexMap {
         }
     }
 
+    #[inline]
     fn clear_node_id(&mut self, id: NodeId) {
         let ix = u64::from(id) - self.min_id;
         self.deque.set(ix as usize, 0);
@@ -103,6 +104,7 @@ impl NodeIdIndexMap {
     /// with the given target `GraphRecordIx`.
     ///
     /// Returns `true` if the NodeId was successfully appended.
+    #[inline]
     pub fn append_node_id(
         &mut self,
         id: NodeId,
@@ -361,15 +363,18 @@ impl NodeRecords {
 
     /// Return the `GraphRecordIx` that will be used by the next node
     /// that's inserted into the graph.
+    #[inline]
     fn next_graph_ix(&self) -> NodeRecordId {
         let rec_count = self.records_vec.len();
         NodeRecordId::from_record_start(rec_count, 2)
     }
 
+    #[inline]
     pub(super) fn sequences(&self) -> &Sequences {
         &self.sequences
     }
 
+    #[inline]
     pub(super) fn sequences_mut(&mut self) -> &mut Sequences {
         &mut self.sequences
     }
@@ -391,6 +396,7 @@ impl NodeRecords {
         Some(g_rec_ix)
     }
 
+    #[inline]
     fn insert_node(&mut self, n_id: NodeId) -> Option<NodeRecordId> {
         if n_id == NodeId::from(0) {
             return None;
@@ -527,6 +533,7 @@ impl NodeRecords {
         Some(())
     }
 
+    #[inline]
     pub(super) fn create_node<I: Into<NodeId>>(
         &mut self,
         n_id: I,
@@ -542,6 +549,7 @@ impl NodeRecords {
         Some(g_ix)
     }
 
+    #[inline]
     pub(super) fn append_empty_node(&mut self) -> NodeId {
         let n_id = NodeId::from(self.id_index_map.max_id + 1);
         let _g_ix = self.insert_node(n_id).unwrap();

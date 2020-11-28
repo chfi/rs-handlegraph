@@ -33,6 +33,7 @@ impl PackedDeque {
         }
     }
 
+    #[inline]
     pub fn reserve_with_width(&mut self, width: usize, capacity: usize) {
         if capacity > self.vector.len() {
             let mut vector = PackedIntVec::new_with_width(width);
@@ -46,6 +47,7 @@ impl PackedDeque {
         }
     }
 
+    #[inline]
     pub fn reserve(&mut self, capacity: usize) {
         if capacity > self.vector.len() {
             let width = self.vector.width();
@@ -60,6 +62,7 @@ impl PackedDeque {
         }
     }
 
+    #[inline]
     fn grow_as_needed(&mut self) {
         if self.num_entries == self.vector.len() {
             let capacity = Self::FACTOR * self.vector.len() as f64;
@@ -137,15 +140,12 @@ impl PackedDeque {
     #[inline]
     fn internal_index(&self, ix: usize) -> usize {
         assert!(ix < self.num_entries);
-        if let Some(ix) = ix.checked_sub(self.vector.len() - self.start_ix) {
-            ix
+        let diff = self.vector.len() - self.start_ix;
+        if ix >= diff {
+            ix - diff
         } else {
             self.start_ix + ix
         }
-        // if ix < self.vector.len() - self.start_ix {
-        // } else {
-        //     ix - (self.vector.len() - self.start_ix)
-        // }
     }
 
     pub fn save_diagnostics<W: std::io::Write>(

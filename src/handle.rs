@@ -180,6 +180,7 @@ pub struct Edge(pub Handle, pub Handle);
 
 impl Edge {
     /// Construct an edge, taking the orientation of the handles into account
+    #[inline]
     pub fn edge_handle(left: Handle, right: Handle) -> Edge {
         let flipped_right = right.flip();
         let flipped_left = left.flip();

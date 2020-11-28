@@ -181,6 +181,7 @@ impl EdgeLists {
 
     /// Create a new record with the provided contents and return its
     /// `EdgeListIx`.
+    #[inline]
     pub(super) fn append_record(
         &mut self,
         handle: Handle,
@@ -223,6 +224,7 @@ impl EdgeLists {
 
     /// Follow the linked list pointer in the given record to the next
     /// entry, if it exists.
+    #[inline]
     fn next(&self, record: EdgeRecord) -> Option<EdgeRecord> {
         self.get_record(record.1)
     }
@@ -243,6 +245,7 @@ impl EdgeLists {
     ///
     /// If no edge record fulfills the predicate, does nothing and
     /// return `false`. Returns `true` if a record was updated.
+    #[inline]
     pub(super) fn update_edge_record<P, F>(
         &mut self,
         start: EdgeListIx,

@@ -67,11 +67,13 @@ impl Default for Sequences {
 impl Sequences {
     /// Add a new, empty sequence record.
 
+    #[inline]
     pub(super) fn append_empty_record(&mut self) {
         self.lengths.append(0);
         self.offsets.append(0);
     }
 
+    #[inline]
     fn set_record(
         &mut self,
         seq_ix: SeqRecordIx,
@@ -83,6 +85,7 @@ impl Sequences {
         self.offsets.set_pack(ix, offset);
     }
 
+    #[inline]
     fn get_record(&self, seq_ix: SeqRecordIx) -> (usize, usize) {
         let ix = seq_ix.at_0();
 
@@ -92,6 +95,7 @@ impl Sequences {
         (offset, length)
     }
 
+    #[inline]
     pub(super) fn clear_record(&mut self, seq_ix: SeqRecordIx) {
         let ix = seq_ix.at_0();
 
@@ -101,6 +105,7 @@ impl Sequences {
         self.removed_records.push(seq_ix);
     }
 
+    #[inline]
     fn append_record(&mut self, offset: usize, length: usize) -> SeqRecordIx {
         let seq_ix = SeqRecordIx::new(self.lengths.len());
 
@@ -111,6 +116,7 @@ impl Sequences {
 
     /// Adds a sequence and updates the sequence records for the
     /// provided `NodeRecordId` to the correct length and offset.
+    #[inline]
     pub(super) fn add_sequence(
         &mut self,
         rec_id: NodeRecordId,
@@ -132,6 +138,7 @@ impl Sequences {
     /// Overwrites the sequence for the provided `GraphRecordIx` with
     /// `seq`. The provided sequence must have exactly the same length
     /// as the old one.
+    #[inline]
     pub(super) fn overwrite_sequence(
         &mut self,
         rec_id: NodeRecordId,
@@ -216,6 +223,7 @@ impl Sequences {
         self.lengths.iter().sum::<u64>() as usize
     }
 
+    #[inline]
     fn iter_impl(
         &self,
         offset: usize,
@@ -231,6 +239,7 @@ impl Sequences {
         }
     }
 
+    #[inline]
     pub(super) fn iter(
         &self,
         seq_ix: SeqRecordIx,
@@ -318,6 +327,21 @@ impl<'a> Iterator for PackedSeqIter<'a> {
         self.iter.size_hint()
     }
 
+    #[inline]
+    fn count(self) -> usize {
+        self.length
+    }
+
+    #[inline]
+    fn last(mut self) -> Option<u8> {
+        if self.reverse {
+            let base = self.iter.next()?;
+            Some(decode_dna_base(encoded_complement(base)))
+        } else {
+            let base = self.iter.last()?;
+            Some(decode_dna_base(base))
+        }
+    }
 }
 
 impl<'a> std::iter::ExactSizeIterator for PackedSeqIter<'a> {

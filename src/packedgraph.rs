@@ -61,6 +61,7 @@ impl HandleGraph for PackedGraph {
         self.edges.len()
     }
 
+    #[inline]
     fn total_length(&self) -> usize {
         self.nodes.sequences().total_length()
     }
@@ -84,6 +85,7 @@ impl<'a> IntoHandles for &'a PackedGraph {
 impl<'a> IntoEdges for &'a PackedGraph {
     type Edges = EdgesIter<&'a PackedGraph>;
 
+    #[inline]
     fn edges(self) -> Self::Edges {
         EdgesIter::new(self)
     }
@@ -147,11 +149,13 @@ impl<'a> IntoNodeOccurrences for &'a PackedGraph {
 }
 
 impl AdditiveHandleGraph for PackedGraph {
+    #[inline]
     fn append_handle(&mut self, sequence: &[u8]) -> Handle {
         let id = self.max_node_id() + 1;
         self.create_handle(sequence, id)
     }
 
+    #[inline]
     fn create_handle<T: Into<NodeId>>(
         &mut self,
         sequence: &[u8],
@@ -169,6 +173,7 @@ impl AdditiveHandleGraph for PackedGraph {
         Handle::pack(id, false)
     }
 
+    #[inline]
     fn create_edge(&mut self, Edge(left, right): Edge) {
         let left_gix = self.nodes.handle_record(left).unwrap();
         let right_gix = self.nodes.handle_record(right).unwrap();
@@ -209,10 +214,12 @@ impl AdditiveHandleGraph for PackedGraph {
 }
 
 impl SubtractiveHandleGraph for PackedGraph {
+    #[inline]
     fn remove_handle(&mut self, handle: Handle) -> bool {
         self.remove_handle_impl(handle).is_some()
     }
 
+    #[inline]
     fn remove_edge(&mut self, edge: Edge) -> bool {
         self.remove_edge_impl(edge).is_some()
     }

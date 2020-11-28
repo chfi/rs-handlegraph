@@ -37,6 +37,7 @@ pub struct Page {
 crate::impl_space_usage!(Page, [vector]);
 
 impl Page {
+    #[inline]
     pub fn with_width(width: usize, offset: usize, length: usize) -> Self {
         let end = offset + length;
         let vector = PackedIntVec::new_with_width(width);
@@ -49,6 +50,7 @@ impl Page {
         }
     }
 
+    #[inline]
     pub fn new(offset: usize, length: usize) -> Self {
         Self::with_width(1, offset, length)
     }
@@ -70,36 +72,36 @@ impl Page {
 
     #[inline]
     pub fn append(&mut self, value: u64) -> bool {
-        print!(" - Appending {:4} ... ", value);
+        // print!(" - Appending {:4} ... ", value);
 
         self.vector.append(value);
 
-        if self.closed() {
-            println!(" closing page");
-        } else {
-            println!(
-                " page open, {} left",
-                (self.end - self.offset) - self.len()
-            );
-        }
+        // if self.closed() {
+        //     println!(" closing page");
+        // } else {
+        //     println!(
+        //         " page open, {} left",
+        //         (self.end - self.offset) - self.len()
+        //     );
+        // }
 
         self.closed()
     }
 
     #[inline]
     pub fn append_slice(&mut self, items: &[u64]) -> bool {
-        print!(" - Appending slice of length {:4} ... ", items.len());
+        // print!(" - Appending slice of length {:4} ... ", items.len());
 
         self.vector.append_slice(items);
 
-        if self.closed() {
-            println!(" closing page");
-        } else {
-            println!(
-                " page open, {} left",
-                (self.end - self.offset) - self.len()
-            );
-        }
+        // if self.closed() {
+        //     println!(" closing page");
+        // } else {
+        //     println!(
+        //         " page open, {} left",
+        //         (self.end - self.offset) - self.len()
+        //     );
+        // }
 
         self.closed()
     }
@@ -108,22 +110,22 @@ impl Page {
     where
         I: Iterator<Item = u64> + ExactSizeIterator,
     {
-        print!(
-            " - Appending iter, width {:2}, length {:4} ... ",
-            width,
-            iter.size_hint().1.unwrap()
-        );
+        // print!(
+        //     " - Appending iter, width {:2}, length {:4} ... ",
+        //     width,
+        //     iter.size_hint().1.unwrap()
+        // );
 
         self.vector.append_iter(width, iter);
 
-        if self.closed() {
-            println!(" closing page");
-        } else {
-            println!(
-                " page open, {} left",
-                (self.end - self.offset) - self.len()
-            );
-        }
+        // if self.closed() {
+        //     println!(" closing page");
+        // } else {
+        //     println!(
+        //         " page open, {} left",
+        //         (self.end - self.offset) - self.len()
+        //     );
+        // }
 
         self.closed()
     }
@@ -239,9 +241,9 @@ impl FlexPagedVec {
     where
         I: Iterator<Item = u64> + ExactSizeIterator,
     {
+        let len = iter.len();
         let page = &mut self.open_page;
 
-        let len = iter.size_hint().1.unwrap();
         let closed = page.append_iter(width, iter);
         self.num_entries += len;
 
@@ -250,6 +252,7 @@ impl FlexPagedVec {
         }
     }
 
+    #[inline]
     fn page_iter(&self, page_ix: usize) -> Option<vector::Iter<'_>> {
         if page_ix == self.closed_pages.len() {
             Some(self.open_page.vector.iter())
@@ -259,6 +262,7 @@ impl FlexPagedVec {
         }
     }
 
+    #[inline]
     pub fn iter_slice(
         &self,
         offset: usize,
