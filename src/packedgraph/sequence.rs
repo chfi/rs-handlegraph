@@ -42,7 +42,7 @@ impl RecordIndex for SeqRecordIx {
 
 #[derive(Debug, Clone)]
 pub struct Sequences {
-    pub sequences: FlexPagedVec,
+    pub sequences: PackedIntVec,
     pub lengths: PackedIntVec,
     pub offsets: PagedIntVec,
     pub removed_records: Vec<SeqRecordIx>,
@@ -56,7 +56,9 @@ crate::impl_space_usage!(
 impl Default for Sequences {
     fn default() -> Self {
         Sequences {
-            sequences: FlexPagedVec::new(2, 8_388_608),
+            sequences: PackedIntVec::new_with_width(2),
+            // sequences: FlexPagedVec::new(2, 8_388_608),
+            // sequences: FlexPagedVec::new(2, 67_108_864),
             lengths: Default::default(),
             offsets: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
             removed_records: Vec::new(),
@@ -230,7 +232,7 @@ impl Sequences {
         len: usize,
         reverse: bool,
     ) -> PackedSeqIter<'_> {
-        let iter = self.sequences.iter_slice(offset, len).unwrap();
+        let iter = self.sequences.iter_slice(offset, len);
 
         PackedSeqIter {
             iter,

@@ -882,7 +882,7 @@ pub(crate) mod tests {
 
         let hnd = |x: u64| Handle::pack(x, false);
 
-        let s1 = p_path.append_handle_record(hnd(1));
+        let s1 = p_path.append_handle_record(hnd(1), 0, 0);
         let s2 = p_path.insert_after(s1, hnd(4)).unwrap();
         let s3 = p_path.insert_after(s2, hnd(3)).unwrap();
         let s4 = p_path.insert_after(s3, hnd(2)).unwrap();

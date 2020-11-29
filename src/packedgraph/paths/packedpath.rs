@@ -106,11 +106,16 @@ impl StepList {
         self.steps.len()
     }
 
-    pub(super) fn append_handle_record(&mut self, handle: Handle) -> StepPtr {
+    pub(crate) fn append_handle_record(
+        &mut self,
+        handle: Handle,
+        prev: u64,
+        next: u64,
+    ) -> StepPtr {
         let new_ix = StepPtr::from_zero_based(self.storage_len());
         self.steps.append(handle.pack());
-        self.links.append(0);
-        self.links.append(0);
+        self.links.append(prev);
+        self.links.append(next);
         new_ix
     }
 
@@ -517,7 +522,12 @@ where
     #[must_use]
     pub(crate) fn append_handle(&mut self, handle: Handle) -> StepUpdate {
         let tail = self.tail;
-        let step = self.path.steps_mut().append_handle_record(handle);
+
+        let step = self.path.steps_mut().append_handle_record(
+            handle,
+            self.tail.pack(),
+            0,
+        );
 
         // add back link from new step to old tail
         let new_prev_ix = step.to_record_ix(2, 0).unwrap();
@@ -541,7 +551,11 @@ where
     #[must_use]
     pub(crate) fn prepend_handle(&mut self, handle: Handle) -> StepUpdate {
         let head = self.head;
-        let step = self.path.steps_mut().append_handle_record(handle);
+
+        let step =
+            self.path
+                .steps_mut()
+                .append_handle_record(handle, 0, head.pack());
 
         // add forward link from new step to old head
         let new_next_ix = step.to_record_ix(2, 1).unwrap();
@@ -903,7 +917,8 @@ pub(crate) mod tests {
     impl StepList {
         fn generate_from_length(length: usize) -> (StepList, usize) {
             let mut path = StepList::default();
-            let mut head = path.append_handle_record(Handle::pack(1, false));
+            let mut head =
+                path.append_handle_record(Handle::pack(1, false), 0, 0);
             for id in 2..=length {
                 let handle = Handle::pack(id, false);
                 head = path.insert_after(head, handle).unwrap();
