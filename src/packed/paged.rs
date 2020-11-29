@@ -3,12 +3,64 @@ use super::vector::PackedIntVec;
 use super::traits::*;
 
 #[derive(Debug, Clone)]
-pub struct PagedIntVec {
+pub struct PagedIntVec<Codec = DiffCodec> {
     pub page_size: usize,
     pub num_entries: usize,
     pub anchors: PackedIntVec,
     pub pages: Vec<PackedIntVec>,
     initial_width: usize,
+    codec: Codec,
+}
+
+/// Abstraction of the method used by a [`PagedIntVec`] to pack
+/// elements into a page, to reduce memory consumption.
+pub trait PagedCodec {
+    fn encode(value: u64, anchor: u64) -> u64;
+
+    fn decode(value: u64, anchor: u64) -> u64;
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DiffCodec();
+
+impl PagedCodec for DiffCodec {
+    #[inline]
+    fn encode(value: u64, anchor: u64) -> u64 {
+        if value == 0 {
+            0
+        } else if value >= anchor {
+            let raw_diff = value - anchor;
+            raw_diff + raw_diff / 4 + 1
+        } else {
+            5 * (anchor - value)
+        }
+    }
+
+    #[inline]
+    fn decode(diff: u64, anchor: u64) -> u64 {
+        if diff == 0 {
+            0
+        } else if diff % 5 == 0 {
+            anchor - diff / 5
+        } else {
+            anchor + diff - diff / 5 - 1
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct IdentityCodec();
+
+impl PagedCodec for IdentityCodec {
+    #[inline]
+    fn encode(value: u64, _anchor: u64) -> u64 {
+        value
+    }
+
+    #[inline]
+    fn decode(value: u64, _anchor: u64) -> u64 {
+        value
+    }
 }
 
 crate::impl_space_usage!(PagedIntVec, [anchors, pages]);
@@ -31,6 +83,7 @@ impl PagedIntVec {
             anchors,
             pages,
             initial_width,
+            codec: Default::default(),
         }
     }
 
@@ -44,6 +97,7 @@ impl PagedIntVec {
             anchors,
             pages,
             initial_width,
+            codec: Default::default(),
         }
     }
 
@@ -103,31 +157,6 @@ impl PagedIntVec {
     #[inline]
     pub(super) fn page_width(&self) -> usize {
         self.page_size
-    }
-
-    #[allow(clippy::wrong_self_convention)]
-    #[inline]
-    const fn to_diff(value: u64, anchor: u64) -> u64 {
-        if value == 0 {
-            0
-        } else if value >= anchor {
-            let raw_diff = value - anchor;
-            raw_diff + raw_diff / 4 + 1
-        } else {
-            5 * (anchor - value)
-        }
-    }
-
-    #[allow(clippy::wrong_self_convention)]
-    #[inline]
-    const fn from_diff(diff: u64, anchor: u64) -> u64 {
-        if diff == 0 {
-            0
-        } else if diff % 5 == 0 {
-            anchor - diff / 5
-        } else {
-            anchor + diff - diff / 5 - 1
-        }
     }
 
     pub fn save_diagnostics<W: std::io::Write>(
@@ -201,7 +230,7 @@ impl PagedIntVec {
     }
 }
 
-impl PackedCollection for PagedIntVec {
+impl<T: PagedCodec> PackedCollection for PagedIntVec<T> {
     #[inline]
     fn len(&self) -> usize {
         self.num_entries
@@ -232,14 +261,14 @@ impl PackedCollection for PagedIntVec {
         }
 
         self.pages[page_ix]
-            .set(index % self.page_size, Self::to_diff(value, anchor));
+            .set(index % self.page_size, T::encode(value, anchor));
     }
 
     #[inline]
     fn get(&self, index: usize) -> u64 {
         assert!(index < self.num_entries);
         let page_ix = index / self.page_size;
-        Self::from_diff(
+        T::decode(
             self.pages[page_ix].get(index % self.page_size),
             self.anchors.get(page_ix),
         )

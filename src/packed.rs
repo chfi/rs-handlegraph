@@ -6,8 +6,12 @@ pub mod traits;
 pub mod vector;
 
 pub use self::{
-    deque::PackedDeque, flexpaged::FlexPagedVec, paged::PagedIntVec,
-    robust::RobustPagedIntVec, traits::*, vector::PackedIntVec,
+    deque::PackedDeque,
+    flexpaged::FlexPagedVec,
+    paged::{IdentityCodec, PagedCodec, PagedIntVec},
+    robust::RobustPagedIntVec,
+    traits::*,
+    vector::PackedIntVec,
 };
 
 #[inline]
