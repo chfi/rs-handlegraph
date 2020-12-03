@@ -434,14 +434,13 @@ pub(crate) const DNA_BASE_1_ENCODING_TABLE: [u8; 256] = {
         (b'T', 3),
     ];
 
-    let mut table: [u8; 256] = [4; 256];
+    let mut table: [u8; 256] = [64; 256];
     let mut i = 0;
     while i < 8 {
         let (base, val) = pairs[i];
-        table[base as usize] = val;
+        table[base as usize] = val << 4;
         i += 1;
     }
-
     table
 };
 
@@ -457,13 +456,14 @@ pub(crate) const DNA_BASE_2_ENCODING_TABLE: [u8; 256] = {
         (b'T', 3),
     ];
 
-    let mut table: [u8; 256] = [64; 256];
+    let mut table: [u8; 256] = [4; 256];
     let mut i = 0;
     while i < 8 {
         let (base, val) = pairs[i];
-        table[base as usize] = val << 4;
+        table[base as usize] = val;
         i += 1;
     }
+
     table
 };
 
@@ -479,7 +479,75 @@ pub(crate) const fn encode_dna_base_2_u8(base: u8) -> u8 {
 
 #[inline]
 pub(crate) const fn encode_dna_pair_u8(bases: &[u8; 2]) -> u8 {
-    encode_dna_base_2_u8(bases[0]) | encode_dna_base_1_u8(bases[1])
+    encode_dna_base_1_u8(bases[0]) | encode_dna_base_2_u8(bases[1])
+}
+
+pub(crate) const DNA_PAIR_DECODING_TABLE: [[u8; 2]; 256] = {
+    let mut table: [[u8; 2]; 256] = [[b'N', b'N']; 256];
+
+    let bases: [u8; 5] = [b'A', b'C', b'G', b'T', b'N'];
+
+    let mut i = 0;
+
+    while i < 5 {
+        let mut j = 0;
+
+        let base_2 = bases[i];
+
+        while j < 5 {
+            let base_1 = bases[j];
+            table[j << 4 | i] = [base_1, base_2];
+
+            j += 1;
+        }
+
+        i += 1;
+    }
+
+    table
+};
+
+pub fn encode_sequence(seq: &[u8]) -> Vec<u8> {
+    let odd_len = seq.len() % 2 != 0;
+    let res_len = (seq.len() / 2) + seq.len() % 2;
+
+    let mut res = Vec::with_capacity(res_len);
+
+    let chunks = seq.chunks_exact(2);
+
+    let last = match chunks.remainder() {
+        &[b] => encode_dna_base_1_u8(b),
+        _ => 0,
+    };
+
+    for chunk in chunks {
+        if let &[b1, b2] = chunk {
+            res.push(encode_dna_pair_u8(&[b1, b2]));
+        }
+    }
+
+    if odd_len {
+        res.push(last);
+    }
+
+    res
+}
+
+pub fn decode_sequence(seq: &[u8], len: usize) -> Vec<u8> {
+    let mut res = Vec::with_capacity(len);
+    let mut remaining = len;
+
+    for [b1, b2] in seq.iter().map(|&val| DNA_PAIR_DECODING_TABLE[val as usize])
+    {
+        res.push(b1);
+        if remaining < 2 {
+            break;
+        }
+        res.push(b2);
+        remaining -= 2;
+    }
+
+    res
 }
 
 #[cfg(test)]
