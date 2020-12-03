@@ -554,6 +554,88 @@ pub fn decode_sequence(seq: &[u8], len: usize) -> Vec<u8> {
 mod tests {
     use super::*;
 
+    fn print_3_bits_vec(slice: &[u8], newline: bool) {
+        for (ix, byte) in slice.iter().enumerate() {
+            if ix != 0 {
+                print!("  ");
+            }
+            let b1 = byte >> 4;
+            let b2 = byte & 0b111;
+            print!("{:03b} {:03b}", b1, b2);
+        }
+        if newline {
+            println!();
+        }
+    }
+
+    #[test]
+    fn new_sequence_encoding() {
+        use bstr::{BString, ByteSlice, ByteVec, B};
+
+        let bases = vec![b'A', b'C', b'G', b'T', b'N'];
+
+        let seqs_0 = vec![b"A", b"c", b"g", b"T", b"N", b"Q"];
+
+        let seqs_1 = {
+            let mut seqs = Vec::new();
+            for &b_1 in bases.iter() {
+                for &b_2 in bases.iter() {
+                    seqs.push([b_1, b_2]);
+                }
+            }
+            seqs
+        };
+
+        let seqs_2 = vec![
+            B("GTCA"),
+            B("AAGTGCTAGT"),
+            B("ATA"),
+            B("AGTA"),
+            B("GTCCA"),
+            B("GGGT"),
+            B("AACT"),
+            B("AACAT"),
+            B("AGCC"),
+        ];
+
+        println!("---------------");
+
+        for seq in seqs_0 {
+            let encoded = encode_sequence(seq);
+            print!("{}\t{:?}\t", seq.as_bstr(), encoded);
+            print_3_bits_vec(&encoded, false);
+
+            let decoded = decode_sequence(&encoded, seq.len());
+            println!("  \t{}", decoded.as_bstr());
+        }
+
+        println!("---------------");
+
+        for seq in seqs_1 {
+            let encoded = encode_sequence(&seq);
+            print!("{}\t{:?}\t", seq.as_bstr(), encoded);
+            print_3_bits_vec(&encoded, false);
+
+            let decoded = decode_sequence(&encoded, seq.len());
+            println!("  \t{}", decoded.as_bstr());
+
+            assert_eq!(decoded, seq);
+        }
+
+        println!("---------------");
+
+        for seq in seqs_2 {
+            let encoded = encode_sequence(&seq);
+            print!("{}\t{:?}\t", seq.as_bstr(), encoded);
+            print_3_bits_vec(&encoded, false);
+
+            let decoded = decode_sequence(&encoded, seq.len());
+            println!("  \t{}", decoded.as_bstr());
+
+            assert_eq!(decoded, seq);
+        }
+    }
+
     #[test]
     fn packedgraph_split_sequence() {
         use bstr::{BString, B};
