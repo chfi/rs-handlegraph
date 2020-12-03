@@ -422,6 +422,66 @@ pub(crate) const fn decode_dna_base(val: u64) -> u8 {
     }
 }
 
+pub(crate) const DNA_BASE_1_ENCODING_TABLE: [u8; 256] = {
+    let pairs: [(u8, u8); 8] = [
+        (b'a', 0),
+        (b'A', 0),
+        (b'c', 1),
+        (b'C', 1),
+        (b'g', 2),
+        (b'G', 2),
+        (b't', 3),
+        (b'T', 3),
+    ];
+
+    let mut table: [u8; 256] = [4; 256];
+    let mut i = 0;
+    while i < 8 {
+        let (base, val) = pairs[i];
+        table[base as usize] = val;
+        i += 1;
+    }
+
+    table
+};
+
+pub(crate) const DNA_BASE_2_ENCODING_TABLE: [u8; 256] = {
+    let pairs: [(u8, u8); 8] = [
+        (b'a', 0),
+        (b'A', 0),
+        (b'c', 1),
+        (b'C', 1),
+        (b'g', 2),
+        (b'G', 2),
+        (b't', 3),
+        (b'T', 3),
+    ];
+
+    let mut table: [u8; 256] = [64; 256];
+    let mut i = 0;
+    while i < 8 {
+        let (base, val) = pairs[i];
+        table[base as usize] = val << 4;
+        i += 1;
+    }
+    table
+};
+
+#[inline]
+pub(crate) const fn encode_dna_base_1_u8(base: u8) -> u8 {
+    DNA_BASE_1_ENCODING_TABLE[base as usize]
+}
+
+#[inline]
+pub(crate) const fn encode_dna_base_2_u8(base: u8) -> u8 {
+    DNA_BASE_2_ENCODING_TABLE[base as usize]
+}
+
+#[inline]
+pub(crate) const fn encode_dna_pair_u8(bases: &[u8; 2]) -> u8 {
+    encode_dna_base_2_u8(bases[0]) | encode_dna_base_1_u8(bases[1])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
