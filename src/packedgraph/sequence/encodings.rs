@@ -1,73 +1,61 @@
 use crate::packed::{self, *};
 
+const PACKED_BASE_ENCODING: [(u8, u8); 8] = [
+    (b'a', 0),
+    (b'A', 0),
+    (b'c', 1),
+    (b'C', 1),
+    (b'g', 2),
+    (b'G', 2),
+    (b't', 3),
+    (b'T', 3),
+];
+
+const PACKED_BASE_DECODING: [u8; 5] = [b'A', b'C', b'G', b'T', b'N'];
+
+const PACKED_BASE_COMPLEMENT: [u8; 256] = {
+    let mut table: [u8; 256] = [4; 256];
+
+    let mut i = 0;
+    while i < 4 {
+        table[i] = 3 - (i as u8);
+        i += 1;
+    }
+
+    table
+};
+
 // Packed 2-3 bit encoding using u64-size blocks
 
-const fn dna_encoding_table() -> [u64; 256] {
+pub(crate) const DNA_3BIT_ENCODING_TABLE: [u64; 256] = {
     let mut table: [u64; 256] = [4; 256];
 
-    let pairs: [(u8, u64); 8] = [
-        (b'a', 0),
-        (b'A', 0),
-        (b'c', 1),
-        (b'C', 1),
-        (b'g', 2),
-        (b'G', 2),
-        (b't', 3),
-        (b'T', 3),
-    ];
-
     let mut i = 0;
-
     while i < 8 {
-        let (base, value) = pairs[i];
-        table[base as usize] = value;
+        let (base, value) = PACKED_BASE_ENCODING[i];
+        table[base as usize] = value as u64;
         i += 1;
     }
 
     table
-}
-
-const fn encoded_complement_table() -> [u64; 5] {
-    let mut table: [u64; 5] = [0; 5];
-    let mut i = 0;
-
-    while i < 5 {
-        if i == 4 {
-            table[i] = 4;
-        } else {
-            table[i] = 3 - (i as u64);
-        }
-        i += 1;
-    }
-    table
-}
-
-pub(crate) const DNA_ENCODING_TABLE: [u64; 256] = dna_encoding_table();
-pub(crate) const ENCODED_COMPLEMENT_TABLE: [u64; 5] =
-    encoded_complement_table();
-pub(crate) const DNA_DECODING_TABLE: [u8; 5] = [b'A', b'C', b'G', b'T', b'N'];
+};
 
 #[inline]
 pub(crate) const fn encode_dna_base(base: u8) -> u64 {
-    DNA_ENCODING_TABLE[base as usize]
+    DNA_3BIT_ENCODING_TABLE[base as usize]
 }
 
 #[inline]
 pub(crate) const fn encoded_complement(val: u64) -> u64 {
-    if val > 3 {
-        ENCODED_COMPLEMENT_TABLE[4]
-    } else {
-        let v = val as u8;
-        ENCODED_COMPLEMENT_TABLE[v as usize]
-    }
+    PACKED_BASE_COMPLEMENT[(val as u8) as usize] as u64
 }
 
 #[inline]
 pub(crate) const fn decode_dna_base(val: u64) -> u8 {
     if val > 3 {
-        DNA_DECODING_TABLE[4]
+        PACKED_BASE_DECODING[4]
     } else {
-        DNA_DECODING_TABLE[val as usize]
+        PACKED_BASE_DECODING[val as usize]
     }
 }
 
@@ -123,21 +111,10 @@ impl<'a> std::iter::ExactSizeIterator for PackedSeqIter<'a> {
 // Packed 4-bit encoding using u8-size blocks
 
 pub(crate) const DNA_BASE_1_ENCODING_TABLE: [u8; 256] = {
-    let pairs: [(u8, u8); 8] = [
-        (b'a', 0),
-        (b'A', 0),
-        (b'c', 1),
-        (b'C', 1),
-        (b'g', 2),
-        (b'G', 2),
-        (b't', 3),
-        (b'T', 3),
-    ];
-
     let mut table: [u8; 256] = [64; 256];
     let mut i = 0;
     while i < 8 {
-        let (base, val) = pairs[i];
+        let (base, val) = PACKED_BASE_ENCODING[i];
         table[base as usize] = val << 4;
         i += 1;
     }
@@ -145,21 +122,10 @@ pub(crate) const DNA_BASE_1_ENCODING_TABLE: [u8; 256] = {
 };
 
 pub(crate) const DNA_BASE_2_ENCODING_TABLE: [u8; 256] = {
-    let pairs: [(u8, u8); 8] = [
-        (b'a', 0),
-        (b'A', 0),
-        (b'c', 1),
-        (b'C', 1),
-        (b'g', 2),
-        (b'G', 2),
-        (b't', 3),
-        (b'T', 3),
-    ];
-
     let mut table: [u8; 256] = [4; 256];
     let mut i = 0;
     while i < 8 {
-        let (base, val) = pairs[i];
+        let (base, val) = PACKED_BASE_ENCODING[i];
         table[base as usize] = val;
         i += 1;
     }
@@ -185,22 +151,17 @@ pub(crate) const fn encode_dna_pair_u8(bases: &[u8; 2]) -> u8 {
 pub(crate) const DNA_PAIR_DECODING_TABLE: [[u8; 2]; 256] = {
     let mut table: [[u8; 2]; 256] = [[b'N', b'N']; 256];
 
-    let bases: [u8; 5] = [b'A', b'C', b'G', b'T', b'N'];
-
     let mut i = 0;
-
     while i < 5 {
+        let base_2 = PACKED_BASE_DECODING[i];
+
         let mut j = 0;
-
-        let base_2 = bases[i];
-
         while j < 5 {
-            let base_1 = bases[j];
+            let base_1 = PACKED_BASE_DECODING[j];
             table[j << 4 | i] = [base_1, base_2];
 
             j += 1;
         }
-
         i += 1;
     }
 
@@ -270,7 +231,7 @@ mod tests {
 
     #[test]
     fn new_sequence_encoding() {
-        use bstr::{BString, ByteSlice, ByteVec, B};
+        use bstr::{ByteSlice, B};
 
         let bases = vec![b'A', b'C', b'G', b'T', b'N'];
 
@@ -298,16 +259,15 @@ mod tests {
             B("AGCC"),
         ];
 
-        println!("---------------");
+        let encoded_bases = seqs_0
+            .iter()
+            .map(|&seq| encode_sequence(seq))
+            .collect::<Vec<_>>();
 
-        for seq in seqs_0 {
-            let encoded = encode_sequence(seq);
-            print!("{}\t{:?}\t", seq.as_bstr(), encoded);
-            print_3_bits_vec(&encoded, false);
-
-            let decoded = decode_sequence(&encoded, seq.len());
-            println!("  \t{}", decoded.as_bstr());
-        }
+        assert_eq!(
+            encoded_bases,
+            [[0], [1 << 4], [2 << 4], [3 << 4], [4 << 4], [4 << 4]]
+        );
 
         println!("---------------");
 
