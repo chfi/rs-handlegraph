@@ -250,6 +250,58 @@ where
     }
 }
 
+pub struct DecodeIter<'a> {
+    encoded: &'a [u8],
+    left: usize,
+    right: usize,
+    done: bool,
+}
+
+impl<'a> DecodeIter<'a> {
+    fn new(encoded: &'a [u8], offset: usize, length: usize) -> Self {
+        assert!(encoded.len() <= offset + length);
+
+        let left = offset;
+        let right = offset + length - 1;
+
+        Self {
+            encoded,
+            left,
+            right,
+            done: false,
+        }
+    }
+}
+
+impl<'a> Iterator for DecodeIter<'a> {
+    type Item = u8;
+
+    #[inline]
+    fn next(&mut self) -> Option<u8> {
+        if self.done {
+            return None;
+        }
+
+        let slice_index = self.left / 2;
+
+        let decoded =
+            DNA_PAIR_DECODING_TABLE[self.encoded[slice_index] as usize];
+
+        let item = if self.left % 2 == 0 {
+            decoded[0]
+        } else {
+            decoded[1]
+        };
+
+        self.left += 1;
+        if self.left > self.right {
+            self.done = true;
+        }
+
+        Some(item)
+    }
+}
+
 pub fn encode_sequence(seq: &[u8]) -> Vec<u8> {
     let odd_len = seq.len() % 2 != 0;
     let res_len = (seq.len() / 2) + seq.len() % 2;
@@ -366,7 +418,9 @@ mod tests {
             print!("{}\t{:?}\t", seq.as_bstr(), encoded);
             print_3_bits_vec(&encoded, false);
 
-            let decoded = decode_sequence(&encoded, seq.len());
+            // let decoded = decode_sequence(&encoded, seq.len());
+            let decoded =
+                DecodeIter::new(&encoded, 0, seq.len()).collect::<Vec<_>>();
             println!("  \t{}", decoded.as_bstr());
 
             assert_eq!(decoded, seq);
@@ -375,12 +429,16 @@ mod tests {
         println!("---------------");
 
         for seq in seqs_2 {
-            let encoded = encode_sequence(&seq);
-            // print!("{}\t{:?}\t", seq.as_bstr(), encoded);
-            // print_3_bits_vec(&encoded, false);
+            let encode_iter = EncodeIter {
+                iter: seq.iter().copied(),
+            };
+            let encoded = encode_iter.collect::<Vec<_>>();
+            print!("{}\t{:?}\t", seq.as_bstr(), encoded);
+            print_3_bits_vec(&encoded, false);
 
-            let decoded = decode_sequence(&encoded, seq.len());
-            // println!("  \t{}", decoded.as_bstr());
+            let decoded =
+                DecodeIter::new(&encoded, 0, seq.len()).collect::<Vec<_>>();
+            println!("  \t{}", decoded.as_bstr());
 
             assert_eq!(decoded, seq);
         }
