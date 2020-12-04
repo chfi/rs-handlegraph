@@ -154,6 +154,7 @@ pub(crate) const DNA_PAIR_DECODING_TABLE: [[u8; 2]; 256] = {
     let mut i = 0;
     while i < 5 {
         let base_2 = PACKED_BASE_DECODING[i];
+        table[i << 4 | 0xF] = [base_2, 0];
 
         let mut j = 0;
         while j < 5 {
@@ -258,7 +259,7 @@ pub fn encode_sequence(seq: &[u8]) -> Vec<u8> {
     let chunks = seq.chunks_exact(2);
 
     let last = match chunks.remainder() {
-        &[b] => encode_dna_base_1_u8(b),
+        &[b] => encode_dna_base_1_u8(b) | 0xF,
         _ => 0,
     };
 
@@ -281,12 +282,14 @@ pub fn decode_sequence(seq: &[u8], len: usize) -> Vec<u8> {
 
     for [b1, b2] in seq.iter().map(|&val| DNA_PAIR_DECODING_TABLE[val as usize])
     {
-        res.push(b1);
         if remaining < 2 {
+            res.push(b1);
             break;
+        } else {
+            res.push(b1);
+            res.push(b2);
+            remaining -= 2;
         }
-        res.push(b2);
-        remaining -= 2;
     }
 
     res
@@ -347,7 +350,7 @@ mod tests {
 
         assert_eq!(
             encoded_bases,
-            [[0], [1 << 4], [2 << 4], [3 << 4], [4 << 4], [4 << 4]]
+            [[0x0F], [0x1F], [0x2F], [0x3F], [0x4F], [0x4F]]
         );
 
         println!("---------------");
