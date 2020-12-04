@@ -168,6 +168,87 @@ pub(crate) const DNA_PAIR_DECODING_TABLE: [[u8; 2]; 256] = {
     table
 };
 
+pub struct EncodeIterSlice<'a> {
+    iter: std::slice::ChunksExact<'a, u8>,
+    last: Option<u8>,
+    done: bool,
+}
+
+impl<'a> EncodeIterSlice<'a> {
+    fn new(seq: &'a [u8]) -> Self {
+        let iter = seq.chunks_exact(2);
+        let last = match iter.remainder() {
+            &[base] => Some(encode_dna_base_1_u8(base)),
+            _ => None,
+        };
+
+        Self {
+            iter,
+            last,
+            done: false,
+        }
+    }
+}
+
+impl<'a> Iterator for EncodeIterSlice<'a> {
+    type Item = u8;
+
+    #[inline]
+    fn next(&mut self) -> Option<u8> {
+        if self.done {
+            return None;
+        }
+
+        match self.iter.next() {
+            None => {
+                self.done = true;
+                self.last
+            }
+            Some(bases) => {
+                if let &[b1, b2] = bases {
+                    Some(encode_dna_pair_u8(&[b1, b2]))
+                } else {
+                    unreachable!();
+                }
+            }
+        }
+    }
+}
+
+pub struct EncodeIter<I>
+where
+    I: Iterator<Item = u8> + ExactSizeIterator,
+{
+    iter: I,
+}
+
+impl<I> EncodeIter<I>
+where
+    I: Iterator<Item = u8> + ExactSizeIterator,
+{
+    fn new(iter: I) -> Self {
+        Self { iter }
+    }
+}
+
+impl<I> Iterator for EncodeIter<I>
+where
+    I: Iterator<Item = u8> + ExactSizeIterator,
+{
+    type Item = u8;
+
+    #[inline]
+    fn next(&mut self) -> Option<u8> {
+        let first = self.iter.next()?;
+        match self.iter.next() {
+            None => Some(encode_dna_base_1_u8(first)),
+            Some(second) => {
+                Some(encode_dna_base_1_u8(first) | encode_dna_base_2_u8(second))
+            }
+        }
+    }
+}
+
 pub fn encode_sequence(seq: &[u8]) -> Vec<u8> {
     let odd_len = seq.len() % 2 != 0;
     let res_len = (seq.len() / 2) + seq.len() % 2;
@@ -272,7 +353,13 @@ mod tests {
         println!("---------------");
 
         for seq in seqs_1 {
-            let encoded = encode_sequence(&seq);
+            // let encode_iter = EncodeIterSlice::new(&seq);
+            let encode_iter = EncodeIter {
+                iter: seq.iter().copied(),
+            };
+            let encoded = encode_iter.collect::<Vec<_>>();
+
+            // let encoded = encode_sequence(&seq);
             print!("{}\t{:?}\t", seq.as_bstr(), encoded);
             print_3_bits_vec(&encoded, false);
 
@@ -286,11 +373,11 @@ mod tests {
 
         for seq in seqs_2 {
             let encoded = encode_sequence(&seq);
-            print!("{}\t{:?}\t", seq.as_bstr(), encoded);
-            print_3_bits_vec(&encoded, false);
+            // print!("{}\t{:?}\t", seq.as_bstr(), encoded);
+            // print_3_bits_vec(&encoded, false);
 
             let decoded = decode_sequence(&encoded, seq.len());
-            println!("  \t{}", decoded.as_bstr());
+            // println!("  \t{}", decoded.as_bstr());
 
             assert_eq!(decoded, seq);
         }
