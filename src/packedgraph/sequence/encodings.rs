@@ -169,6 +169,90 @@ pub(crate) const DNA_PAIR_DECODING_TABLE: [[u8; 2]; 256] = {
     table
 };
 
+#[derive(Debug, Default, Clone)]
+pub struct EncodedSequence {
+    pub(crate) vec: Vec<u8>,
+    len: usize,
+}
+
+impl EncodedSequence {
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    #[inline]
+    pub fn read_latest_mask(&self) -> u8 {
+        if self.len % 2 == 0 {
+            0x0F
+        } else {
+            0xF0
+        }
+    }
+
+    #[inline]
+    pub fn append_latest_mask(&self) -> u8 {
+        if self.len % 2 == 0 {
+            0xF0
+        } else {
+            0x0F
+        }
+    }
+
+    #[inline]
+    pub fn append_base(&mut self, base: u8) {
+        if self.len % 2 == 0 {
+            self.vec.push(encode_dna_base_1_u8(base));
+            self.len += 1;
+        } else {
+            if let Some(last) = self.vec.last_mut() {
+                *last |= encode_dna_base_2_u8(base);
+                self.len += 1;
+            }
+        }
+    }
+
+    #[inline]
+    pub fn get_base(&self, index: usize) -> Option<u8> {
+        let slice_index = index / 2;
+        let encoded = self.vec.get(slice_index)?;
+        if index % 2 == 0 {
+            Some(encoded & 0x0F)
+        } else {
+            Some(encoded & 0xF0)
+        }
+    }
+
+    pub fn append_seq(&mut self, seq: &[u8]) -> usize {
+        assert!(!seq.is_empty());
+        let offset = self.len;
+
+        if self.len % 2 == 0 {
+            let iter = EncodeIterSlice::new(seq);
+            self.len += seq.len();
+            self.vec.extend(iter);
+            offset
+        } else {
+            if seq.len() == 1 {
+                self.append_base(seq[0]);
+                self.len += 1;
+                offset
+            } else {
+                self.append_base(seq[0]);
+                let iter = EncodeIterSlice::new(&seq[1..]);
+                self.len += seq.len();
+                self.vec.extend(iter);
+                offset
+            }
+        }
+    }
+}
+
 pub struct EncodeIterSlice<'a> {
     iter: std::slice::ChunksExact<'a, u8>,
     last: Option<u8>,
@@ -258,7 +342,7 @@ pub struct DecodeIter<'a> {
 }
 
 impl<'a> DecodeIter<'a> {
-    fn new(encoded: &'a [u8], offset: usize, length: usize) -> Self {
+    pub(super) fn new(encoded: &'a [u8], offset: usize, length: usize) -> Self {
         assert!(encoded.len() <= offset + length);
 
         let left = offset;
