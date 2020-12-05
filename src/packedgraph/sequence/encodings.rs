@@ -198,6 +198,8 @@ pub struct EncodedSequence {
     len: usize,
 }
 
+crate::impl_space_usage!(EncodedSequence, [vec]);
+
 impl EncodedSequence {
     #[inline]
     pub fn len(&self) -> usize {
@@ -308,6 +310,22 @@ impl EncodedSequence {
             }
         }
     }
+
+    pub fn iter(
+        &self,
+        offset: usize,
+        len: usize,
+        reverse: bool,
+    ) -> DecodeIter<'_> {
+        assert!(offset + len <= self.len);
+        DecodeIter {
+            encoded: &self.vec,
+            left: offset,
+            right: offset + len - 1,
+            reverse,
+            done: false,
+        }
+    }
 }
 
 pub struct EncodeIterSlice<'a> {
@@ -406,12 +424,6 @@ impl<'a> DecodeIter<'a> {
         length: usize,
         reverse: bool,
     ) -> Self {
-        println!(
-            "offset {:2}\tlength {:2}\tencoded.len() {}",
-            offset,
-            length,
-            encoded.len()
-        );
         assert!(offset + length <= encoded.len() * 2);
 
         let left = offset;

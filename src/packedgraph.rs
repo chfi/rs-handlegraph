@@ -39,7 +39,7 @@ use iter::EdgeListHandleIter;
 use nodes::IndexMapIter;
 use occurrences::OccurrencesIter;
 use paths::packedpath::StepPtr;
-use sequence::PackedSeqIter;
+use sequence::{DecodeIter, PackedSeqIter};
 
 impl HandleGraph for PackedGraph {
     #[inline]
@@ -121,7 +121,8 @@ impl<'a> IntoNeighbors for &'a PackedGraph {
 }
 
 impl<'a> IntoSequences for &'a PackedGraph {
-    type Sequence = PackedSeqIter<'a>;
+    // type Sequence = PackedSeqIter<'a>;
+    type Sequence = DecodeIter<'a>;
 
     #[inline]
     fn sequence(self, handle: Handle) -> Self::Sequence {
