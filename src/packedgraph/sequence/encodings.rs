@@ -205,14 +205,18 @@ impl EncodedSequence {
     }
 
     #[inline]
-    pub fn append_base(&mut self, base: u8) {
+    pub fn append_base(&mut self, base: u8) -> usize {
         if self.len % 2 == 0 {
-            self.vec.push(encode_dna_base_1_u8(base));
+            self.vec.push(encode_dna_base_1_u8(base) | 0x0F);
             self.len += 1;
+            self.len - 1
         } else {
             if let Some(last) = self.vec.last_mut() {
-                *last |= encode_dna_base_2_u8(base);
+                *last &= encode_dna_base_2_u8(base) | 0xF0;
                 self.len += 1;
+                self.len - 1
+            } else {
+                unreachable!();
             }
         }
     }
@@ -526,5 +530,68 @@ mod tests {
 
             assert_eq!(decoded, seq);
         }
+    }
+
+    fn decode_seq(encoded: &[u8], offset: usize, len: usize) -> Vec<u8> {
+        DecodeIter::new(&encoded, offset, len).collect::<Vec<_>>()
+    }
+
+    #[test]
+    fn encoded_sequence_vec() {
+        use bstr::{ByteSlice, B};
+
+        let mut encoded_seqs = EncodedSequence::default();
+
+        let seqs = vec![
+            B("GTCA"),
+            B("AAGTGCTAGT"),
+            B("ATA"),
+            B("AGTA"),
+            B("GTCCA"),
+            B("GGGT"),
+            B("AACT"),
+            B("AACAT"),
+            B("AGCC"),
+        ];
+
+        let c = encoded_seqs.append_base(b'C');
+        let a = encoded_seqs.append_base(b'a');
+        let n = encoded_seqs.append_base(b'Q');
+
+        println!("c {}", c);
+        println!("a {}", a);
+        println!("n {}", n);
+
+        println!("Vector");
+        for &val in encoded_seqs.vec.iter() {
+            print!("  {:2X}", val);
+        }
+        println!();
+
+        assert_eq!(&encoded_seqs.vec, &[0x10, 0x4F]);
+
+        let s0 = encoded_seqs.append_seq(&seqs[0]);
+        println!("s0 {}", s0);
+
+        println!("Vector");
+        for &val in encoded_seqs.vec.iter() {
+            print!("  {:2X}", val);
+        }
+        println!();
+
+        let decoded_s0 = decode_seq(&encoded_seqs.vec, s0, seqs[0].len());
+        println!("s0 - {}", decoded_s0.as_bstr());
+
+        let s1 = encoded_seqs.append_seq(&seqs[1]);
+        println!("s1 {}", s1);
+
+        println!("Vector");
+        for &val in encoded_seqs.vec.iter() {
+            print!("  {:2X}", val);
+        }
+        println!();
+
+        let decoded_s1 = decode_seq(&encoded_seqs.vec, s1, seqs[1].len());
+        println!("s1 - {}", decoded_s1.as_bstr());
     }
 }
