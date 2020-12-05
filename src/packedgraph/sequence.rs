@@ -180,7 +180,10 @@ impl Sequences {
 
         match &mut self.sequences {
             SequenceStorage::Packed3Bit(packed) => {
-                packed.append_iter(3, seq.iter().map(|&b| encode_dna_base(b)));
+                packed.append_iter(
+                    3,
+                    seq.iter().map(|&b| encode_dna_base_u64(b)),
+                );
             }
             SequenceStorage::Encoded4Bit(packed) => {
                 packed.append_seq(seq);
@@ -209,7 +212,7 @@ impl Sequences {
             SequenceStorage::Packed3Bit(packed) => {
                 for (i, b) in seq.iter().copied().enumerate() {
                     let ix = offset + i;
-                    packed.set(ix, encode_dna_base(b));
+                    packed.set(ix, encode_dna_base_u64(b));
                 }
             }
             SequenceStorage::Encoded4Bit(packed) => {
@@ -347,7 +350,8 @@ impl Defragment for Sequences {
 
                 match &mut new_seqs.sequences {
                     SequenceStorage::Packed3Bit(packed) => {
-                        packed.append_iter(3, seq_iter.map(encode_dna_base));
+                        packed
+                            .append_iter(3, seq_iter.map(encode_dna_base_u64));
                     }
                     SequenceStorage::Encoded4Bit(packed) => {
                         let seq = seq_iter.collect::<Vec<_>>();
@@ -470,7 +474,7 @@ impl SequencesAlt {
         // unimplemented!();
 
         // self.sequences
-        //     .append_iter(3, seq.iter().map(|&b| encode_dna_base(b)));
+        //     .append_iter(3, seq.iter().map(|&b| encode_dna_base_u64(b)));
 
         // Some(seq_ix)
     }

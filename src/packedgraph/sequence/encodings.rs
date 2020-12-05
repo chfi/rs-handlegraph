@@ -41,17 +41,17 @@ pub(crate) const DNA_3BIT_ENCODING_TABLE: [u64; 256] = {
 };
 
 #[inline]
-pub(crate) const fn encode_dna_base(base: u8) -> u64 {
+pub(crate) const fn encode_dna_base_u64(base: u8) -> u64 {
     DNA_3BIT_ENCODING_TABLE[base as usize]
 }
 
 #[inline]
-pub(crate) const fn encoded_complement(val: u64) -> u64 {
+pub(crate) const fn encoded_complement_u64(val: u64) -> u64 {
     PACKED_BASE_COMPLEMENT[(val as u8) as usize] as u64
 }
 
 #[inline]
-pub(crate) const fn decode_dna_base(val: u64) -> u8 {
+pub(crate) const fn decode_dna_base_u64(val: u64) -> u8 {
     if val > 3 {
         PACKED_BASE_DECODING[4]
     } else {
@@ -72,10 +72,10 @@ impl<'a> Iterator for PackedSeqIter<'a> {
     fn next(&mut self) -> Option<u8> {
         if self.reverse {
             let base = self.iter.next_back()?;
-            Some(decode_dna_base(encoded_complement(base)))
+            Some(decode_dna_base_u64(encoded_complement_u64(base)))
         } else {
             let base = self.iter.next()?;
-            Some(decode_dna_base(base))
+            Some(decode_dna_base_u64(base))
         }
     }
 
@@ -93,10 +93,10 @@ impl<'a> Iterator for PackedSeqIter<'a> {
     fn last(mut self) -> Option<u8> {
         if self.reverse {
             let base = self.iter.next()?;
-            Some(decode_dna_base(encoded_complement(base)))
+            Some(decode_dna_base_u64(encoded_complement_u64(base)))
         } else {
             let base = self.iter.last()?;
-            Some(decode_dna_base(base))
+            Some(decode_dna_base_u64(base))
         }
     }
 }

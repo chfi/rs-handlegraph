@@ -285,14 +285,14 @@ pub(crate) mod tests {
     use bstr::{BStr, BString, ByteSlice, ByteVec, B};
 
     use crate::packedgraph::sequence::{
-        decode_dna_base, encode_dna_base, encoded_complement,
+        decode_dna_base_u64, encode_dna_base_u64,
     };
 
     fn append_seq(flex: &mut FlexPagedVec, seq: &[u8]) -> (usize, usize) {
         let offset = flex.len();
         let seq_len = seq.len();
 
-        flex.append_iter(3, seq.iter().map(|&b| encode_dna_base(b)));
+        flex.append_iter(3, seq.iter().map(|&b| encode_dna_base_u64(b)));
 
         (offset, seq_len)
     }
@@ -308,8 +308,11 @@ pub(crate) mod tests {
         );
         for (ix, page) in pages.into_iter().enumerate() {
             let elements = if as_seq {
-                let decoded =
-                    page.vector.iter().map(decode_dna_base).collect::<Vec<_>>();
+                let decoded = page
+                    .vector
+                    .iter()
+                    .map(decode_dna_base_u64)
+                    .collect::<Vec<_>>();
                 format!("{}", decoded.as_bstr())
             } else {
                 let items = page.vector.iter().collect::<Vec<_>>();
@@ -360,7 +363,7 @@ pub(crate) mod tests {
             let flex_seq = flex
                 .iter_slice(offset, len)
                 .unwrap()
-                .map(decode_dna_base)
+                .map(decode_dna_base_u64)
                 .collect::<Vec<_>>();
             assert_eq!(seq, flex_seq);
         }
