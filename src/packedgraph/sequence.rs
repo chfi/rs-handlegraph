@@ -44,8 +44,40 @@ impl RecordIndex for SeqRecordIx {
 }
 
 #[derive(Debug, Clone)]
+pub enum SequenceStorage {
+    Packed3Bit(PackedIntVec),
+    Encoded4Bit(EncodedSequence),
+}
+
+impl SequenceStorage {
+    #[inline]
+    pub fn len(&self) -> usize {
+        match self {
+            SequenceStorage::Packed3Bit(s) => s.len(),
+            SequenceStorage::Encoded4Bit(s) => s.len(),
+        }
+    }
+}
+
+impl succinct::SpaceUsage for SequenceStorage {
+    #[inline]
+    fn is_stack_only() -> bool {
+        false
+    }
+
+    #[inline]
+    fn heap_bytes(&self) -> usize {
+        match self {
+            SequenceStorage::Packed3Bit(seq) => seq.heap_bytes(),
+            SequenceStorage::Encoded4Bit(seq) => seq.vec.heap_bytes(),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
 pub struct Sequences {
-    pub sequences: PackedIntVec,
+    pub sequences: SequenceStorage,
+    // pub sequences: PackedIntVec,
     pub lengths: PackedIntVec,
     pub offsets: PagedIntVec,
     pub removed_records: Vec<SeqRecordIx>,
@@ -59,7 +91,10 @@ crate::impl_space_usage!(
 impl Default for Sequences {
     fn default() -> Self {
         Sequences {
-            sequences: PackedIntVec::new_with_width(2),
+            sequences: SequenceStorage::Packed3Bit(
+                PackedIntVec::new_with_width(2),
+            ),
+            // sequences: PackedIntVec::new_with_width(2),
             // sequences: FlexPagedVec::new(2, 8_388_608),
             // sequences: FlexPagedVec::new(2, 67_108_864),
             lengths: Default::default(),
@@ -70,8 +105,17 @@ impl Default for Sequences {
 }
 
 impl Sequences {
-    /// Add a new, empty sequence record.
+    pub(super) fn new_same_encoding(&self) -> Self {
+        match self.sequences {
+            SequenceStorage::Packed3Bit(_) => Self::default(),
+            SequenceStorage::Encoded4Bit(_) => Self {
+                sequences: SequenceStorage::Encoded4Bit(Default::default()),
+                ..Self::default()
+            },
+        }
+    }
 
+    /// Add a new, empty sequence record.
     #[inline]
     pub(super) fn append_empty_record(&mut self) {
         self.lengths.append(0);
@@ -134,8 +178,14 @@ impl Sequences {
 
         self.set_record(seq_ix, offset, len);
 
-        self.sequences
-            .append_iter(3, seq.iter().map(|&b| encode_dna_base(b)));
+        match &mut self.sequences {
+            SequenceStorage::Packed3Bit(packed) => {
+                packed.append_iter(3, seq.iter().map(|&b| encode_dna_base(b)));
+            }
+            SequenceStorage::Encoded4Bit(packed) => {
+                packed.append_seq(seq);
+            }
+        }
 
         Some(seq_ix)
     }
@@ -155,9 +205,16 @@ impl Sequences {
 
         assert!(old_len == seq.len());
 
-        for (i, b) in seq.iter().copied().enumerate() {
-            let ix = offset + i;
-            self.sequences.set(ix, encode_dna_base(b));
+        match &mut self.sequences {
+            SequenceStorage::Packed3Bit(packed) => {
+                for (i, b) in seq.iter().copied().enumerate() {
+                    let ix = offset + i;
+                    packed.set(ix, encode_dna_base(b));
+                }
+            }
+            SequenceStorage::Encoded4Bit(packed) => {
+                packed.rewrite_section(offset, seq);
+            }
         }
     }
 
@@ -235,13 +292,14 @@ impl Sequences {
         len: usize,
         reverse: bool,
     ) -> PackedSeqIter<'_> {
-        let iter = self.sequences.iter_slice(offset, len);
+        unimplemented!();
+        // let iter = self.sequences.iter_slice(offset, len);
 
-        PackedSeqIter {
-            iter,
-            length: len,
-            reverse,
-        }
+        // PackedSeqIter {
+        //     iter,
+        //     length: len,
+        //     reverse,
+        // }
     }
 
     #[inline]
@@ -266,7 +324,7 @@ impl Defragment for Sequences {
     fn defragment(&mut self) -> Option<()> {
         let total_len = self.offsets.len();
         let mut next_offset = 0;
-        let mut new_seqs = Self::default();
+        let mut new_seqs = self.new_same_encoding();
 
         new_seqs
             .lengths
@@ -286,9 +344,16 @@ impl Defragment for Sequences {
                 new_seqs.offsets.append(new_offset as u64);
 
                 let seq_iter = self.iter_impl(old_offset, length, false);
-                new_seqs
-                    .sequences
-                    .append_iter(3, seq_iter.map(encode_dna_base));
+
+                match &mut new_seqs.sequences {
+                    SequenceStorage::Packed3Bit(packed) => {
+                        packed.append_iter(3, seq_iter.map(encode_dna_base));
+                    }
+                    SequenceStorage::Encoded4Bit(packed) => {
+                        let seq = seq_iter.collect::<Vec<_>>();
+                        packed.append_seq(&seq);
+                    }
+                }
 
                 next_offset += length;
             }
@@ -297,9 +362,11 @@ impl Defragment for Sequences {
         crate::assign_for_fields!(
             self,
             new_seqs,
-            [sequences, lengths, offsets],
+            [lengths, offsets],
             |mut x| std::mem::take(&mut x)
         );
+
+        self.sequences = new_seqs.sequences;
 
         self.removed_records.clear();
 
