@@ -205,18 +205,28 @@ pub(crate) const DNA_PAIR_COMP_DECODING_TABLE: [[u8; 2]; 256] = {
 
 const SHIFT_OFFSET_3BITS_U8: [u8; 8] = [5, 2, 7, 4, 1, 6, 3, 0];
 
-const APPEND_MASK_3BITS_U8: [u8; 8] =
-    [0x00, 0x03, 0x7F, 0x0F, 0x01, 0x3F, 0x07, 0x00];
-
-// const APPEND_SHIFT_3BITS_U8: [u8; 8] =
-//     [5, 2, 7, 4, 1, 6,
+const APPEND_MASK_3BITS_U8: [u8; 8] = [
+    0b0001_1111,
+    0b1110_0011,
+    0b1111_1100,
+    0b1000_1111,
+    0b1111_0001,
+    0b1111_1110,
+    0b1100_0111,
+    0b1111_1000,
+];
 
 const INDEXING_OFFSET_3BITS_U8: [u8; 256] = {
     let mut table: [u8; 256] = [0; 256];
 
     let mut i = 0;
     while i < 256 {
-        table[i] = (i as u8) % 8;
+        let offset = match (i as u8) % 8 {
+            0 | 1 | 2 => 0,
+            3 | 4 | 5 => 1,
+            _ => 2,
+        };
+        table[i] = offset;
         i += 1
     }
 
@@ -234,6 +244,24 @@ pub struct EncodedSequence_ {
     pub(crate) vec: Vec<u8>,
     len: usize,
     encoding: SequenceEncoding,
+}
+
+impl EncodedSequence_ {
+    fn new_half_byte() -> Self {
+        Self {
+            vec: Vec::new(),
+            len: 0,
+            encoding: SequenceEncoding::BaseHalfByte,
+        }
+    }
+
+    fn new_3bits() -> Self {
+        Self {
+            vec: Vec::new(),
+            len: 0,
+            encoding: SequenceEncoding::Base3Bits,
+        }
+    }
 }
 
 crate::impl_space_usage!(EncodedSequence_, [vec]);
@@ -270,21 +298,30 @@ impl EncodedSequence_ {
                     INDEXING_OFFSET_3BITS_U8[(index as u8) as usize];
                 let index_base = 3 * (index >> 3);
                 let byte_index = index_base + index_offset as usize;
+                println!("raw ix   {}", index);
+                println!("offset   {}", index_offset);
+                println!("ix base  {}", index_base);
+                println!("byte ix  {}", byte_index);
                 let enc_base = match index % 8 {
                     x if x == 2 || x == 5 => {
                         let pair =
                             [self.vec[byte_index], self.vec[byte_index + 1]];
                         let bytes = u16::from_le_bytes(pair);
                         let shift = SHIFT_OFFSET_3BITS_U8[(x as u8) as usize];
+                        println!("pair shift: {}", shift);
                         ((bytes >> shift) & 0x07) as u8
                     }
                     x => {
                         let byte = self.vec[byte_index];
+                        println!("  byte {:08b}", byte);
                         let shift = SHIFT_OFFSET_3BITS_U8[(x as u8) as usize];
                         let enc_base = ((byte >> shift) & 0x07) as u8;
+                        println!("one  shift: {}", shift);
                         enc_base
                     }
                 };
+
+                println!("enc_base: {:08b}", enc_base);
 
                 Some(PACKED_BASE_DECODING[enc_base as usize])
             }
@@ -318,27 +355,23 @@ impl EncodedSequence_ {
                 let shift = SHIFT_OFFSET_3BITS_U8[(len_mod_8 as u8) as usize];
                 match len_mod_8 {
                     0 => {
-                        self.vec.push(enc_base << shift);
-                        self.len += 1;
-                        new_index
+                        self.vec.push((enc_base << shift) | mask);
                     }
                     2 => {
                         if let Some(last) = self.vec.last_mut() {
-                            *last &= 0xFC | (enc_base >> 1);
+                            *last &= mask | (enc_base >> 1);
                         } else {
                             unreachable!();
                         }
-                        self.vec.push((enc_base << shift) | mask);
-                        new_index
+                        self.vec.push((enc_base << shift) | 0x7F);
                     }
                     5 => {
                         if let Some(last) = self.vec.last_mut() {
-                            *last &= 0xFE | (enc_base >> 2);
+                            *last &= mask | (enc_base >> 2);
                         } else {
                             unreachable!();
                         }
-                        self.vec.push((enc_base << shift) | mask);
-                        new_index
+                        self.vec.push((enc_base << shift) | 0x3F);
                     }
                     _ => {
                         if let Some(last) = self.vec.last_mut() {
@@ -346,9 +379,11 @@ impl EncodedSequence_ {
                         } else {
                             unreachable!();
                         }
-                        new_index
                     }
                 }
+
+                self.len += 1;
+                new_index
             }
         }
     }
@@ -787,6 +822,20 @@ mod tests {
         }
     }
 
+    fn print_bit_vec(slice: &[u8], newline: bool) {
+        for (ix, byte) in slice.iter().enumerate() {
+            if ix != 0 {
+                print!("  ");
+            }
+            let b1 = byte >> 4;
+            let b2 = byte & 0xF;
+            print!("{:04b} {:04b}", b1, b2);
+        }
+        if newline {
+            println!();
+        }
+    }
+
     #[test]
     fn new_sequence_encoding() {
         use bstr::{ByteSlice, B};
@@ -873,6 +922,51 @@ mod tests {
         rev: bool,
     ) -> Vec<u8> {
         DecodeIter::new(&encoded, offset, len, rev).collect::<Vec<_>>()
+    }
+
+    #[test]
+    fn bytevec_3bit_encoding() {
+        use bstr::{ByteSlice, B};
+
+        let mut encoded_seqs = EncodedSequence_::new_3bits();
+
+        let seqs = vec![
+            B("GTCA"),
+            B("AAGTGCTAGT"),
+            B("ATA"),
+            B("AGTA"),
+            B("GTCCA"),
+            B("GGGT"),
+            B("AACT"),
+            B("AACAT"),
+            B("AGCC"),
+        ];
+
+        let c = encoded_seqs.append_base(b'C');
+        print!("c - {} - {:9?}  ", c, encoded_seqs.vec);
+        print_bit_vec(&encoded_seqs.vec, true);
+
+        let a = encoded_seqs.append_base(b'A');
+        print!("a - {} - {:9?}  ", a, encoded_seqs.vec);
+        print_bit_vec(&encoded_seqs.vec, true);
+
+        let g = encoded_seqs.append_base(b'G');
+        print!("g - {} - {:9?}  ", g, encoded_seqs.vec);
+        print_bit_vec(&encoded_seqs.vec, true);
+
+        let t = encoded_seqs.append_base(b'T');
+        print!("t - {} - {:9?}  ", t, encoded_seqs.vec);
+        print_bit_vec(&encoded_seqs.vec, true);
+
+        let n = encoded_seqs.append_base(b'N');
+        print!("n - {} - {:9?}  ", n, encoded_seqs.vec);
+        print_bit_vec(&encoded_seqs.vec, true);
+
+        println!();
+
+        for x in vec![c, a, g, t, n] {
+            println!("  {:?}", encoded_seqs.get_base(x));
+        }
     }
 
     #[test]
