@@ -169,6 +169,29 @@ pub(crate) const DNA_PAIR_DECODING_TABLE: [[u8; 2]; 256] = {
     table
 };
 
+pub(crate) const DNA_PAIR_COMP_DECODING_TABLE: [[u8; 2]; 256] = {
+    let mut table: [[u8; 2]; 256] = [[b'N', b'N']; 256];
+
+    let mut i = 0;
+    while i < 5 {
+        let comp_2 = PACKED_BASE_COMPLEMENT[i];
+        let base_2 = PACKED_BASE_DECODING[comp_2 as usize];
+        table[i << 4 | 0xF] = [base_2, 0];
+
+        let mut j = 0;
+        while j < 5 {
+            let comp_1 = PACKED_BASE_COMPLEMENT[j];
+            let base_1 = PACKED_BASE_DECODING[comp_1 as usize];
+            table[j << 4 | i] = [base_1, base_2];
+
+            j += 1;
+        }
+        i += 1;
+    }
+
+    table
+};
+
 #[derive(Debug, Default, Clone)]
 pub struct EncodedSequence {
     pub(crate) vec: Vec<u8>,
@@ -244,12 +267,11 @@ impl EncodedSequence {
         } else {
             if seq.len() == 1 {
                 self.append_base(seq[0]);
-                self.len += 1;
                 offset
             } else {
                 self.append_base(seq[0]);
                 let iter = EncodeIterSlice::new(&seq[1..]);
-                self.len += seq.len();
+                self.len += seq.len() - 1;
                 self.vec.extend(iter);
                 offset
             }
@@ -357,6 +379,7 @@ impl<'a> DecodeIter<'a> {
             left,
             right,
             done: false,
+            reverse,
         }
     }
 }
@@ -370,23 +393,43 @@ impl<'a> Iterator for DecodeIter<'a> {
             return None;
         }
 
-        let slice_index = self.left / 2;
+        if !self.reverse {
+            let slice_index = self.left / 2;
 
-        let decoded =
-            DNA_PAIR_DECODING_TABLE[self.encoded[slice_index] as usize];
+            let decoded =
+                DNA_PAIR_DECODING_TABLE[self.encoded[slice_index] as usize];
 
-        let item = if self.left % 2 == 0 {
-            decoded[0]
+            let item = if self.left % 2 == 0 {
+                decoded[0]
+            } else {
+                decoded[1]
+            };
+
+            self.left += 1;
+            if self.left > self.right {
+                self.done = true;
+            }
+
+            Some(item)
         } else {
-            decoded[1]
-        };
+            let slice_index = self.right / 2;
 
-        self.left += 1;
-        if self.left > self.right {
-            self.done = true;
+            let decoded = DNA_PAIR_COMP_DECODING_TABLE
+                [self.encoded[slice_index] as usize];
+
+            let item = if self.right % 2 == 0 {
+                decoded[0]
+            } else {
+                decoded[1]
+            };
+
+            self.right -= 1;
+            if self.left > self.right {
+                self.done = true;
+            }
+
+            Some(item)
         }
-
-        Some(item)
     }
 }
 
@@ -507,8 +550,8 @@ mod tests {
             print_3_bits_vec(&encoded, false);
 
             // let decoded = decode_sequence(&encoded, seq.len());
-            let decoded =
-                DecodeIter::new(&encoded, 0, seq.len()).collect::<Vec<_>>();
+            let decoded = DecodeIter::new(&encoded, 0, seq.len(), false)
+                .collect::<Vec<_>>();
             println!("  \t{}", decoded.as_bstr());
 
             assert_eq!(decoded, seq);
@@ -524,16 +567,21 @@ mod tests {
             print!("{}\t{:?}\t", seq.as_bstr(), encoded);
             print_3_bits_vec(&encoded, false);
 
-            let decoded =
-                DecodeIter::new(&encoded, 0, seq.len()).collect::<Vec<_>>();
+            let decoded = DecodeIter::new(&encoded, 0, seq.len(), false)
+                .collect::<Vec<_>>();
             println!("  \t{}", decoded.as_bstr());
 
             assert_eq!(decoded, seq);
         }
     }
 
-    fn decode_seq(encoded: &[u8], offset: usize, len: usize) -> Vec<u8> {
-        DecodeIter::new(&encoded, offset, len).collect::<Vec<_>>()
+    fn decode_seq(
+        encoded: &[u8],
+        offset: usize,
+        len: usize,
+        rev: bool,
+    ) -> Vec<u8> {
+        DecodeIter::new(&encoded, offset, len, rev).collect::<Vec<_>>()
     }
 
     #[test]
@@ -579,11 +627,13 @@ mod tests {
         }
         println!();
 
-        let decoded_s0 = decode_seq(&encoded_seqs.vec, s0, seqs[0].len());
+        let decoded_s0 =
+            decode_seq(&encoded_seqs.vec, s0, seqs[0].len(), false);
         println!("s0 - {}", decoded_s0.as_bstr());
 
-        let s1 = encoded_seqs.append_seq(&seqs[1]);
+        let s1 = encoded_seqs.append_seq_(&seqs[1]);
         println!("s1 {}", s1);
+        // println!("vector len: {}", encoded_seqs
 
         println!("Vector");
         for &val in encoded_seqs.vec.iter() {
@@ -591,7 +641,17 @@ mod tests {
         }
         println!();
 
-        let decoded_s1 = decode_seq(&encoded_seqs.vec, s1, seqs[1].len());
+        let decoded_s1 =
+            decode_seq(&encoded_seqs.vec, s1, seqs[1].len(), false);
         println!("s1 - {}", decoded_s1.as_bstr());
+
+        println!(" -- reverse complement -- ");
+
+        let decoded_s0 = decode_seq(&encoded_seqs.vec, s0, seqs[0].len(), true);
+        println!("s0 - {} - {}", decoded_s0.len(), decoded_s0.as_bstr());
+
+        let decoded_s1 = decode_seq(&encoded_seqs.vec, s1, seqs[1].len(), true);
+
+        println!("s1 - {} - {}", decoded_s1.len(), decoded_s1.as_bstr());
     }
 }
