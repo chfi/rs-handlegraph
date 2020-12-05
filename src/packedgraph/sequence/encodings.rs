@@ -228,6 +228,18 @@ impl EncodedSequence {
     }
 
     #[inline]
+    pub fn write_base(&mut self, index: usize, base: u8) {
+        assert!(index < self.len);
+        let slice_index = index / 2;
+        let value = &mut self.vec[slice_index];
+        if index % 2 == 0 {
+            *value = (*value & 0x0F) | encode_dna_base_1_u8(base);
+        } else {
+            *value = (*value & 0xF0) | encode_dna_base_2_u8(base);
+        }
+    }
+
+    #[inline]
     pub fn append_base(&mut self, base: u8) -> usize {
         if self.len % 2 == 0 {
             self.vec.push(encode_dna_base_1_u8(base) | 0x0F);
@@ -255,6 +267,25 @@ impl EncodedSequence {
         }
     }
 
+    #[inline]
+    pub fn rewrite_section(&mut self, offset: usize, new_seq: &[u8]) {
+        assert!(offset + new_seq.len() <= self.len && !new_seq.is_empty());
+
+        let mut offset = offset;
+        let mut new_seq = new_seq;
+
+        if offset % 2 != 0 {
+            self.write_base(offset, new_seq[0]);
+            offset += 1;
+            new_seq = &new_seq[1..];
+        }
+
+        for (ix, base) in new_seq.iter().copied().enumerate() {
+            self.write_base(offset + ix, base);
+        }
+    }
+
+    #[inline]
     pub fn append_seq(&mut self, seq: &[u8]) -> usize {
         assert!(!seq.is_empty());
         let offset = self.len;
@@ -365,11 +396,23 @@ pub struct DecodeIter<'a> {
     left: usize,
     right: usize,
     done: bool,
+    reverse: bool,
 }
 
 impl<'a> DecodeIter<'a> {
-    pub(super) fn new(encoded: &'a [u8], offset: usize, length: usize) -> Self {
-        assert!(encoded.len() <= offset + length);
+    pub(super) fn new(
+        encoded: &'a [u8],
+        offset: usize,
+        length: usize,
+        reverse: bool,
+    ) -> Self {
+        println!(
+            "offset {:2}\tlength {:2}\tencoded.len() {}",
+            offset,
+            length,
+            encoded.len()
+        );
+        assert!(offset + length <= encoded.len() * 2);
 
         let left = offset;
         let right = offset + length - 1;
@@ -631,9 +674,10 @@ mod tests {
             decode_seq(&encoded_seqs.vec, s0, seqs[0].len(), false);
         println!("s0 - {}", decoded_s0.as_bstr());
 
-        let s1 = encoded_seqs.append_seq_(&seqs[1]);
+        assert_eq!(&decoded_s0, b"GTCA");
+
+        let s1 = encoded_seqs.append_seq(&seqs[1]);
         println!("s1 {}", s1);
-        // println!("vector len: {}", encoded_seqs
 
         println!("Vector");
         for &val in encoded_seqs.vec.iter() {
@@ -645,13 +689,26 @@ mod tests {
             decode_seq(&encoded_seqs.vec, s1, seqs[1].len(), false);
         println!("s1 - {}", decoded_s1.as_bstr());
 
+        assert_eq!(&decoded_s1, b"AAGTGCTAGT");
+
+        encoded_seqs.rewrite_section(s1 + 2, b"CAC");
+
+        let decoded_s1 =
+            decode_seq(&encoded_seqs.vec, s1, seqs[1].len(), false);
+        println!("s1 - {}", decoded_s1.as_bstr());
+
+        assert_eq!(&decoded_s1, b"AACACCTAGT");
+
         println!(" -- reverse complement -- ");
 
         let decoded_s0 = decode_seq(&encoded_seqs.vec, s0, seqs[0].len(), true);
         println!("s0 - {} - {}", decoded_s0.len(), decoded_s0.as_bstr());
 
+        assert_eq!(&decoded_s0, b"TGAC");
+
         let decoded_s1 = decode_seq(&encoded_seqs.vec, s1, seqs[1].len(), true);
 
         println!("s1 - {} - {}", decoded_s1.len(), decoded_s1.as_bstr());
+        assert_eq!(&decoded_s1, b"ACTAGGTGTT");
     }
 }
