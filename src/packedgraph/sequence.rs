@@ -60,7 +60,6 @@ impl Default for Sequences {
     fn default() -> Self {
         Self {
             sequences: EncodedSequence::new_3bits(),
-            // sequences: EncodedSequence::new_half_byte(),
             lengths: Default::default(),
             offsets: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
             removed_records: Vec::new(),

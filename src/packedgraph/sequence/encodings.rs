@@ -217,28 +217,27 @@ impl EncodedSequence {
                     INDEXING_OFFSET_3BITS_U8[(index as u8) as usize];
                 let index_base = 3 * (index >> 3);
                 let byte_index = index_base + index_offset as usize;
+                let shift = SHIFT_OFFSET_3BITS_U8[((index % 8) as u8) as usize];
                 let enc_base = match index % 8 {
                     x if x == 2 || x == 5 => {
                         let pair =
                             [self.vec[byte_index], self.vec[byte_index + 1]];
                         let bytes = u16::from_le_bytes(pair);
-                        let shift = SHIFT_OFFSET_3BITS_U8[(x as u8) as usize];
                         ((bytes >> shift) & 0x07) as u8
                     }
-                    x => {
+                    _ => {
                         let byte = self.vec[byte_index];
-                        let shift = SHIFT_OFFSET_3BITS_U8[(x as u8) as usize];
-                        let enc_base = ((byte >> shift) & 0x07) as u8;
-                        enc_base
+                        ((byte >> shift) & 0x07) as u8
                     }
                 };
 
-                if comp {
-                    let enc_comp = PACKED_BASE_COMPLEMENT[enc_base as usize];
-                    Some(PACKED_BASE_DECODING[enc_comp as usize])
+                let enc_base = if comp {
+                    PACKED_BASE_COMPLEMENT[enc_base as usize]
                 } else {
-                    Some(PACKED_BASE_DECODING[enc_base as usize])
-                }
+                    enc_base
+                };
+
+                Some(PACKED_BASE_DECODING[enc_base as usize])
             }
         }
     }
@@ -272,28 +271,18 @@ impl EncodedSequence {
                     0 => {
                         self.vec.push((enc_base << shift) | mask);
                     }
-                    2 => {
-                        if let Some(last) = self.vec.last_mut() {
-                            *last &= mask | (enc_base >> 1);
-                        } else {
-                            unreachable!();
-                        }
-                        self.vec.push((enc_base << shift) | 0x7F);
-                    }
-                    5 => {
-                        if let Some(last) = self.vec.last_mut() {
-                            *last &= mask | (enc_base >> 2);
-                        } else {
-                            unreachable!();
-                        }
-                        self.vec.push((enc_base << shift) | 0x3F);
-                    }
-                    _ => {
+                    1 | 3 | 4 | 6 | 7 => {
                         if let Some(last) = self.vec.last_mut() {
                             *last &= (enc_base << shift) | mask;
-                        } else {
-                            unreachable!();
                         }
+                    }
+                    x => {
+                        let (last_shift, new_mask) =
+                            if x == 2 { (1, 0x7F) } else { (2, 0x3F) };
+                        if let Some(last) = self.vec.last_mut() {
+                            *last &= mask | (enc_base >> last_shift);
+                        }
+                        self.vec.push((enc_base << shift) | new_mask);
                     }
                 }
 
@@ -408,6 +397,7 @@ impl EncodedSequence {
 
                         let shift = SHIFT_OFFSET_3BITS_U8
                             [(right_len_mod_8 as u8) as usize];
+
                         let mask = APPEND_MASK_3BITS_U8
                             [(right_len_mod_8 as u8) as usize];
 
@@ -594,53 +584,33 @@ impl<'a> Iterator for DecodeIter<'a> {
 
         match self.encoding {
             SequenceEncoding::BaseHalfByte => {
-                if !self.reverse {
-                    let slice_index = self.left / 2;
+                let index = if self.reverse { self.right } else { self.left };
+                let slice_index = index / 2;
 
-                    let decoded = DNA_PAIR_DECODING_TABLE
-                        [self.encoded[slice_index] as usize];
-
-                    let item = if self.left % 2 == 0 {
-                        decoded[0]
-                    } else {
-                        decoded[1]
-                    };
-
+                let decoded = if !self.reverse {
                     self.left += 1;
-                    if self.left > self.right {
-                        self.done = true;
-                    }
-
-                    Some(item)
+                    DNA_PAIR_DECODING_TABLE[self.encoded[slice_index] as usize]
                 } else {
-                    let slice_index = self.right / 2;
-
-                    let decoded = DNA_PAIR_COMP_DECODING_TABLE
-                        [self.encoded[slice_index] as usize];
-
-                    let item = if self.right % 2 == 0 {
-                        decoded[0]
-                    } else {
-                        decoded[1]
-                    };
-
                     self.right -= 1;
-                    if self.left > self.right {
-                        self.done = true;
-                    }
+                    DNA_PAIR_COMP_DECODING_TABLE
+                        [self.encoded[slice_index] as usize]
+                };
 
-                    Some(item)
+                let item = decoded[index % 2];
+
+                if self.left > self.right {
+                    self.done = true;
                 }
+
+                Some(item)
             }
             SequenceEncoding::Base3Bits => {
                 let index = if !self.reverse {
-                    let index = self.left;
                     self.left += 1;
-                    index
+                    self.left - 1
                 } else {
-                    let index = self.right;
                     self.right -= 1;
-                    index
+                    self.right - 1
                 };
 
                 if self.left > self.right {
@@ -651,30 +621,30 @@ impl<'a> Iterator for DecodeIter<'a> {
                     INDEXING_OFFSET_3BITS_U8[(index as u8) as usize];
                 let index_base = 3 * (index >> 3);
                 let byte_index = index_base + index_offset as usize;
-                let enc_base = match index % 8 {
+
+                let ix_mod_8 = index % 8;
+                let shift = SHIFT_OFFSET_3BITS_U8[(ix_mod_8 as u8) as usize];
+
+                let mut enc_base = match index % 8 {
                     x if x == 2 || x == 5 => {
                         let pair = [
                             self.encoded[byte_index],
                             self.encoded[byte_index + 1],
                         ];
                         let bytes = u16::from_be_bytes(pair);
-                        let shift = SHIFT_OFFSET_3BITS_U8[(x as u8) as usize];
                         ((bytes >> shift) & 0x07) as u8
                     }
-                    x => {
+                    _ => {
                         let byte = self.encoded[byte_index];
-                        let shift = SHIFT_OFFSET_3BITS_U8[(x as u8) as usize];
-                        let enc_base = ((byte >> shift) & 0x07) as u8;
-                        enc_base
+                        ((byte >> shift) & 0x07) as u8
                     }
                 };
 
                 if self.reverse {
-                    let enc_comp = PACKED_BASE_COMPLEMENT[enc_base as usize];
-                    Some(PACKED_BASE_DECODING[enc_comp as usize])
-                } else {
-                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                    enc_base = PACKED_BASE_COMPLEMENT[enc_base as usize];
                 }
+
+                Some(PACKED_BASE_DECODING[enc_base as usize])
             }
         }
     }
