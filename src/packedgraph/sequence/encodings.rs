@@ -207,7 +207,7 @@ impl EncodedSequence {
 
                 if comp {
                     let enc_comp = PACKED_BASE_COMPLEMENT[enc_base as usize];
-                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                    Some(PACKED_BASE_DECODING[enc_comp as usize])
                 } else {
                     Some(PACKED_BASE_DECODING[enc_base as usize])
                 }
@@ -235,7 +235,7 @@ impl EncodedSequence {
 
                 if comp {
                     let enc_comp = PACKED_BASE_COMPLEMENT[enc_base as usize];
-                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                    Some(PACKED_BASE_DECODING[enc_comp as usize])
                 } else {
                     Some(PACKED_BASE_DECODING[enc_base as usize])
                 }
@@ -334,7 +334,7 @@ impl EncodedSequence {
                 for i in 0..diff {
                     self.append_base(seq[i]);
                 }
-                if seq.len() < 8 {
+                if seq.len() <= diff {
                     return new_index;
                 }
                 let chunks = seq[diff..].chunks_exact(8);
@@ -358,6 +358,8 @@ impl EncodedSequence {
                     self.vec.push(byte_0);
                     self.vec.push(byte_1);
                     self.vec.push(byte_2);
+
+                    self.len += 8;
                 }
 
                 for base in rest {
@@ -411,7 +413,7 @@ impl EncodedSequence {
 
                         bytes[1] &= mask | (enc_base << shift);
                     }
-                    x => {
+                    _ => {
                         let byte = &mut self.vec[byte_index];
                         *byte &= mask | (enc_base << shift);
                     }
@@ -452,126 +454,6 @@ impl EncodedSequence {
             reverse,
             done: false,
             encoding: self.encoding,
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-pub struct EncodedSequenceOld {
-    pub(crate) vec: Vec<u8>,
-    len: usize,
-}
-
-crate::impl_space_usage!(EncodedSequenceOld, [vec]);
-
-impl EncodedSequenceOld {
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.len
-    }
-
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
-    #[inline]
-    pub fn write_base(&mut self, index: usize, base: u8) {
-        assert!(index < self.len);
-        let slice_index = index / 2;
-        let value = &mut self.vec[slice_index];
-        let enc_base = DNA_BASE_3BIT_ENCODING[base as usize];
-        if index % 2 == 0 {
-            *value = (*value & 0x0F) | enc_base << 4;
-        } else {
-            *value = (*value & 0xF0) | enc_base;
-        }
-    }
-
-    #[inline]
-    pub fn append_base(&mut self, base: u8) -> usize {
-        if self.len % 2 == 0 {
-            self.vec.push(encode_dna_base_1_u8(base) | 0x0F);
-            self.len += 1;
-            self.len - 1
-        } else {
-            if let Some(last) = self.vec.last_mut() {
-                *last &= encode_dna_base_2_u8(base) | 0xF0;
-                self.len += 1;
-                self.len - 1
-            } else {
-                unreachable!();
-            }
-        }
-    }
-
-    #[inline]
-    pub fn get_base(&self, index: usize) -> Option<u8> {
-        let slice_index = index / 2;
-        let encoded = self.vec.get(slice_index)?;
-        if index % 2 == 0 {
-            Some(encoded & 0x0F)
-        } else {
-            Some(encoded & 0xF0)
-        }
-    }
-
-    #[inline]
-    pub fn rewrite_section(&mut self, offset: usize, new_seq: &[u8]) {
-        assert!(offset + new_seq.len() <= self.len && !new_seq.is_empty());
-
-        let mut offset = offset;
-        let mut new_seq = new_seq;
-
-        if offset % 2 != 0 {
-            self.write_base(offset, new_seq[0]);
-            offset += 1;
-            new_seq = &new_seq[1..];
-        }
-
-        for (ix, base) in new_seq.iter().copied().enumerate() {
-            self.write_base(offset + ix, base);
-        }
-    }
-
-    #[inline]
-    pub fn append_seq(&mut self, seq: &[u8]) -> usize {
-        assert!(!seq.is_empty());
-        let offset = self.len;
-
-        if self.len % 2 == 0 {
-            let iter = EncodeIterSlice::new(seq);
-            self.len += seq.len();
-            self.vec.extend(iter);
-            offset
-        } else {
-            if seq.len() == 1 {
-                self.append_base(seq[0]);
-                offset
-            } else {
-                self.append_base(seq[0]);
-                let iter = EncodeIterSlice::new(&seq[1..]);
-                self.len += seq.len() - 1;
-                self.vec.extend(iter);
-                offset
-            }
-        }
-    }
-
-    pub fn iter(
-        &self,
-        offset: usize,
-        len: usize,
-        reverse: bool,
-    ) -> DecodeIter<'_> {
-        assert!(offset + len <= self.len);
-        DecodeIter {
-            encoded: &self.vec,
-            left: offset,
-            right: offset + len - 1,
-            reverse,
-            done: false,
-            encoding: SequenceEncoding::BaseHalfByte,
         }
     }
 }
@@ -630,15 +512,6 @@ where
     iter: I,
 }
 
-impl<I> EncodeIter<I>
-where
-    I: Iterator<Item = u8> + ExactSizeIterator,
-{
-    fn new(iter: I) -> Self {
-        Self { iter }
-    }
-}
-
 impl<I> Iterator for EncodeIter<I>
 where
     I: Iterator<Item = u8> + ExactSizeIterator,
@@ -667,7 +540,7 @@ pub struct DecodeIter<'a> {
 }
 
 impl<'a> DecodeIter<'a> {
-    pub(super) fn new_half_byte(
+    pub fn new_half_byte(
         encoded: &'a [u8],
         offset: usize,
         length: usize,
@@ -688,7 +561,7 @@ impl<'a> DecodeIter<'a> {
         }
     }
 
-    pub(super) fn new_3bits(
+    pub fn new_3bits(
         encoded: &'a [u8],
         offset: usize,
         length: usize,
@@ -784,7 +657,7 @@ impl<'a> Iterator for DecodeIter<'a> {
                             self.encoded[byte_index],
                             self.encoded[byte_index + 1],
                         ];
-                        let bytes = u16::from_le_bytes(pair);
+                        let bytes = u16::from_be_bytes(pair);
                         let shift = SHIFT_OFFSET_3BITS_U8[(x as u8) as usize];
                         ((bytes >> shift) & 0x07) as u8
                     }
@@ -870,20 +743,6 @@ mod tests {
         }
     }
 
-    fn print_bit_vec(slice: &[u8], newline: bool) {
-        for (ix, byte) in slice.iter().enumerate() {
-            if ix != 0 {
-                print!("  ");
-            }
-            let b1 = byte >> 4;
-            let b2 = byte & 0xF;
-            print!("{:04b} {:04b}", b1, b2);
-        }
-        if newline {
-            println!();
-        }
-    }
-
     #[test]
     fn new_sequence_encoding() {
         use bstr::{ByteSlice, B};
@@ -927,17 +786,14 @@ mod tests {
         println!("---------------");
 
         for seq in seqs_1 {
-            // let encode_iter = EncodeIterSlice::new(&seq);
             let encode_iter = EncodeIter {
                 iter: seq.iter().copied(),
             };
             let encoded = encode_iter.collect::<Vec<_>>();
 
-            // let encoded = encode_sequence(&seq);
             print!("{}\t{:?}\t", seq.as_bstr(), encoded);
             print_3_bits_vec(&encoded, false);
 
-            // let decoded = decode_sequence(&encoded, seq.len());
             let decoded =
                 DecodeIter::new_half_byte(&encoded, 0, seq.len(), false)
                     .collect::<Vec<_>>();
@@ -977,8 +833,6 @@ mod tests {
 
     #[test]
     fn bytevec_3bit_encoding() {
-        use bstr::B;
-
         let mut encoded_seqs = EncodedSequence::new_3bits();
 
         let _c = encoded_seqs.append_base(b'C');
@@ -992,13 +846,15 @@ mod tests {
             &encoded_seqs.vec,
             &[33, 56, 2, 104, 176, 152, 77, 176, 11, 136, 127]
         );
+
+        assert_eq!(encoded_seqs.len(), 27);
     }
 
     #[test]
-    fn encoded_sequence_vec() {
+    fn bytevec_4bit_encoding() {
         use bstr::{ByteSlice, B};
 
-        let mut encoded_seqs = EncodedSequenceOld::default();
+        let mut encoded_seqs = EncodedSequence::new_half_byte();
 
         let seqs = vec![
             B("GTCA"),
@@ -1077,5 +933,7 @@ mod tests {
 
         println!("s1 - {} - {}", decoded_s1.len(), decoded_s1.as_bstr());
         assert_eq!(&decoded_s1, b"ACTAGGTGTT");
+
+        assert_eq!(encoded_seqs.len(), 17);
     }
 }

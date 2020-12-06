@@ -1,4 +1,4 @@
-use crate::packed::{self, *};
+use crate::packed::*;
 
 use super::{
     defragment::Defragment,
@@ -59,8 +59,8 @@ crate::impl_space_usage!(
 impl Default for Sequences {
     fn default() -> Self {
         Self {
-            // sequences: EncodedSequence::new_3bits(),
-            sequences: EncodedSequence::new_half_byte(),
+            sequences: EncodedSequence::new_3bits(),
+            // sequences: EncodedSequence::new_half_byte(),
             lengths: Default::default(),
             offsets: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
             removed_records: Vec::new(),
@@ -132,16 +132,9 @@ impl Sequences {
 
         self.set_record(seq_ix, offset, len);
 
-        // self
         self.sequences.append_seq(seq);
 
         Some(seq_ix)
-        // unimplemented!();
-
-        // self.sequences
-        //     .append_iter(3, seq.iter().map(|&b| encode_dna_base_u64(b)));
-
-        // Some(seq_ix)
     }
 
     /// Overwrites the sequence for the provided `GraphRecordIx` with
