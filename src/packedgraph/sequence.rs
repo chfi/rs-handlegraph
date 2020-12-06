@@ -59,8 +59,8 @@ crate::impl_space_usage!(
 impl Default for Sequences {
     fn default() -> Self {
         Self {
-            // sequences: Default::default(),
-            sequences: EncodedSequence::new_3bits(),
+            // sequences: EncodedSequence::new_3bits(),
+            sequences: EncodedSequence::new_half_byte(),
             lengths: Default::default(),
             offsets: PagedIntVec::new(super::graph::NARROW_PAGE_WIDTH),
             removed_records: Vec::new(),

@@ -39,7 +39,7 @@ use iter::EdgeListHandleIter;
 use nodes::IndexMapIter;
 use occurrences::OccurrencesIter;
 use paths::packedpath::StepPtr;
-use sequence::{DecodeIter, PackedSeqIter};
+use sequence::DecodeIter;
 
 impl HandleGraph for PackedGraph {
     #[inline]

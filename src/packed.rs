@@ -1,5 +1,4 @@
 pub mod deque;
-pub mod flexpaged;
 pub mod paged;
 pub mod robust;
 pub mod traits;
@@ -7,7 +6,6 @@ pub mod vector;
 
 pub use self::{
     deque::PackedDeque,
-    flexpaged::FlexPagedVec,
     paged::{IdentityCodec, PagedCodec, PagedIntVec},
     robust::RobustPagedIntVec,
     traits::*,

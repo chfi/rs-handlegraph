@@ -1,5 +1,3 @@
-use crate::packed::{self, *};
-
 const PACKED_BASE_ENCODING: [(u8, u8); 8] = [
     (b'a', 0),
     (b'A', 0),
@@ -24,90 +22,6 @@ const PACKED_BASE_COMPLEMENT: [u8; 256] = {
 
     table
 };
-
-// Packed 2-3 bit encoding using u64-size blocks
-
-pub(crate) const DNA_3BIT_ENCODING_TABLE: [u64; 256] = {
-    let mut table: [u64; 256] = [4; 256];
-
-    let mut i = 0;
-    while i < 8 {
-        let (base, value) = PACKED_BASE_ENCODING[i];
-        table[base as usize] = value as u64;
-        i += 1;
-    }
-
-    table
-};
-
-#[inline]
-pub(crate) const fn encode_dna_base_u64(base: u8) -> u64 {
-    DNA_3BIT_ENCODING_TABLE[base as usize]
-}
-
-#[inline]
-pub(crate) const fn encoded_complement_u64(val: u64) -> u64 {
-    PACKED_BASE_COMPLEMENT[(val as u8) as usize] as u64
-}
-
-#[inline]
-pub(crate) const fn decode_dna_base_u64(val: u64) -> u8 {
-    if val > 3 {
-        PACKED_BASE_DECODING[4]
-    } else {
-        PACKED_BASE_DECODING[val as usize]
-    }
-}
-
-pub struct PackedSeqIter<'a> {
-    pub(super) iter: packed::vector::Iter<'a>,
-    pub(super) length: usize,
-    pub(super) reverse: bool,
-}
-
-impl<'a> Iterator for PackedSeqIter<'a> {
-    type Item = u8;
-
-    #[inline]
-    fn next(&mut self) -> Option<u8> {
-        if self.reverse {
-            let base = self.iter.next_back()?;
-            Some(decode_dna_base_u64(encoded_complement_u64(base)))
-        } else {
-            let base = self.iter.next()?;
-            Some(decode_dna_base_u64(base))
-        }
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.iter.size_hint()
-    }
-
-    #[inline]
-    fn count(self) -> usize {
-        self.length
-    }
-
-    #[inline]
-    fn last(mut self) -> Option<u8> {
-        if self.reverse {
-            let base = self.iter.next()?;
-            Some(decode_dna_base_u64(encoded_complement_u64(base)))
-        } else {
-            let base = self.iter.last()?;
-            Some(decode_dna_base_u64(base))
-        }
-    }
-}
-
-impl<'a> std::iter::ExactSizeIterator for PackedSeqIter<'a> {
-    #[inline]
-    fn len(&self) -> usize {
-        self.length
-    }
-}
-
 // Packed 4-bit encoding using u8-size blocks
 
 pub(crate) const DNA_BASE_1_ENCODING_TABLE: [u8; 256] = {
@@ -247,7 +161,7 @@ pub struct EncodedSequence {
 }
 
 impl EncodedSequence {
-    pub(crate) fn new_half_byte() -> Self {
+    pub fn new_half_byte() -> Self {
         Self {
             vec: Vec::new(),
             len: 0,
@@ -255,7 +169,7 @@ impl EncodedSequence {
         }
     }
 
-    pub(crate) fn new_3bits() -> Self {
+    pub fn new_3bits() -> Self {
         Self {
             vec: Vec::new(),
             len: 0,
@@ -884,7 +798,7 @@ impl<'a> Iterator for DecodeIter<'a> {
 
                 if self.reverse {
                     let enc_comp = PACKED_BASE_COMPLEMENT[enc_base as usize];
-                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                    Some(PACKED_BASE_DECODING[enc_comp as usize])
                 } else {
                     Some(PACKED_BASE_DECODING[enc_base as usize])
                 }
