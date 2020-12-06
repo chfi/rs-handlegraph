@@ -378,15 +378,24 @@ impl PackedGraph {
         let nodes = &mut self.nodes;
         let occurrences = &mut self.occurrences;
 
-        let mut mut_ctx = paths.get_all_paths_mut_ctx();
-        let refs_mut = mut_ctx.par_iter_mut();
+        rayon::join(
+            || {
+                Self::apply_node_occurrence_consumer(
+                    receiver,
+                    nodes,
+                    occurrences,
+                );
+            },
+            || {
+                let mut mut_ctx = paths.get_all_paths_mut_ctx();
+                let refs_mut = mut_ctx.par_iter_mut();
 
-        refs_mut.for_each_with(sender, |s, path| {
-            let path_id = path.path_id;
-            let updates = f(path_id, path);
-            s.send((path_id, updates)).unwrap();
-        });
-
-        Self::apply_node_occurrence_consumer(receiver, nodes, occurrences);
+                refs_mut.for_each_with(sender, |s, path| {
+                    let path_id = path.path_id;
+                    let updates = f(path_id, path);
+                    s.send((path_id, updates)).unwrap();
+                });
+            },
+        );
     }
 }
