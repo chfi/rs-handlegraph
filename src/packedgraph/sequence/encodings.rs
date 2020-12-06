@@ -240,14 +240,14 @@ pub enum SequenceEncoding {
 }
 
 #[derive(Debug, Clone)]
-pub struct EncodedSequence_ {
+pub struct EncodedSequence {
     pub(crate) vec: Vec<u8>,
     len: usize,
     encoding: SequenceEncoding,
 }
 
-impl EncodedSequence_ {
-    fn new_half_byte() -> Self {
+impl EncodedSequence {
+    pub(crate) fn new_half_byte() -> Self {
         Self {
             vec: Vec::new(),
             len: 0,
@@ -255,7 +255,7 @@ impl EncodedSequence_ {
         }
     }
 
-    fn new_3bits() -> Self {
+    pub(crate) fn new_3bits() -> Self {
         Self {
             vec: Vec::new(),
             len: 0,
@@ -264,9 +264,9 @@ impl EncodedSequence_ {
     }
 }
 
-crate::impl_space_usage!(EncodedSequence_, [vec]);
+crate::impl_space_usage!(EncodedSequence, [vec]);
 
-impl EncodedSequence_ {
+impl EncodedSequence {
     #[inline]
     pub fn len(&self) -> usize {
         self.len
@@ -278,7 +278,7 @@ impl EncodedSequence_ {
     }
 
     #[inline]
-    pub fn get_base(&self, index: usize) -> Option<u8> {
+    pub fn get_base(&self, index: usize, comp: bool) -> Option<u8> {
         assert!(index < self.len);
 
         match self.encoding {
@@ -291,7 +291,12 @@ impl EncodedSequence_ {
                     value & 0x0F
                 };
 
-                Some(PACKED_BASE_DECODING[enc_base as usize])
+                if comp {
+                    let enc_comp = PACKED_BASE_COMPLEMENT[enc_base as usize];
+                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                } else {
+                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                }
             }
             SequenceEncoding::Base3Bits => {
                 let index_offset =
@@ -314,7 +319,12 @@ impl EncodedSequence_ {
                     }
                 };
 
-                Some(PACKED_BASE_DECODING[enc_base as usize])
+                if comp {
+                    let enc_comp = PACKED_BASE_COMPLEMENT[enc_base as usize];
+                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                } else {
+                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                }
             }
         }
     }
@@ -520,28 +530,27 @@ impl EncodedSequence_ {
         len: usize,
         reverse: bool,
     ) -> DecodeIter<'_> {
-        unimplemented!();
-
-        // assert!(offset + len <= self.len);
-        // DecodeIter {
-        //     encoded: &self.vec,
-        //     left: offset,
-        //     right: offset + len - 1,
-        //     reverse,
-        //     done: false,
-        // }
+        assert!(offset + len <= self.len);
+        DecodeIter {
+            encoded: &self.vec,
+            left: offset,
+            right: offset + len - 1,
+            reverse,
+            done: false,
+            encoding: self.encoding,
+        }
     }
 }
 
 #[derive(Debug, Default, Clone)]
-pub struct EncodedSequence {
+pub struct EncodedSequenceOld {
     pub(crate) vec: Vec<u8>,
     len: usize,
 }
 
-crate::impl_space_usage!(EncodedSequence, [vec]);
+crate::impl_space_usage!(EncodedSequenceOld, [vec]);
 
-impl EncodedSequence {
+impl EncodedSequenceOld {
     #[inline]
     pub fn len(&self) -> usize {
         self.len
@@ -648,6 +657,7 @@ impl EncodedSequence {
             right: offset + len - 1,
             reverse,
             done: false,
+            encoding: SequenceEncoding::BaseHalfByte,
         }
     }
 }
@@ -739,10 +749,11 @@ pub struct DecodeIter<'a> {
     right: usize,
     done: bool,
     reverse: bool,
+    encoding: SequenceEncoding,
 }
 
 impl<'a> DecodeIter<'a> {
-    pub(super) fn new(
+    pub(super) fn new_half_byte(
         encoded: &'a [u8],
         offset: usize,
         length: usize,
@@ -759,6 +770,28 @@ impl<'a> DecodeIter<'a> {
             right,
             done: false,
             reverse,
+            encoding: SequenceEncoding::BaseHalfByte,
+        }
+    }
+
+    pub(super) fn new_3bits(
+        encoded: &'a [u8],
+        offset: usize,
+        length: usize,
+        reverse: bool,
+    ) -> Self {
+        assert!(offset + length <= encoded.len() * 2);
+
+        let left = offset;
+        let right = offset + length - 1;
+
+        Self {
+            encoded,
+            left,
+            right,
+            done: false,
+            reverse,
+            encoding: SequenceEncoding::Base3Bits,
         }
     }
 }
@@ -772,42 +805,90 @@ impl<'a> Iterator for DecodeIter<'a> {
             return None;
         }
 
-        if !self.reverse {
-            let slice_index = self.left / 2;
+        match self.encoding {
+            SequenceEncoding::BaseHalfByte => {
+                if !self.reverse {
+                    let slice_index = self.left / 2;
 
-            let decoded =
-                DNA_PAIR_DECODING_TABLE[self.encoded[slice_index] as usize];
+                    let decoded = DNA_PAIR_DECODING_TABLE
+                        [self.encoded[slice_index] as usize];
 
-            let item = if self.left % 2 == 0 {
-                decoded[0]
-            } else {
-                decoded[1]
-            };
+                    let item = if self.left % 2 == 0 {
+                        decoded[0]
+                    } else {
+                        decoded[1]
+                    };
 
-            self.left += 1;
-            if self.left > self.right {
-                self.done = true;
+                    self.left += 1;
+                    if self.left > self.right {
+                        self.done = true;
+                    }
+
+                    Some(item)
+                } else {
+                    let slice_index = self.right / 2;
+
+                    let decoded = DNA_PAIR_COMP_DECODING_TABLE
+                        [self.encoded[slice_index] as usize];
+
+                    let item = if self.right % 2 == 0 {
+                        decoded[0]
+                    } else {
+                        decoded[1]
+                    };
+
+                    self.right -= 1;
+                    if self.left > self.right {
+                        self.done = true;
+                    }
+
+                    Some(item)
+                }
             }
+            SequenceEncoding::Base3Bits => {
+                let index = if !self.reverse {
+                    let index = self.left;
+                    self.left += 1;
+                    index
+                } else {
+                    let index = self.right;
+                    self.right -= 1;
+                    index
+                };
 
-            Some(item)
-        } else {
-            let slice_index = self.right / 2;
+                if self.left > self.right {
+                    self.done = true;
+                }
 
-            let decoded = DNA_PAIR_COMP_DECODING_TABLE
-                [self.encoded[slice_index] as usize];
+                let index_offset =
+                    INDEXING_OFFSET_3BITS_U8[(index as u8) as usize];
+                let index_base = 3 * (index >> 3);
+                let byte_index = index_base + index_offset as usize;
+                let enc_base = match index % 8 {
+                    x if x == 2 || x == 5 => {
+                        let pair = [
+                            self.encoded[byte_index],
+                            self.encoded[byte_index + 1],
+                        ];
+                        let bytes = u16::from_le_bytes(pair);
+                        let shift = SHIFT_OFFSET_3BITS_U8[(x as u8) as usize];
+                        ((bytes >> shift) & 0x07) as u8
+                    }
+                    x => {
+                        let byte = self.encoded[byte_index];
+                        let shift = SHIFT_OFFSET_3BITS_U8[(x as u8) as usize];
+                        let enc_base = ((byte >> shift) & 0x07) as u8;
+                        enc_base
+                    }
+                };
 
-            let item = if self.right % 2 == 0 {
-                decoded[0]
-            } else {
-                decoded[1]
-            };
-
-            self.right -= 1;
-            if self.left > self.right {
-                self.done = true;
+                if self.reverse {
+                    let enc_comp = PACKED_BASE_COMPLEMENT[enc_base as usize];
+                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                } else {
+                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                }
             }
-
-            Some(item)
         }
     }
 }
@@ -943,8 +1024,9 @@ mod tests {
             print_3_bits_vec(&encoded, false);
 
             // let decoded = decode_sequence(&encoded, seq.len());
-            let decoded = DecodeIter::new(&encoded, 0, seq.len(), false)
-                .collect::<Vec<_>>();
+            let decoded =
+                DecodeIter::new_half_byte(&encoded, 0, seq.len(), false)
+                    .collect::<Vec<_>>();
             println!("  \t{}", decoded.as_bstr());
 
             assert_eq!(decoded, seq);
@@ -960,8 +1042,9 @@ mod tests {
             print!("{}\t{:?}\t", seq.as_bstr(), encoded);
             print_3_bits_vec(&encoded, false);
 
-            let decoded = DecodeIter::new(&encoded, 0, seq.len(), false)
-                .collect::<Vec<_>>();
+            let decoded =
+                DecodeIter::new_half_byte(&encoded, 0, seq.len(), false)
+                    .collect::<Vec<_>>();
             println!("  \t{}", decoded.as_bstr());
 
             assert_eq!(decoded, seq);
@@ -974,14 +1057,15 @@ mod tests {
         len: usize,
         rev: bool,
     ) -> Vec<u8> {
-        DecodeIter::new(&encoded, offset, len, rev).collect::<Vec<_>>()
+        DecodeIter::new_half_byte(&encoded, offset, len, rev)
+            .collect::<Vec<_>>()
     }
 
     #[test]
     fn bytevec_3bit_encoding() {
         use bstr::B;
 
-        let mut encoded_seqs = EncodedSequence_::new_3bits();
+        let mut encoded_seqs = EncodedSequence::new_3bits();
 
         let _c = encoded_seqs.append_base(b'C');
         let _a = encoded_seqs.append_base(b'A');
@@ -1000,7 +1084,7 @@ mod tests {
     fn encoded_sequence_vec() {
         use bstr::{ByteSlice, B};
 
-        let mut encoded_seqs = EncodedSequence::default();
+        let mut encoded_seqs = EncodedSequenceOld::default();
 
         let seqs = vec![
             B("GTCA"),

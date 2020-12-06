@@ -11,7 +11,7 @@ use super::{
     graph::NARROW_PAGE_WIDTH,
     index::{NodeRecordId, OneBasedIndex, RecordIndex},
     occurrences::OccurListIx,
-    sequence::{SeqRecordIx, Sequences, SequencesAlt},
+    sequence::{SeqRecordIx, Sequences},
 };
 
 /// The index into the underlying packed vector that is used to
@@ -207,7 +207,7 @@ impl<'a> Iterator for IndexMapIter<'a> {
 pub struct NodeRecords {
     pub records_vec: PagedIntVec,
     pub id_index_map: NodeIdIndexMap,
-    pub sequences: SequencesAlt,
+    pub sequences: Sequences,
     pub removed_nodes: Vec<NodeRecordId>,
     pub node_occurrence_map: PagedIntVec,
 }
@@ -370,12 +370,12 @@ impl NodeRecords {
     }
 
     #[inline]
-    pub(super) fn sequences(&self) -> &SequencesAlt {
+    pub(super) fn sequences(&self) -> &Sequences {
         &self.sequences
     }
 
     #[inline]
-    pub(super) fn sequences_mut(&mut self) -> &mut SequencesAlt {
+    pub(super) fn sequences_mut(&mut self) -> &mut Sequences {
         &mut self.sequences
     }
 
