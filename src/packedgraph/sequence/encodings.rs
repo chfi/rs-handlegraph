@@ -199,18 +199,17 @@ impl EncodedSequence {
             SequenceEncoding::BaseHalfByte => {
                 let slice_index = index / 2;
                 let value = &self.vec[slice_index];
-                let enc_base = if index % 2 == 0 {
+                let mut enc_base = if index % 2 == 0 {
                     (value >> 4) & 0x0F
                 } else {
                     value & 0x0F
                 };
 
                 if comp {
-                    let enc_comp = PACKED_BASE_COMPLEMENT[enc_base as usize];
-                    Some(PACKED_BASE_DECODING[enc_comp as usize])
-                } else {
-                    Some(PACKED_BASE_DECODING[enc_base as usize])
+                    enc_base = PACKED_BASE_COMPLEMENT[enc_base as usize];
                 }
+
+                Some(PACKED_BASE_DECODING[enc_base as usize])
             }
             SequenceEncoding::Base3Bits => {
                 let index_offset =
@@ -218,24 +217,20 @@ impl EncodedSequence {
                 let index_base = 3 * (index >> 3);
                 let byte_index = index_base + index_offset as usize;
                 let shift = SHIFT_OFFSET_3BITS_U8[((index % 8) as u8) as usize];
-                let enc_base = match index % 8 {
+                let bytes = match index % 8 {
                     x if x == 2 || x == 5 => {
                         let pair =
                             [self.vec[byte_index], self.vec[byte_index + 1]];
-                        let bytes = u16::from_le_bytes(pair);
-                        ((bytes >> shift) & 0x07) as u8
+                        u16::from_le_bytes(pair)
                     }
-                    _ => {
-                        let byte = self.vec[byte_index];
-                        ((byte >> shift) & 0x07) as u8
-                    }
+                    _ => self.vec[byte_index] as u16,
                 };
 
-                let enc_base = if comp {
-                    PACKED_BASE_COMPLEMENT[enc_base as usize]
-                } else {
-                    enc_base
-                };
+                let mut enc_base = ((bytes >> shift) & 0x07) as u8;
+
+                if comp {
+                    enc_base = PACKED_BASE_COMPLEMENT[enc_base as usize]
+                }
 
                 Some(PACKED_BASE_DECODING[enc_base as usize])
             }
