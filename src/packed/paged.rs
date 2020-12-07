@@ -3,7 +3,9 @@ use super::vector::PackedIntVec;
 use super::traits::*;
 
 #[derive(Debug, Clone)]
-pub struct PagedIntVec<Codec = DiffCodec> {
+pub struct PagedIntVec<Codec = XorCodec> {
+    // pub struct PagedIntVec<Codec = DiffCodec> {
+    // pub struct PagedIntVec<Codec = IdentityCodec> {
     pub page_size: usize,
     pub num_entries: usize,
     pub anchors: PackedIntVec,
@@ -18,6 +20,29 @@ pub trait PagedCodec {
     fn encode(value: u64, anchor: u64) -> u64;
 
     fn decode(value: u64, anchor: u64) -> u64;
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct XorCodec();
+
+impl PagedCodec for XorCodec {
+    #[inline]
+    fn encode(value: u64, anchor: u64) -> u64 {
+        if value == 0 {
+            0
+        } else {
+            ((value ^ anchor) << 1) + 1
+        }
+    }
+
+    #[inline]
+    fn decode(diff: u64, anchor: u64) -> u64 {
+        if diff == 0 {
+            0
+        } else {
+            (diff >> 1) ^ anchor
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
