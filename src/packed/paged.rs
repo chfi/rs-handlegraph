@@ -256,6 +256,79 @@ impl PagedIntVec {
 }
 
 impl<T: PagedCodec> PagedIntVec<T> {
+    /// Fills the last page in this [`PagedIntVec`] using the provided
+    /// slice, without adding a new page. Returns `None` if the `self`
+    /// is empty, the last page is full, or if `data` is empty.
+    /// Otherwise, returns the remainder of the slice that wasn't
+    /// added to the page.
+    #[inline]
+    fn fill_last_page<'a>(&mut self, data: &'a [u64]) -> Option<&'a [u64]> {
+        let total_slots = self.pages.len() * self.page_size;
+        let last_page_slots = total_slots - self.num_entries;
+        if last_page_slots == 0 || data.is_empty() || self.anchors.is_empty() {
+            return None;
+        }
+
+        let split_index = last_page_slots.min(data.len());
+
+        let (page, rest) = data.split_at(split_index);
+
+        let anchor = self.anchors.get(self.pages.len() - 1);
+
+        let buf = page
+            .iter()
+            .copied()
+            .map(|v| T::encode(v, anchor))
+            .collect::<Vec<_>>();
+
+        let width = buf.iter().copied().max().map(super::width_for)?;
+
+        let last_page = self.pages.last_mut()?;
+
+        last_page.append_iter(width, buf.into_iter());
+
+        self.num_entries += page.len();
+
+        Some(rest)
+    }
+
+    /// Append a new page containing the values in `data`. Returns the
+    /// subslice of elements that didn't fit in the page size, or
+    /// `None` if the last page in the vector was not full, or `data`
+    /// was empty.
+    #[inline]
+    fn append_page<'a>(&mut self, data: &'a [u64]) -> Option<&'a [u64]> {
+        let total_slots = self.pages.len() * self.page_size;
+        let last_page_slots = total_slots - self.num_entries;
+
+        if self.num_entries != total_slots || data.is_empty() {
+            return None;
+        }
+
+        let split_index = self.page_size.min(data.len());
+
+        let (page, rest) = data.split_at(split_index);
+
+        let anchor = page.iter().copied().filter(|&x| x != 0).min()?;
+
+        let width = page.iter().copied().max().map(super::width_for)?;
+
+        let mut new_page =
+            PackedIntVec::with_width_and_capacity(width, self.page_size);
+
+        for &value in page.iter() {
+            let encoded = T::encode(value, anchor);
+            new_page.append(encoded);
+        }
+
+        self.anchors.append(anchor);
+        self.pages.push(new_page);
+
+        self.num_entries += split_index;
+
+        Some(rest)
+    }
+
     #[inline]
     fn append_pages<I>(&mut self, mut iter: I)
     where
