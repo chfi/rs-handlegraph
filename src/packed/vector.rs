@@ -183,15 +183,14 @@ impl PackedIntVec {
     where
         I: Iterator<Item = u64> + ExactSizeIterator,
     {
-        if let Some(len) = iter.size_hint().1 {
-            let offset = self.num_entries;
-            let indices = offset..(offset + len);
+        let len = iter.len();
+        let offset = self.num_entries;
+        let indices = offset..(offset + len);
 
-            self.resize_with_width(self.num_entries + len, width);
+        self.resize_with_width(self.num_entries + len, width);
 
-            for (value, ix) in iter.zip(indices) {
-                self.vector.set(ix as u64, value);
-            }
+        for (value, ix) in iter.zip(indices) {
+            self.vector.set(ix as u64, value);
         }
     }
 

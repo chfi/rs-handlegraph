@@ -3,8 +3,8 @@ use super::vector::PackedIntVec;
 use super::traits::*;
 
 #[derive(Debug, Clone)]
-pub struct PagedIntVec<Codec = XorCodec> {
-    // pub struct PagedIntVec<Codec = DiffCodec> {
+// pub struct PagedIntVec<Codec = XorCodec> {
+pub struct PagedIntVec<Codec = DiffCodec> {
     // pub struct PagedIntVec<Codec = IdentityCodec> {
     pub page_size: usize,
     pub num_entries: usize,
@@ -251,6 +251,61 @@ impl PagedIntVec {
                 min,
                 max
             );
+        }
+    }
+}
+
+impl<T: PagedCodec> PagedIntVec<T> {
+    #[inline]
+    fn append_pages<I>(&mut self, mut iter: I)
+    where
+        I: Iterator<Item = u64> + ExactSizeIterator,
+    {
+        let mut buffer: Vec<u64> = Vec::with_capacity(self.page_size);
+
+        loop {
+            if iter.len() == 0 {
+                break;
+            }
+
+            buffer.clear();
+            buffer.extend(iter.by_ref().take(self.page_size));
+
+            let (anchor, max) = buffer
+                .iter()
+                .filter(|&&x| x != 0)
+                .fold((std::u64::MAX, 0u64), |(a, m), &x| (a.min(x), m.max(x)));
+
+            let width = super::width_for(T::encode(max, anchor));
+
+            let mut new_page = PackedIntVec::new_with_width(width);
+            new_page.resize(self.page_size);
+            new_page.append_iter(
+                width,
+                buffer.iter().map(|&x| T::encode(x, anchor)),
+            );
+            self.anchors.append(anchor);
+            self.pages.push(new_page);
+        }
+    }
+
+    #[inline]
+    pub fn append_iter<I>(&mut self, mut iter: I)
+    where
+        I: Iterator<Item = u64> + ExactSizeIterator,
+    {
+        let total_slots = self.pages.len() * self.page_size;
+
+        if self.num_entries == total_slots {
+            self.append_pages(iter);
+        } else {
+            let empty_last_page = total_slots - self.num_entries;
+            if let Some(last_page) = self.pages.last_mut() {
+                let width = last_page.width();
+                last_page
+                    .append_iter(width, iter.by_ref().take(empty_last_page));
+                self.append_pages(iter);
+            }
         }
     }
 }
