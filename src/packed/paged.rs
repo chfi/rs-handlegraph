@@ -474,6 +474,61 @@ mod tests {
         }
     }
 
+    #[test]
+    fn append_slice() {
+        // 25 values
+        let values = vec![
+            2464, 5400, 1398, 1335, 81, 7006, 9025, 9167, 2235, 5376, 3198,
+            7302, 1273, 3716, 363, 8808, 4834, 9841, 9999, 5661, 9424, 4530,
+            7128, 945, 4138,
+        ];
+
+        let mut paged = PagedIntVec::new(10);
+
+        let rest = paged.append_page(&values);
+        println!("paged len: {}", paged.len());
+        println!("num pages: {}", paged.pages.len());
+        println!("rest:  {:?}", rest);
+
+        // for i in 1..=paged.len() {
+        for i in 0..paged.len() {
+            let val = paged.get(i);
+            println!("  {:2} - {}", i, val);
+        }
+
+        println!("----------------------");
+
+        let values_2 = [842, 381, 7128, 6778];
+
+        let rest_2 = paged.append_page(&values_2);
+        println!("paged len: {}", paged.len());
+        println!("num pages: {}", paged.pages.len());
+        println!("rest_2:  {:?}", rest_2);
+
+        for i in 0..paged.len() {
+            let val = paged.get(i);
+            println!("  {:2} - {}", i, val);
+        }
+
+        println!("----------------------");
+        let rest_3 = paged.fill_last_page(rest.unwrap());
+
+        println!("paged len: {}", paged.len());
+        println!("num pages: {}", paged.pages.len());
+        println!("rest_3:  {:?}", rest_3);
+
+        for i in 0..paged.len() {
+            let val = paged.get(i);
+            println!("  {:2} - {}", i, val);
+        }
+    }
+
+    // quickcheck! {
+    //     fn append_slice(values: Vec<u64>) -> bool {
+
+    //     }
+    // }
+
     quickcheck! {
         fn prop_paged_append(paged: PagedIntVec, value: u64) -> bool {
             let mut paged = paged;
