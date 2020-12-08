@@ -16,6 +16,7 @@ gfa = "0.9"
 fnv = "1.0"
 succinct = "0.5"
 rayon = "1.5"
+crossbeam-channel = "0.5"
 
 [dev-dependencies]
 quickcheck = "0.9"

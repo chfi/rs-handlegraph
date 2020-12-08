@@ -181,6 +181,7 @@ name = "handlegraph"
 version = "0.6.0"
 dependencies = [
  "bstr",
+ "crossbeam-channel",
  "fnv",
  "gfa",
  "quickcheck",

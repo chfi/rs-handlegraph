@@ -218,7 +218,7 @@ impl PackedGraph {
     }
 
     pub(super) fn apply_node_occurrence_consumer<'a>(
-        receiver: std::sync::mpsc::Receiver<(PathId, Vec<paths::StepUpdate>)>,
+        receiver: crossbeam_channel::Receiver<(PathId, Vec<paths::StepUpdate>)>,
         nodes: &'a mut NodeRecords,
         occurrences: &'a mut NodeOccurrences,
     ) {
@@ -369,10 +369,10 @@ impl PackedGraph {
         for<'b> F: Fn(PathId, &mut paths::PackedPathMut<'b>) -> Vec<paths::StepUpdate>
             + Sync,
     {
-        use std::sync::mpsc;
+        use crossbeam_channel::unbounded;
 
         let (sender, receiver) =
-            mpsc::channel::<(PathId, Vec<paths::StepUpdate>)>();
+            unbounded::<(PathId, Vec<paths::StepUpdate>)>();
 
         let paths = &mut self.paths;
         let nodes = &mut self.nodes;
