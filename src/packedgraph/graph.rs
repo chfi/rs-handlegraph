@@ -18,6 +18,8 @@ pub(super) use super::{
     sequence::SeqRecordIx,
 };
 
+use super::occurrences::OccurListIx;
+
 use super::{defragment::Defragment, paths};
 
 pub(crate) static NARROW_PAGE_WIDTH: usize = 256;
@@ -217,6 +219,145 @@ impl PackedGraph {
         Some(())
     }
 
+    pub(super) fn apply_node_occurrence_consumer_new<'a>(
+        receiver: crossbeam_channel::Receiver<(PathId, Vec<paths::StepUpdate>)>,
+        nodes: &'a mut NodeRecords,
+        occurrences: &'a mut NodeOccurrences,
+    ) {
+        use paths::{StepPtr, StepUpdate};
+
+        let mut buf: Vec<u64> = Vec::with_capacity(1024);
+
+        let mut path_id_buf: Vec<u64> = Vec::with_capacity(1024);
+        let mut offset_buf: Vec<u64> = Vec::with_capacity(1024);
+        let mut next_ptr_buf: Vec<u64> = Vec::with_capacity(1024);
+
+        let mut to_remove: Vec<(OccurListIx, StepPtr)> =
+            Vec::with_capacity(124);
+
+        while let Ok((path_id, updates)) = receiver.recv() {
+            path_id_buf.clear();
+            offset_buf.clear();
+            next_ptr_buf.clear();
+            to_remove.clear();
+
+            let mut new_occur_ix = occurrences.path_ids.len();
+
+            for step_update in updates {
+                match step_update {
+                    StepUpdate::Insert { handle, step } => {
+                        let rec_id = nodes.handle_record(handle).unwrap();
+                        let vec_ix = rec_id.to_zero_based().unwrap();
+
+                        let occur_ix: OccurListIx =
+                            nodes.node_occurrence_map.get_unpack(vec_ix);
+
+                        path_id_buf.push(path_id.pack());
+                        offset_buf.push(step.pack());
+                        next_ptr_buf.push(occur_ix.pack());
+
+                        nodes
+                            .node_occurrence_map
+                            .set_pack(vec_ix, new_occur_ix);
+                        new_occur_ix += 1;
+                    }
+                    StepUpdate::Remove { handle, step } => {
+                        let rec_id = nodes.handle_record(handle).unwrap();
+                        let vec_ix = rec_id.to_zero_based().unwrap();
+
+                        let occur_head =
+                            nodes.node_occurrence_map.get_unpack(vec_ix);
+
+                        to_remove.push((occur_head, step));
+                    }
+                }
+            }
+
+            let path_ids_rest = if !occurrences.path_ids.pages_full() {
+                occurrences
+                    .path_ids
+                    .fill_last_page(&mut buf, &path_id_buf)
+                    .unwrap()
+            } else {
+                path_id_buf.as_slice()
+            };
+
+            let mut rest = path_ids_rest;
+            if !path_ids_rest.is_empty() {
+                loop {
+                    match occurrences.path_ids.append_page(rest) {
+                        None => break,
+                        Some(new_rest) => {
+                            // if new_rest.is_empty() || new {
+                            if new_rest.len() < 1024 {
+                                break;
+                            }
+                            rest = new_rest;
+                        }
+                    }
+                }
+            }
+
+            occurrences.path_ids.fill_last_page(&mut buf, rest);
+
+            let offsets_rest = if !occurrences.node_occur_offsets.pages_full() {
+                occurrences
+                    .node_occur_offsets
+                    .fill_last_page(&mut buf, &offset_buf)
+                    .unwrap()
+            } else {
+                offset_buf.as_slice()
+            };
+
+            let mut rest = offsets_rest;
+            if !offsets_rest.is_empty() {
+                loop {
+                    match occurrences.node_occur_offsets.append_page(rest) {
+                        None => break,
+                        Some(new_rest) => {
+                            if new_rest.len() < 256 {
+                                // if new_rest.is_empty() {
+                                break;
+                            }
+                            rest = new_rest;
+                        }
+                    }
+                }
+            }
+
+            occurrences
+                .node_occur_offsets
+                .fill_last_page(&mut buf, rest);
+
+            let next_ptr_rest = if !occurrences.node_occur_next.pages_full() {
+                occurrences
+                    .node_occur_next
+                    .fill_last_page(&mut buf, &next_ptr_buf)
+                    .unwrap()
+            } else {
+                next_ptr_buf.as_slice()
+            };
+
+            let mut rest = next_ptr_rest;
+            if !next_ptr_rest.is_empty() {
+                loop {
+                    match occurrences.node_occur_next.append_page(rest) {
+                        None => break,
+                        Some(new_rest) => {
+                            // if new_rest.is_empty() {
+                            if new_rest.len() < 256 {
+                                break;
+                            }
+                            rest = new_rest;
+                        }
+                    }
+                }
+            }
+
+            occurrences.node_occur_next.fill_last_page(&mut buf, rest);
+        }
+    }
+
     pub(super) fn apply_node_occurrence_consumer<'a>(
         receiver: crossbeam_channel::Receiver<(PathId, Vec<paths::StepUpdate>)>,
         nodes: &'a mut NodeRecords,
@@ -380,11 +521,16 @@ impl PackedGraph {
 
         rayon::join(
             || {
-                Self::apply_node_occurrence_consumer(
+                Self::apply_node_occurrence_consumer_new(
                     receiver,
                     nodes,
                     occurrences,
                 );
+                // Self::apply_node_occurrence_consumer(
+                //     receiver,
+                //     nodes,
+                //     occurrences,
+                // );
             },
             || {
                 let mut mut_ctx = paths.get_all_paths_mut_ctx();
