@@ -219,7 +219,7 @@ impl PackedGraph {
         Some(())
     }
 
-    pub(super) fn apply_node_occurrence_consumer_new<'a>(
+    pub(super) fn apply_node_occurrence_consumer<'a>(
         receiver: crossbeam_channel::Receiver<(PathId, Vec<paths::StepUpdate>)>,
         nodes: &'a mut NodeRecords,
         occurrences: &'a mut NodeOccurrences,
@@ -359,56 +359,6 @@ impl PackedGraph {
         }
     }
 
-    pub(super) fn apply_node_occurrence_consumer<'a>(
-        receiver: crossbeam_channel::Receiver<(PathId, Vec<paths::StepUpdate>)>,
-        nodes: &'a mut NodeRecords,
-        occurrences: &'a mut NodeOccurrences,
-    ) {
-        use paths::StepUpdate;
-        while let Ok((path_id, updates)) = receiver.recv() {
-            for step_update in updates {
-                match step_update {
-                    StepUpdate::Insert { handle, step } => {
-                        let rec_id = nodes.handle_record(handle).unwrap();
-                        let vec_ix = rec_id.to_zero_based().unwrap();
-
-                        let occur_ix =
-                            nodes.node_occurrence_map.get_unpack(vec_ix);
-
-                        let new_occur_ix =
-                            occurrences.append_entry(path_id, step, occur_ix);
-
-                        nodes
-                            .node_occurrence_map
-                            .set_pack(vec_ix, new_occur_ix);
-                    }
-                    StepUpdate::Remove { handle, step } => {
-                        let rec_id = nodes.handle_record(handle).unwrap();
-                        let vec_ix = rec_id.to_zero_based().unwrap();
-
-                        let occur_head =
-                            nodes.node_occurrence_map.get_unpack(vec_ix);
-
-                        let new_occur_ix = occurrences
-                            .iter_mut(occur_head)
-                            .remove_record_with(|_, record| {
-                                record.path_id == path_id
-                                    && record.offset == step
-                            });
-
-                        if let Some(new_head) = new_occur_ix {
-                            if new_head != occur_head {
-                                nodes
-                                    .node_occurrence_map
-                                    .set_pack(vec_ix, new_head);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     pub(super) fn apply_node_occurrence(
         &mut self,
         path_id: PathId,
@@ -522,16 +472,11 @@ impl PackedGraph {
 
         rayon::join(
             || {
-                Self::apply_node_occurrence_consumer_new(
+                Self::apply_node_occurrence_consumer(
                     receiver,
                     nodes,
                     occurrences,
                 );
-                // Self::apply_node_occurrence_consumer(
-                //     receiver,
-                //     nodes,
-                //     occurrences,
-                // );
             },
             || {
                 let mut mut_ctx = paths.get_all_paths_mut_ctx();
