@@ -184,6 +184,11 @@ impl PagedIntVec {
         self.page_size
     }
 
+    #[inline]
+    pub fn page_size(&self) -> usize {
+        self.page_size
+    }
+
     pub fn save_diagnostics<W: std::io::Write>(
         &self,
         mut w: W,
@@ -282,7 +287,12 @@ impl<T: PagedCodec> PagedIntVec<T> {
 
         let (page, rest) = data.split_at(split_index);
 
-        let anchor = self.anchors.get(self.pages.len() - 1);
+        let mut anchor = self.anchors.get(self.pages.len() - 1);
+
+        if anchor == 0 {
+            self.anchors.set(self.pages.len() - 1, page[0]);
+            anchor = page[0];
+        }
 
         buf.clear();
         if buf.capacity() < page.len() {
@@ -319,9 +329,11 @@ impl<T: PagedCodec> PagedIntVec<T> {
 
         let (page, rest) = data.split_at(split_index);
 
-        let anchor = page.iter().copied().filter(|&x| x != 0).min()?;
+        let anchor =
+            page.iter().copied().filter(|&x| x != 0).min().unwrap_or(0);
 
         let width = page.iter().copied().max().map(super::width_for)?;
+        let width = width.max(1);
 
         let mut new_page =
             PackedIntVec::with_width_and_capacity(width, self.page_size);

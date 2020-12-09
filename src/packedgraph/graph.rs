@@ -288,17 +288,17 @@ impl PackedGraph {
                     match occurrences.path_ids.append_page(rest) {
                         None => break,
                         Some(new_rest) => {
-                            // if new_rest.is_empty() || new {
-                            if new_rest.len() < 1024 {
+                            rest = new_rest;
+                            if new_rest.len() < occurrences.path_ids.page_size()
+                            {
                                 break;
                             }
-                            rest = new_rest;
                         }
                     }
                 }
             }
 
-            occurrences.path_ids.fill_last_page(&mut buf, rest);
+            occurrences.path_ids.append_page(rest);
 
             let offsets_rest = if !occurrences.node_occur_offsets.pages_full() {
                 occurrences
@@ -315,19 +315,18 @@ impl PackedGraph {
                     match occurrences.node_occur_offsets.append_page(rest) {
                         None => break,
                         Some(new_rest) => {
-                            if new_rest.len() < 256 {
-                                // if new_rest.is_empty() {
+                            rest = new_rest;
+                            if new_rest.len()
+                                < occurrences.node_occur_offsets.page_size()
+                            {
                                 break;
                             }
-                            rest = new_rest;
                         }
                     }
                 }
             }
 
-            occurrences
-                .node_occur_offsets
-                .fill_last_page(&mut buf, rest);
+            occurrences.node_occur_offsets.append_page(rest);
 
             let next_ptr_rest = if !occurrences.node_occur_next.pages_full() {
                 occurrences
@@ -345,16 +344,18 @@ impl PackedGraph {
                         None => break,
                         Some(new_rest) => {
                             // if new_rest.is_empty() {
-                            if new_rest.len() < 256 {
+                            rest = new_rest;
+                            if new_rest.len()
+                                < occurrences.node_occur_next.page_size()
+                            {
                                 break;
                             }
-                            rest = new_rest;
                         }
                     }
                 }
             }
 
-            occurrences.node_occur_next.fill_last_page(&mut buf, rest);
+            occurrences.node_occur_next.append_page(rest);
         }
     }
 
