@@ -241,7 +241,7 @@ impl PackedGraph {
             next_ptr_buf.clear();
             to_remove.clear();
 
-            let mut new_occur_ix = occurrences.path_ids.len();
+            let mut new_occur_ix = occurrences.path_ids.len() + 1;
 
             for step_update in updates {
                 match step_update {
