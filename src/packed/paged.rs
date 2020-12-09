@@ -256,13 +256,22 @@ impl PagedIntVec {
 }
 
 impl<T: PagedCodec> PagedIntVec<T> {
+    #[inline]
+    pub fn pages_full(&self) -> bool {
+        self.num_entries == self.pages.len() * self.page_size
+    }
+
     /// Fills the last page in this [`PagedIntVec`] using the provided
     /// slice, without adding a new page. Returns `None` if the `self`
     /// is empty, the last page is full, or if `data` is empty.
     /// Otherwise, returns the remainder of the slice that wasn't
     /// added to the page.
     #[inline]
-    fn fill_last_page<'a>(&mut self, data: &'a [u64]) -> Option<&'a [u64]> {
+    pub fn fill_last_page<'a>(
+        &mut self,
+        buf: &mut Vec<u64>,
+        data: &'a [u64],
+    ) -> Option<&'a [u64]> {
         let total_slots = self.pages.len() * self.page_size;
         let last_page_slots = total_slots - self.num_entries;
         if last_page_slots == 0 || data.is_empty() || self.anchors.is_empty() {
@@ -275,17 +284,18 @@ impl<T: PagedCodec> PagedIntVec<T> {
 
         let anchor = self.anchors.get(self.pages.len() - 1);
 
-        let buf = page
-            .iter()
-            .copied()
-            .map(|v| T::encode(v, anchor))
-            .collect::<Vec<_>>();
+        buf.clear();
+        if buf.capacity() < page.len() {
+            buf.reserve(page.len() - buf.capacity());
+        }
+
+        buf.extend(page.iter().copied().map(|v| T::encode(v, anchor)));
 
         let width = buf.iter().copied().max().map(super::width_for)?;
 
         let last_page = self.pages.last_mut()?;
 
-        last_page.append_iter(width, buf.into_iter());
+        last_page.append_iter(width, buf.iter().copied());
 
         self.num_entries += page.len();
 
@@ -297,7 +307,7 @@ impl<T: PagedCodec> PagedIntVec<T> {
     /// `None` if the last page in the vector was not full, or `data`
     /// was empty.
     #[inline]
-    fn append_page<'a>(&mut self, data: &'a [u64]) -> Option<&'a [u64]> {
+    pub fn append_page<'a>(&mut self, data: &'a [u64]) -> Option<&'a [u64]> {
         let total_slots = self.pages.len() * self.page_size;
         let last_page_slots = total_slots - self.num_entries;
 
@@ -485,6 +495,8 @@ mod tests {
 
         let mut paged = PagedIntVec::new(10);
 
+        let mut buf: Vec<u64> = Vec::with_capacity(10);
+
         let rest = paged.append_page(&values);
         println!("paged len: {}", paged.len());
         println!("num pages: {}", paged.pages.len());
@@ -511,7 +523,7 @@ mod tests {
         }
 
         println!("----------------------");
-        let rest_3 = paged.fill_last_page(rest.unwrap());
+        let rest_3 = paged.fill_last_page(&mut buf, rest.unwrap());
 
         println!("paged len: {}", paged.len());
         println!("num pages: {}", paged.pages.len());

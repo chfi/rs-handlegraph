@@ -313,7 +313,9 @@ impl EncodedSequence {
                 }
             }
             SequenceEncoding::Base3Bits => {
-                self.vec.reserve(seq.len());
+                if self.vec.capacity() < seq.len() {
+                    self.vec.reserve(seq.len() - self.vec.capacity());
+                }
                 let diff = seq.len().min(8 - (self.len % 8));
                 for i in 0..diff {
                     self.append_base(seq[i]);
