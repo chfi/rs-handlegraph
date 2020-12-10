@@ -18,6 +18,7 @@ pub(super) use super::{
     sequence::SeqRecordIx,
 };
 
+use super::edges::EdgeListIx;
 use super::occurrences::OccurListIx;
 
 use super::{defragment::Defragment, paths};
@@ -118,6 +119,63 @@ impl PackedGraph {
             path_ref.path.transform_steps(transform);
             Vec::new()
         });
+    }
+
+    pub fn create_edges_iter<I>(&mut self, mut iter: I)
+    where
+        I: Iterator<Item = Edge>,
+    {
+        let edge_page_size = self.edges.record_vec.page_size();
+
+        let mut page_buf: Vec<u64> = Vec::with_capacity(edge_page_size);
+        let mut data_buf: Vec<u64> = Vec::with_capacity(edge_page_size);
+        let mut edge_vec_ix = 1 + (self.edges.record_vec.len() / 2);
+
+        while let Some(Edge(left, right)) = iter.next() {
+            let left_gix = self.nodes.handle_record(left).unwrap();
+            let right_gix = self.nodes.handle_record(right).unwrap();
+
+            let left_edge_dir = if left.is_reverse() {
+                Direction::Left
+            } else {
+                Direction::Right
+            };
+
+            let right_edge_dir = if right.is_reverse() {
+                Direction::Right
+            } else {
+                Direction::Left
+            };
+
+            let left_edge_list =
+                self.nodes.get_edge_list(left_gix, left_edge_dir);
+            let right_edge_list =
+                self.nodes.get_edge_list(right_gix, right_edge_dir);
+
+            data_buf.push(right.pack());
+            data_buf.push(left_edge_list.pack());
+
+            self.nodes.set_edge_list(
+                left_gix,
+                left_edge_dir,
+                EdgeListIx::from_one_based(edge_vec_ix),
+            );
+            edge_vec_ix += 1;
+
+            data_buf.push(left.pack());
+            data_buf.push(right_edge_list.pack());
+            self.nodes.set_edge_list(
+                right_gix,
+                right_edge_dir,
+                EdgeListIx::from_one_based(edge_vec_ix),
+            );
+            edge_vec_ix += 1;
+
+            if data_buf.len() >= edge_page_size {
+                self.edges.record_vec.append_pages(&mut page_buf, &data_buf);
+                data_buf.clear();
+            }
+        }
     }
 
     pub(super) fn remove_edge_impl(&mut self, edge: Edge) -> Option<()> {
