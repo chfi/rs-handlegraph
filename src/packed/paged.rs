@@ -272,16 +272,17 @@ impl<T: PagedCodec> PagedIntVec<T> {
     /// Otherwise, returns the remainder of the slice that wasn't
     /// added to the page.
     #[inline]
-    pub fn fill_last_page<'a>(
+    fn fill_last_page<'a>(
         &mut self,
         buf: &mut Vec<u64>,
         data: &'a [u64],
     ) -> Option<&'a [u64]> {
-        let total_slots = self.pages.len() * self.page_size;
-        let last_page_slots = total_slots - self.num_entries;
-        if last_page_slots == 0 || data.is_empty() || self.anchors.is_empty() {
+        if data.is_empty() || self.anchors.is_empty() {
             return None;
         }
+
+        let last_page_slots =
+            self.page_size - (self.num_entries % self.page_size);
 
         let split_index = last_page_slots.min(data.len());
 
@@ -317,11 +318,12 @@ impl<T: PagedCodec> PagedIntVec<T> {
     /// `None` if the last page in the vector was not full, or `data`
     /// was empty.
     #[inline]
-    pub fn append_page<'a>(&mut self, data: &'a [u64]) -> Option<&'a [u64]> {
-        let total_slots = self.pages.len() * self.page_size;
-        let last_page_slots = total_slots - self.num_entries;
-
-        if self.num_entries != total_slots || data.is_empty() {
+    fn append_page<'a>(
+        &mut self,
+        buf: &mut Vec<u64>,
+        data: &'a [u64],
+    ) -> Option<&'a [u64]> {
+        if data.is_empty() {
             return None;
         }
 
@@ -332,16 +334,20 @@ impl<T: PagedCodec> PagedIntVec<T> {
         let anchor =
             page.iter().copied().filter(|&x| x != 0).min().unwrap_or(0);
 
-        let width = page.iter().copied().max().map(super::width_for)?;
+        buf.clear();
+        if buf.capacity() < page.len() {
+            buf.reserve(page.len() - buf.capacity());
+        }
+
+        buf.extend(page.iter().copied().map(|v| T::encode(v, anchor)));
+
+        let width = buf.iter().copied().max().map(super::width_for)?;
         let width = width.max(1);
 
         let mut new_page =
             PackedIntVec::with_width_and_capacity(width, self.page_size);
 
-        for &value in page.iter() {
-            let encoded = T::encode(value, anchor);
-            new_page.append(encoded);
-        }
+        new_page.append_iter(width, buf.iter().copied());
 
         self.anchors.append(anchor);
         self.pages.push(new_page);
@@ -352,54 +358,16 @@ impl<T: PagedCodec> PagedIntVec<T> {
     }
 
     #[inline]
-    fn append_pages<I>(&mut self, mut iter: I)
-    where
-        I: Iterator<Item = u64> + ExactSizeIterator,
-    {
-        let mut buffer: Vec<u64> = Vec::with_capacity(self.page_size);
-
-        loop {
-            if iter.len() == 0 {
-                break;
-            }
-
-            buffer.clear();
-            buffer.extend(iter.by_ref().take(self.page_size));
-
-            let (anchor, max) = buffer
-                .iter()
-                .filter(|&&x| x != 0)
-                .fold((std::u64::MAX, 0u64), |(a, m), &x| (a.min(x), m.max(x)));
-
-            let width = super::width_for(T::encode(max, anchor));
-
-            let mut new_page = PackedIntVec::new_with_width(width);
-            new_page.resize(self.page_size);
-            new_page.append_iter(
-                width,
-                buffer.iter().map(|&x| T::encode(x, anchor)),
-            );
-            self.anchors.append(anchor);
-            self.pages.push(new_page);
+    pub fn append_pages(&mut self, buf: &mut Vec<u64>, mut data: &[u64]) {
+        if !self.pages_full() {
+            data = self.fill_last_page(buf, data).unwrap();
         }
-    }
 
-    #[inline]
-    pub fn append_iter<I>(&mut self, mut iter: I)
-    where
-        I: Iterator<Item = u64> + ExactSizeIterator,
-    {
-        let total_slots = self.pages.len() * self.page_size;
-
-        if self.num_entries == total_slots {
-            self.append_pages(iter);
-        } else {
-            let empty_last_page = total_slots - self.num_entries;
-            if let Some(last_page) = self.pages.last_mut() {
-                let width = last_page.width();
-                last_page
-                    .append_iter(width, iter.by_ref().take(empty_last_page));
-                self.append_pages(iter);
+        while !data.is_empty() {
+            if let Some(rest) = self.append_page(buf, data) {
+                data = rest;
+            } else {
+                break;
             }
         }
     }

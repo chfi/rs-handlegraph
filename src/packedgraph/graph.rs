@@ -273,89 +273,15 @@ impl PackedGraph {
                 }
             }
 
-            let path_ids_rest = if !occurrences.path_ids.pages_full() {
-                occurrences
-                    .path_ids
-                    .fill_last_page(&mut buf, &path_id_buf)
-                    .unwrap()
-            } else {
-                path_id_buf.as_slice()
-            };
+            occurrences.path_ids.append_pages(&mut buf, &path_id_buf);
 
-            let mut rest = path_ids_rest;
-            if !path_ids_rest.is_empty() {
-                loop {
-                    match occurrences.path_ids.append_page(rest) {
-                        None => break,
-                        Some(new_rest) => {
-                            rest = new_rest;
-                            if new_rest.len() < occurrences.path_ids.page_size()
-                            {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+            occurrences
+                .node_occur_offsets
+                .append_pages(&mut buf, &offset_buf);
 
-            occurrences.path_ids.append_page(rest);
-
-            let offsets_rest = if !occurrences.node_occur_offsets.pages_full() {
-                occurrences
-                    .node_occur_offsets
-                    .fill_last_page(&mut buf, &offset_buf)
-                    .unwrap()
-            } else {
-                offset_buf.as_slice()
-            };
-
-            let mut rest = offsets_rest;
-            if !offsets_rest.is_empty() {
-                loop {
-                    match occurrences.node_occur_offsets.append_page(rest) {
-                        None => break,
-                        Some(new_rest) => {
-                            rest = new_rest;
-                            if new_rest.len()
-                                < occurrences.node_occur_offsets.page_size()
-                            {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            occurrences.node_occur_offsets.append_page(rest);
-
-            let next_ptr_rest = if !occurrences.node_occur_next.pages_full() {
-                occurrences
-                    .node_occur_next
-                    .fill_last_page(&mut buf, &next_ptr_buf)
-                    .unwrap()
-            } else {
-                next_ptr_buf.as_slice()
-            };
-
-            let mut rest = next_ptr_rest;
-            if !next_ptr_rest.is_empty() {
-                loop {
-                    match occurrences.node_occur_next.append_page(rest) {
-                        None => break,
-                        Some(new_rest) => {
-                            // if new_rest.is_empty() {
-                            rest = new_rest;
-                            if new_rest.len()
-                                < occurrences.node_occur_next.page_size()
-                            {
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
-
-            occurrences.node_occur_next.append_page(rest);
+            occurrences
+                .node_occur_next
+                .append_pages(&mut buf, &next_ptr_buf);
         }
     }
 
