@@ -427,7 +427,9 @@ impl<T: PagedCodec> PackedCollection for PagedIntVec<T> {
         }
 
         self.num_entries += 1;
-        self.set(self.num_entries - 1, value);
+        if value != 0 {
+            self.set(self.num_entries - 1, value);
+        }
     }
 
     #[inline]
@@ -477,7 +479,7 @@ mod tests {
 
         let mut buf: Vec<u64> = Vec::with_capacity(10);
 
-        let rest = paged.append_page(&values);
+        let rest = paged.append_page(&mut buf, &values);
         println!("paged len: {}", paged.len());
         println!("num pages: {}", paged.pages.len());
         println!("rest:  {:?}", rest);
@@ -492,7 +494,7 @@ mod tests {
 
         let values_2 = [842, 381, 7128, 6778];
 
-        let rest_2 = paged.append_page(&values_2);
+        let rest_2 = paged.append_page(&mut buf, &values_2);
         println!("paged len: {}", paged.len());
         println!("num pages: {}", paged.pages.len());
         println!("rest_2:  {:?}", rest_2);
