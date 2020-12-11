@@ -176,6 +176,11 @@ impl PackedGraph {
                 data_buf.clear();
             }
         }
+
+        if !data_buf.is_empty() {
+            self.edges.record_vec.append_pages(&mut page_buf, &data_buf);
+            data_buf.clear();
+        }
     }
 
     pub(super) fn remove_edge_impl(&mut self, edge: Edge) -> Option<()> {
