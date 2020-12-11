@@ -692,6 +692,56 @@ where
         self.append_handle(handle)
     }
 
+    fn append_steps_iter<I>(&mut self, mut iter: I) -> Vec<StepUpdate>
+    where
+        I: Iterator<Item = Handle>,
+    {
+        let steps_page_size = self.path.steps_ref().steps.page_size();
+        let links_page_size = self.path.steps_ref().links.page_size();
+
+        let mut steps_buf: Vec<u64> = Vec::with_capacity(steps_page_size);
+        let mut links_buf: Vec<u64> = Vec::with_capacity(links_page_size);
+        let mut page_buf: Vec<u64> = Vec::with_capacity(steps_page_size);
+
+        let mut step_updates: Vec<StepUpdate> =
+            Vec::with_capacity(steps_page_size);
+
+        let mut tail = self.tail;
+        let mut next_ptr = self.path.steps_ref().storage_len() + 1;
+
+        while let Some(handle) = iter.next() {
+            steps_buf.push(handle.pack());
+            links_buf.push(tail.pack());
+            links_buf.push(next_ptr as u64);
+
+            step_updates.push(StepUpdate::Insert {
+                handle,
+                step: StepPtr::from_one_based(next_ptr),
+            });
+
+            tail = StepPtr::from_one_based(next_ptr);
+            next_ptr += 1;
+
+            if steps_buf.len() >= steps_page_size {
+                self.path
+                    .steps_mut()
+                    .steps
+                    .append_pages(&mut page_buf, &steps_buf);
+                steps_buf.clear();
+            }
+
+            if links_buf.len() >= links_page_size {
+                self.path
+                    .steps_mut()
+                    .links
+                    .append_pages(&mut page_buf, &links_buf);
+                links_buf.clear();
+            }
+        }
+
+        step_updates
+    }
+
     fn prepend_step(&mut self, handle: Handle) -> StepUpdate {
         self.prepend_handle(handle)
     }

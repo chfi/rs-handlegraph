@@ -138,6 +138,13 @@ pub trait MutPath: PathBase {
     /// returning a `StepUpdate` that includes the new step index.
     fn append_step(&mut self, handle: Handle) -> StepUpdate<Self::StepIx>;
 
+    fn append_steps_iter<I>(
+        &mut self,
+        iter: I,
+    ) -> Vec<StepUpdate<Self::StepIx>>
+    where
+        I: Iterator<Item = Handle>;
+
     /// Extend the path by prepend a step on `handle` before the
     /// beginning, returning a `StepUpdate` that includes the new step
     /// index.
