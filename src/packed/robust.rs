@@ -46,6 +46,26 @@ impl RobustPagedIntVec {
         self.other_pages.page_width()
     }
 
+    #[inline]
+    pub fn page_size(&self) -> usize {
+        self.other_pages.page_width()
+    }
+
+    #[inline]
+    pub fn append_pages(&mut self, buf: &mut Vec<u64>, mut data: &[u64]) {
+        if self.first_page.len() < self.page_width() {
+            let first_page_slots = self.page_width() - self.first_page.len();
+            let split_index = first_page_slots.min(data.len());
+            let (page, rest) = data.split_at(split_index);
+            self.first_page.append_slice(page);
+            data = rest;
+        }
+
+        if !data.is_empty() {
+            self.other_pages.append_pages(buf, data);
+        }
+    }
+
     pub fn print_diagnostics(&self) {
         println!("First page");
         print!(" -- ");
