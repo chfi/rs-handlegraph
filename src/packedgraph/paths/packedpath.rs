@@ -706,27 +706,25 @@ where
         let mut step_updates: Vec<StepUpdate> =
             Vec::with_capacity(steps_page_size);
 
-        let mut prev_ptr = self.tail;
         let mut cur_ptr = self.path.steps_ref().storage_len() + 1;
 
         if self.head.is_null() {
             self.head = StepPtr::from_one_based(cur_ptr);
+            // push the head
+            links_buf.push(0);
         }
 
         let steps_mut = self.path.steps_mut();
 
         while let Some(handle) = iter.next() {
             steps_buf.push(handle.pack());
-            links_buf.push(prev_ptr.pack());
-            links_buf.push(StepPtr::from_one_based(cur_ptr + 1).pack());
+            links_buf.push(StepPtr::from_one_based(cur_ptr).pack());
+            links_buf.push(StepPtr::from_one_based(cur_ptr - 1).pack());
 
             step_updates.push(StepUpdate::Insert {
                 handle,
                 step: StepPtr::from_one_based(cur_ptr),
             });
-
-            prev_ptr = StepPtr::from_one_based(cur_ptr);
-            cur_ptr += 1;
 
             if steps_buf.len() >= steps_page_size {
                 steps_mut.steps.append_pages(&mut page_buf, &steps_buf);
@@ -737,11 +735,11 @@ where
                 steps_mut.links.append_pages(&mut page_buf, &links_buf);
                 links_buf.clear();
             }
-        }
 
-        // Hacky, but null the last next-link, easier than handling it
-        // in the loop
-        steps_mut.links.set(steps_mut.len() - 1, 0);
+            cur_ptr += 1;
+        }
+        // add the null next-link for the new tail
+        links_buf.push(0);
 
         if !steps_buf.is_empty() {
             self.path
@@ -758,6 +756,8 @@ where
                 .append_pages(&mut page_buf, &links_buf);
             links_buf.clear();
         }
+
+        self.tail = StepPtr::from_one_based(cur_ptr);
 
         step_updates
     }
