@@ -710,16 +710,15 @@ where
 
         if self.head.is_null() {
             self.head = StepPtr::from_one_based(cur_ptr);
-            // push the head
-            links_buf.push(0);
         }
 
         let steps_mut = self.path.steps_mut();
 
         while let Some(handle) = iter.next() {
             steps_buf.push(handle.pack());
-            links_buf.push(StepPtr::from_one_based(cur_ptr).pack());
+
             links_buf.push(StepPtr::from_one_based(cur_ptr - 1).pack());
+            links_buf.push(StepPtr::from_one_based(cur_ptr + 1).pack());
 
             step_updates.push(StepUpdate::Insert {
                 handle,
@@ -738,8 +737,6 @@ where
 
             cur_ptr += 1;
         }
-        // add the null next-link for the new tail
-        links_buf.push(0);
 
         if !steps_buf.is_empty() {
             self.path
@@ -757,7 +754,10 @@ where
             links_buf.clear();
         }
 
-        self.tail = StepPtr::from_one_based(cur_ptr);
+        let links_len = self.path.steps_ref().links.len();
+        self.path.steps_mut().links.set(links_len - 1, 0);
+
+        self.tail = StepPtr::from_one_based(cur_ptr - 1);
 
         step_updates
     }

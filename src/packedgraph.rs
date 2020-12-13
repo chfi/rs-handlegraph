@@ -164,9 +164,6 @@ impl AdditiveHandleGraph for PackedGraph {
         node_id: T,
     ) -> Handle {
         let id = node_id.into();
-        println!("id: {:?}", id);
-        println!("seq len: {}", sequence.len());
-        println!("has node: {}", self.nodes.has_node(id));
         assert!(
             id != NodeId::from(0)
                 && !sequence.is_empty()
@@ -479,7 +476,7 @@ mod tests {
         let path_ref = graph.paths.path_ref(PathId(id)).unwrap();
         let head = path_ref.head;
         let tail = path_ref.tail;
-        // paths::packedpath::tests::print_path(&path_ref.path, head, tail);
+        paths::packedpath::tests::print_path(&path_ref.path, head, tail);
         paths::packedpath::tests::print_path_vecs(&path_ref.path);
     }
 
@@ -809,16 +806,19 @@ mod tests {
                 .collect::<Vec<_>>()
         });
 
-        println!("path_0 len: {:?}", graph.path_len(path_0));
-        println!("path_1 len: {:?}", graph.path_len(path_1));
-        // println!("
+        let path_0_steps = graph
+            .get_path_ref(path_0)
+            .unwrap()
+            .steps()
+            .collect::<Vec<_>>();
 
-        // paths::packedpath::tests::print_path_vecs(&path_ref.path);
-        println!("----------");
-        print_path_debug(&graph, path_0.0);
-        println!("-----------------------");
-        print_path_debug(&graph, path_1.0);
-        println!("-----------------");
+        let path_1_steps = graph
+            .get_path_ref(path_1)
+            .unwrap()
+            .steps()
+            .collect::<Vec<_>>();
+
+        assert_eq!(path_0_steps, path_1_steps);
     }
 
     #[test]
