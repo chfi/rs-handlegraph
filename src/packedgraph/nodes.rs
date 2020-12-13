@@ -304,7 +304,6 @@ impl NodeRecords {
         let width = 64 - nodes.leading_zeros() as usize;
         let id_index_map =
             NodeIdIndexMap::with_width_and_capacity(width, nodes);
-        let records_vec = PagedIntVec::new_with_width(NARROW_PAGE_WIDTH, width);
 
         Self {
             id_index_map,

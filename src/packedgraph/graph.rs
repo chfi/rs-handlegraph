@@ -295,7 +295,7 @@ impl PackedGraph {
         let mut offset_buf: Vec<u64> = Vec::with_capacity(1024);
         let mut next_ptr_buf: Vec<u64> = Vec::with_capacity(1024);
 
-        let mut to_remove: Vec<(OccurListIx, StepPtr)> =
+        let mut to_remove: Vec<(usize, OccurListIx, StepPtr)> =
             Vec::with_capacity(124);
 
         while let Ok((path_id, updates)) = receiver.recv() {
@@ -331,7 +331,7 @@ impl PackedGraph {
                         let occur_head =
                             nodes.node_occurrence_map.get_unpack(vec_ix);
 
-                        to_remove.push((occur_head, step));
+                        to_remove.push((vec_ix, occur_head, step));
                     }
                 }
             }
@@ -345,6 +345,20 @@ impl PackedGraph {
             occurrences
                 .node_occur_next
                 .append_pages(&mut buf, &next_ptr_buf);
+
+            for &(vec_ix, occur_head, step) in to_remove.iter() {
+                let new_occur_ix = occurrences
+                    .iter_mut(occur_head)
+                    .remove_record_with(|_, record| {
+                        record.path_id == path_id && record.offset == step
+                    });
+
+                if let Some(new_head) = new_occur_ix {
+                    if new_head != occur_head {
+                        nodes.node_occurrence_map.set_pack(vec_ix, new_head);
+                    }
+                }
+            }
         }
     }
 
