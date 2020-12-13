@@ -14,8 +14,9 @@ use crate::{
         SubtractiveHandleGraph, TransformNodeIds,
     },
     pathhandlegraph::{
-        GraphPathNames, GraphPathsRef, IntoNodeOccurrences, IntoPathIds,
-        MutPath, MutableGraphPaths, PathId, PathSequences, PathSteps,
+        GraphPathNames, GraphPaths, GraphPathsRef, IntoNodeOccurrences,
+        IntoPathIds, MutPath, MutableGraphPaths, PathId, PathSequences,
+        PathSteps,
     },
 };
 
@@ -163,6 +164,9 @@ impl AdditiveHandleGraph for PackedGraph {
         node_id: T,
     ) -> Handle {
         let id = node_id.into();
+        println!("id: {:?}", id);
+        println!("seq len: {}", sequence.len());
+        println!("has node: {}", self.nodes.has_node(id));
         assert!(
             id != NodeId::from(0)
                 && !sequence.is_empty()
@@ -475,7 +479,7 @@ mod tests {
         let path_ref = graph.paths.path_ref(PathId(id)).unwrap();
         let head = path_ref.head;
         let tail = path_ref.tail;
-        paths::packedpath::tests::print_path(&path_ref.path, head, tail);
+        // paths::packedpath::tests::print_path(&path_ref.path, head, tail);
         paths::packedpath::tests::print_path_vecs(&path_ref.path);
     }
 
@@ -781,6 +785,40 @@ mod tests {
         let node_8_occ_2 = get_occurs(&graph, 8);
 
         assert_eq!(node_8_occ_2, vec![(1, 3), (0, 2)]);
+    }
+
+    #[test]
+    fn append_steps_iter() {
+        let mut graph = test_graph_no_paths();
+
+        let handles =
+            (1..=9).map(|x| Handle::pack(x, false)).collect::<Vec<_>>();
+
+        let path_0 = graph.paths.create_path(b"path_0", false);
+        let path_1 = graph.paths.create_path(b"path_1", false);
+
+        graph.with_path_mut_ctx(path_0, |path_ref| {
+            path_ref.append_steps_iter(handles.iter().copied())
+        });
+
+        graph.with_path_mut_ctx(path_1, |path_ref| {
+            handles
+                .iter()
+                .copied()
+                .map(|h| path_ref.append_step(h))
+                .collect::<Vec<_>>()
+        });
+
+        println!("path_0 len: {:?}", graph.path_len(path_0));
+        println!("path_1 len: {:?}", graph.path_len(path_1));
+        // println!("
+
+        // paths::packedpath::tests::print_path_vecs(&path_ref.path);
+        println!("----------");
+        print_path_debug(&graph, path_0.0);
+        println!("-----------------------");
+        print_path_debug(&graph, path_1.0);
+        println!("-----------------");
     }
 
     #[test]
