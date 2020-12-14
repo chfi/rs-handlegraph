@@ -545,7 +545,6 @@ impl<'a> PackedPathMut<'a> {
         let mut page_buf: Vec<u64> = Vec::with_capacity(steps_page_size);
 
         let mut steps: Vec<StepPtr> = Vec::with_capacity(steps_page_size);
-        // let mut step_updates: Vec<StepUpdate> =
 
         let mut cur_ptr = self.path.steps_ref().storage_len() + 1;
 

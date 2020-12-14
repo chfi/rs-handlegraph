@@ -282,6 +282,125 @@ impl PackedGraph {
         Some(())
     }
 
+    pub(super) fn apply_step_updates_worker<'a>(
+        receiver: crossbeam_channel::Receiver<(PathId, paths::StepUpdate)>,
+        nodes: &'a mut NodeRecords,
+        occurrences: &'a mut NodeOccurrences,
+    ) {
+        use paths::{StepPtr, StepUpdate};
+
+        let path_id_page_size = occurrences.path_ids.page_size();
+        let offsets_page_size = occurrences.node_occur_offsets.page_size();
+        let next_ptr_page_size = occurrences.node_occur_next.page_size();
+
+        let mut buf: Vec<u64> = Vec::with_capacity(1024);
+
+        let mut path_id_buf: Vec<u64> = Vec::with_capacity(1024);
+        let mut offset_buf: Vec<u64> = Vec::with_capacity(1024);
+        let mut next_ptr_buf: Vec<u64> = Vec::with_capacity(1024);
+
+        let mut to_remove: Vec<(PathId, usize, OccurListIx, StepPtr)> =
+            Vec::with_capacity(128);
+
+        let mut new_occur_ix = occurrences.path_ids.len() + 1;
+
+        while let Ok((path_id, step_update)) = receiver.recv() {
+            match step_update {
+                StepUpdate::Insert { handle, step } => {
+                    let rec_id = nodes.handle_record(handle).unwrap();
+                    let vec_ix = rec_id.to_zero_based().unwrap();
+
+                    let occur_ix: OccurListIx =
+                        nodes.node_occurrence_map.get_unpack(vec_ix);
+
+                    path_id_buf.push(path_id.pack());
+                    offset_buf.push(step.pack());
+                    next_ptr_buf.push(occur_ix.pack());
+
+                    nodes.node_occurrence_map.set_pack(vec_ix, new_occur_ix);
+                    new_occur_ix += 1;
+                }
+                StepUpdate::Remove { handle, step } => {
+                    let rec_id = nodes.handle_record(handle).unwrap();
+                    let vec_ix = rec_id.to_zero_based().unwrap();
+
+                    let occur_head =
+                        nodes.node_occurrence_map.get_unpack(vec_ix);
+
+                    to_remove.push((path_id, vec_ix, occur_head, step));
+                }
+            }
+
+            if path_id_buf.len() >= path_id_page_size {
+                occurrences.path_ids.append_pages(&mut buf, &path_id_buf);
+
+                path_id_buf.clear();
+            }
+
+            if offset_buf.len() >= offsets_page_size {
+                occurrences
+                    .node_occur_offsets
+                    .append_pages(&mut buf, &offset_buf);
+
+                offset_buf.clear();
+            }
+
+            if next_ptr_buf.len() >= next_ptr_page_size {
+                occurrences
+                    .node_occur_next
+                    .append_pages(&mut buf, &next_ptr_buf);
+
+                next_ptr_buf.clear();
+            }
+
+            if to_remove.len() >= 124 {
+                // TODO have to handle causality within each path here
+                for &(path_id, vec_ix, occur_head, step) in to_remove.iter() {
+                    let new_occur_ix = occurrences
+                        .iter_mut(occur_head)
+                        .remove_record_with(|_, record| {
+                            record.path_id == path_id && record.offset == step
+                        });
+
+                    if let Some(new_head) = new_occur_ix {
+                        if new_head != occur_head {
+                            nodes
+                                .node_occurrence_map
+                                .set_pack(vec_ix, new_head);
+                        }
+                    }
+                }
+
+                to_remove.clear();
+            }
+        }
+
+        occurrences.path_ids.append_pages(&mut buf, &path_id_buf);
+
+        occurrences
+            .node_occur_offsets
+            .append_pages(&mut buf, &offset_buf);
+
+        occurrences
+            .node_occur_next
+            .append_pages(&mut buf, &next_ptr_buf);
+
+        // TODO have to handle causality within each path here
+        for &(path_id, vec_ix, occur_head, step) in to_remove.iter() {
+            let new_occur_ix = occurrences
+                .iter_mut(occur_head)
+                .remove_record_with(|_, record| {
+                    record.path_id == path_id && record.offset == step
+                });
+
+            if let Some(new_head) = new_occur_ix {
+                if new_head != occur_head {
+                    nodes.node_occurrence_map.set_pack(vec_ix, new_head);
+                }
+            }
+        }
+    }
+
     pub(super) fn apply_node_occurrence_consumer<'a>(
         receiver: crossbeam_channel::Receiver<(PathId, Vec<paths::StepUpdate>)>,
         nodes: &'a mut NodeRecords,
