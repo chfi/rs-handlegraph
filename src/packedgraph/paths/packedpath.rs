@@ -2,6 +2,8 @@ use std::num::NonZeroUsize;
 
 use fnv::FnvHashMap;
 
+use crossbeam_channel::{Receiver, Sender};
+
 use crate::{
     handle::{Handle, NodeId},
     packed::*,
@@ -512,6 +514,71 @@ impl<'a> PackedPathMut<'a> {
             tail: properties.tail,
             circular: properties.circular,
         }
+    }
+
+    pub(crate) fn append_handle_chn(
+        &mut self,
+        sender: Sender<(PathId, StepUpdate)>,
+        handle: Handle,
+    ) -> StepPtr {
+        unimplemented!();
+    }
+
+    fn append_handles_iter_chn<I>(&mut self, mut iter: I) -> Vec<StepPtr>
+    where
+        I: Iterator<Item = Handle>,
+    {
+        unimplemented!();
+    }
+
+    pub(crate) fn prepend_handle_chn(
+        &mut self,
+        sender: Sender<(PathId, StepUpdate)>,
+        handle: Handle,
+    ) -> StepPtr {
+        unimplemented!();
+    }
+
+    pub(crate) fn insert_handle_after_chn(
+        &mut self,
+        sender: Sender<(PathId, StepUpdate)>,
+        step: StepPtr,
+        handle: Handle,
+    ) -> StepPtr {
+        unimplemented!();
+    }
+
+    pub(crate) fn remove_step_chn(
+        &mut self,
+        sender: Sender<(PathId, StepUpdate)>,
+        step: StepPtr,
+    ) -> bool {
+        unimplemented!();
+    }
+
+    fn rewrite_segment_chn(
+        &mut self,
+        from: StepPtr,
+        to: StepPtr,
+        new_segment: &[Handle],
+    ) -> Option<(Self::StepIx, Self::StepIx)> {
+        unimplemented!();
+    }
+
+    pub(crate) fn remove_step_at_index_chn(
+        &mut self,
+        sender: Sender<(PathId, StepUpdate)>,
+        rem_step_ix: StepPtr,
+    ) -> bool {
+        unimplemented!();
+    }
+
+    pub(crate) fn flip_step_orientation_chn(
+        &mut self,
+        sender: Sender<(PathId, StepUpdate)>,
+        step: StepPtr,
+    ) {
+        unimplemented!();
     }
 }
 
