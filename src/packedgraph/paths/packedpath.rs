@@ -529,11 +529,81 @@ impl<'a> PackedPathMut<'a> {
     }
 
     #[inline]
-    fn append_handles_iter_chn<I>(&mut self, mut iter: I) -> Vec<StepPtr>
+    fn append_handles_iter_chn<I>(
+        &mut self,
+        sender: Sender<(PathId, StepUpdate)>,
+        mut iter: I,
+    ) -> Vec<StepPtr>
     where
         I: Iterator<Item = Handle>,
     {
-        unimplemented!();
+        let steps_page_size = self.path.steps_ref().steps.page_size();
+        let links_page_size = self.path.steps_ref().links.page_size();
+
+        let mut steps_buf: Vec<u64> = Vec::with_capacity(steps_page_size);
+        let mut links_buf: Vec<u64> = Vec::with_capacity(links_page_size);
+        let mut page_buf: Vec<u64> = Vec::with_capacity(steps_page_size);
+
+        let mut steps: Vec<StepPtr> = Vec::with_capacity(steps_page_size);
+        // let mut step_updates: Vec<StepUpdate> =
+
+        let mut cur_ptr = self.path.steps_ref().storage_len() + 1;
+
+        if self.head.is_null() {
+            self.head = StepPtr::from_one_based(cur_ptr);
+        }
+
+        let steps_mut = self.path.steps_mut();
+
+        while let Some(handle) = iter.next() {
+            steps_buf.push(handle.pack());
+
+            links_buf.push(StepPtr::from_one_based(cur_ptr - 1).pack());
+            links_buf.push(StepPtr::from_one_based(cur_ptr + 1).pack());
+
+            sender.send((
+                self.path_id,
+                StepUpdate::Insert {
+                    handle,
+                    step: StepPtr::from_one_based(cur_ptr),
+                },
+            ));
+
+            if steps_buf.len() >= steps_page_size {
+                steps_mut.steps.append_pages(&mut page_buf, &steps_buf);
+                steps_buf.clear();
+            }
+
+            if links_buf.len() >= links_page_size {
+                steps_mut.links.append_pages(&mut page_buf, &links_buf);
+                links_buf.clear();
+            }
+
+            cur_ptr += 1;
+        }
+
+        if !steps_buf.is_empty() {
+            self.path
+                .steps_mut()
+                .steps
+                .append_pages(&mut page_buf, &steps_buf);
+            steps_buf.clear();
+        }
+
+        if !links_buf.is_empty() {
+            self.path
+                .steps_mut()
+                .links
+                .append_pages(&mut page_buf, &links_buf);
+            links_buf.clear();
+        }
+
+        let links_len = self.path.steps_ref().links.len();
+        self.path.steps_mut().links.set(links_len - 1, 0);
+
+        self.tail = StepPtr::from_one_based(cur_ptr - 1);
+
+        steps
     }
 
     #[inline]
