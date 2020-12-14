@@ -516,14 +516,19 @@ impl<'a> PackedPathMut<'a> {
         }
     }
 
+    #[inline]
     pub(crate) fn append_handle_chn(
         &mut self,
         sender: Sender<(PathId, StepUpdate)>,
         handle: Handle,
     ) -> StepPtr {
-        unimplemented!();
+        let step_update = self.append_handle(handle);
+        let step = step_update.step();
+        sender.send((self.path_id, step_update));
+        step
     }
 
+    #[inline]
     fn append_handles_iter_chn<I>(&mut self, mut iter: I) -> Vec<StepPtr>
     where
         I: Iterator<Item = Handle>,
@@ -531,54 +536,161 @@ impl<'a> PackedPathMut<'a> {
         unimplemented!();
     }
 
+    #[inline]
     pub(crate) fn prepend_handle_chn(
         &mut self,
         sender: Sender<(PathId, StepUpdate)>,
         handle: Handle,
     ) -> StepPtr {
-        unimplemented!();
+        let step_update = self.prepend_handle(handle);
+        let step = step_update.step();
+        sender.send((self.path_id, step_update));
+        step
     }
 
+    #[inline]
     pub(crate) fn insert_handle_after_chn(
         &mut self,
         sender: Sender<(PathId, StepUpdate)>,
         step: StepPtr,
         handle: Handle,
-    ) -> StepPtr {
-        unimplemented!();
+    ) -> Option<StepPtr> {
+        let step_update = if step == self.tail {
+            Some(self.append_step(handle))
+        } else {
+            let step = self.path.steps_mut().insert_after(step, handle)?;
+            Some(StepUpdate::Insert { handle, step })
+        }?;
+
+        let step = step_update.step();
+        sender.send((self.path_id, step_update));
+        Some(step)
     }
 
+    #[inline]
     pub(crate) fn remove_step_chn(
         &mut self,
         sender: Sender<(PathId, StepUpdate)>,
         step: StepPtr,
     ) -> bool {
-        unimplemented!();
+        if let Some(step_update) = self.remove_step_at_index(step) {
+            let step = step_update.step();
+            sender.send((self.path_id, step_update));
+            true
+        } else {
+            false
+        }
     }
 
+    #[inline]
     fn rewrite_segment_chn(
         &mut self,
+        sender: Sender<(PathId, StepUpdate)>,
         from: StepPtr,
         to: StepPtr,
         new_segment: &[Handle],
-    ) -> Option<(Self::StepIx, Self::StepIx)> {
-        unimplemented!();
+    ) -> Option<(StepPtr, StepPtr)> {
+        if new_segment.is_empty() {
+            return None;
+        }
+
+        // make sure both steps actually exist in this path
+        let (from_step, to_step) = {
+            let steps = self.path.steps_ref();
+            let from_step = steps.get_step(from)?;
+            let to_step = steps.get_step(to)?;
+            if from_step.handle.pack() == 0 || to_step.handle.pack() == 0 {
+                return None;
+            }
+            (from_step, to_step)
+        };
+
+        // clear the steps to be removed, and push their corresponding
+        // step updates
+        {
+            let steps = self.path.steps_mut();
+            let to_remove = steps.iter(from, to).collect::<Vec<_>>();
+
+            for (ptr, step) in to_remove.into_iter() {
+                sender.send((
+                    self.path_id,
+                    StepUpdate::Remove {
+                        step: ptr,
+                        handle: step.handle,
+                    },
+                ));
+
+                let step_ix = ptr.to_record_ix(1, 0)?;
+                let link_ix = ptr.to_record_ix(2, 0)?;
+
+                steps.steps.set(step_ix, 0);
+                steps.links.set(link_ix, 0);
+                steps.links.set(link_ix + 1, 0);
+                steps.removed_steps += 1;
+            }
+        }
+
+        let mut handles = new_segment.iter();
+        let first_handle = *handles.next()?;
+
+        let start = {
+            let update = if from_step.prev.is_null() {
+                self.prepend_step(first_handle)
+            } else {
+                self.insert_step_after(from_step.prev, first_handle)?
+            };
+            let step = update.step();
+            sender.send((self.path_id, update));
+            step
+        };
+
+        let mut last = start;
+        for &handle in handles {
+            let update = self.insert_step_after(last, handle)?;
+            last = update.step();
+            sender.send((self.path_id, update));
+        }
+
+        let end = last;
+
+        let steps = self.path.steps_mut();
+
+        if let Some(ix) = from_step.prev.to_record_ix(2, 1) {
+            steps.links.set_pack(ix, start);
+        }
+        if let Some(ix) = to_step.next.to_record_ix(2, 0) {
+            steps.links.set_pack(ix, end);
+        }
+
+        Some((start, end))
     }
 
-    pub(crate) fn remove_step_at_index_chn(
-        &mut self,
-        sender: Sender<(PathId, StepUpdate)>,
-        rem_step_ix: StepPtr,
-    ) -> bool {
-        unimplemented!();
-    }
-
+    #[inline]
     pub(crate) fn flip_step_orientation_chn(
         &mut self,
         sender: Sender<(PathId, StepUpdate)>,
         step: StepPtr,
-    ) {
-        unimplemented!();
+    ) -> Option<()> {
+        let step_rec_ix = step.to_record_start(1)?;
+        let handle: Handle =
+            self.path.steps_mut().steps.get_unpack(step_rec_ix);
+
+        self.path
+            .steps_mut()
+            .steps
+            .set_pack(step_rec_ix, handle.flip());
+
+        sender.send((self.path_id, StepUpdate::Remove { handle, step }));
+
+        sender.send((
+            self.path_id,
+            StepUpdate::Insert {
+                handle: handle.flip(),
+                step,
+            },
+        ));
+
+        Some(())
     }
 }
 
