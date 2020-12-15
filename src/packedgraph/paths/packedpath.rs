@@ -517,9 +517,9 @@ impl<'a> PackedPathMut<'a> {
     }
 
     #[inline]
-    pub(crate) fn append_handle_chn(
+    pub fn append_handle_chn(
         &mut self,
-        sender: Sender<(PathId, StepUpdate)>,
+        sender: &mut Sender<(PathId, StepUpdate)>,
         handle: Handle,
     ) -> StepPtr {
         let step_update = self.append_handle(handle);
@@ -529,11 +529,12 @@ impl<'a> PackedPathMut<'a> {
     }
 
     #[inline]
-    fn append_handles_iter_chn<I>(
+    pub fn append_handles_iter_chn<I>(
         &mut self,
-        sender: Sender<(PathId, StepUpdate)>,
+        sender: &mut Sender<(PathId, StepUpdate)>,
         mut iter: I,
-    ) -> Vec<StepPtr>
+    )
+    // ) -> Vec<StepPtr>
     where
         I: Iterator<Item = Handle>,
     {
@@ -543,8 +544,6 @@ impl<'a> PackedPathMut<'a> {
         let mut steps_buf: Vec<u64> = Vec::with_capacity(steps_page_size);
         let mut links_buf: Vec<u64> = Vec::with_capacity(links_page_size);
         let mut page_buf: Vec<u64> = Vec::with_capacity(steps_page_size);
-
-        let mut steps: Vec<StepPtr> = Vec::with_capacity(steps_page_size);
 
         let mut cur_ptr = self.path.steps_ref().storage_len() + 1;
 
@@ -601,14 +600,12 @@ impl<'a> PackedPathMut<'a> {
         self.path.steps_mut().links.set(links_len - 1, 0);
 
         self.tail = StepPtr::from_one_based(cur_ptr - 1);
-
-        steps
     }
 
     #[inline]
-    pub(crate) fn prepend_handle_chn(
+    pub fn prepend_handle_chn(
         &mut self,
-        sender: Sender<(PathId, StepUpdate)>,
+        sender: &mut Sender<(PathId, StepUpdate)>,
         handle: Handle,
     ) -> StepPtr {
         let step_update = self.prepend_handle(handle);
@@ -618,9 +615,9 @@ impl<'a> PackedPathMut<'a> {
     }
 
     #[inline]
-    pub(crate) fn insert_handle_after_chn(
+    pub fn insert_handle_after_chn(
         &mut self,
-        sender: Sender<(PathId, StepUpdate)>,
+        sender: &mut Sender<(PathId, StepUpdate)>,
         step: StepPtr,
         handle: Handle,
     ) -> Option<StepPtr> {
@@ -637,9 +634,9 @@ impl<'a> PackedPathMut<'a> {
     }
 
     #[inline]
-    pub(crate) fn remove_step_chn(
+    pub fn remove_step_chn(
         &mut self,
-        sender: Sender<(PathId, StepUpdate)>,
+        sender: &mut Sender<(PathId, StepUpdate)>,
         step: StepPtr,
     ) -> bool {
         if let Some(step_update) = self.remove_step_at_index(step) {
@@ -652,9 +649,9 @@ impl<'a> PackedPathMut<'a> {
     }
 
     #[inline]
-    fn rewrite_segment_chn(
+    pub fn rewrite_segment_chn(
         &mut self,
-        sender: Sender<(PathId, StepUpdate)>,
+        sender: &mut Sender<(PathId, StepUpdate)>,
         from: StepPtr,
         to: StepPtr,
         new_segment: &[Handle],
@@ -735,9 +732,9 @@ impl<'a> PackedPathMut<'a> {
     }
 
     #[inline]
-    pub(crate) fn flip_step_orientation_chn(
+    pub fn flip_step_orientation_chn(
         &mut self,
-        sender: Sender<(PathId, StepUpdate)>,
+        sender: &mut Sender<(PathId, StepUpdate)>,
         step: StepPtr,
     ) -> Option<()> {
         let step_rec_ix = step.to_record_start(1)?;

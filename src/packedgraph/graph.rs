@@ -578,6 +578,39 @@ impl PackedGraph {
         }
     }
 
+    pub fn with_all_paths_mut_ctx_chn_new<F>(&mut self, f: F)
+    where
+        for<'b> F: Fn(
+                PathId,
+                &mut crossbeam_channel::Sender<(PathId, paths::StepUpdate)>,
+                &mut paths::PackedPathMut<'b>,
+            ) + Sync,
+    {
+        use crossbeam_channel::unbounded;
+
+        let (sender, receiver) = unbounded::<(PathId, paths::StepUpdate)>();
+        // unbounded::<(PathId, Vec<paths::StepUpdate>)>();
+
+        let paths = &mut self.paths;
+        let nodes = &mut self.nodes;
+        let occurrences = &mut self.occurrences;
+
+        rayon::join(
+            || {
+                Self::apply_step_updates_worker(receiver, nodes, occurrences);
+            },
+            || {
+                let mut mut_ctx = paths.get_all_paths_mut_ctx();
+                let refs_mut = mut_ctx.par_iter_mut();
+
+                refs_mut.for_each_with(sender, |s, path| {
+                    let path_id = path.path_id;
+                    let updates = f(path_id, s, path);
+                });
+            },
+        );
+    }
+
     pub fn with_all_paths_mut_ctx_chn<F>(&mut self, f: F)
     where
         for<'b> F: Fn(PathId, &mut paths::PackedPathMut<'b>) -> Vec<paths::StepUpdate>
