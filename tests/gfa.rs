@@ -366,3 +366,70 @@ fn gfa_a3105_simple_construction() {
     println!("comparing");
     assert_eq!(test_records, expected_test_records);
 }
+
+#[test]
+fn gfa_a3105_fast_construction() {
+    let parser = GFAParser::new();
+    let gfa: GFA<usize, ()> =
+        parser.parse_file("tests/gfas/A-3105.gfa").unwrap();
+
+    println!("parsed GFA");
+    let min_id = gfa.segments.iter().map(|seg| seg.name).min().unwrap();
+    let id_offset = if min_id == 0 { 1 } else { 0 };
+
+    let mut graph = PackedGraph::default();
+
+    println!("adding segments");
+    for segment in gfa.segments.iter() {
+        let id = (segment.name + id_offset) as u64;
+        graph.create_handle(&segment.sequence, id);
+    }
+
+    let edges_iter = gfa.links.iter().map(|link| {
+        let from_id = (link.from_segment + id_offset) as u64;
+        let to_id = (link.to_segment + id_offset) as u64;
+
+        let from = Handle::new(from_id, link.from_orient);
+        let to = Handle::new(to_id, link.to_orient);
+        Edge(from, to)
+    });
+
+    graph.create_edges_iter(edges_iter);
+
+    use fnv::FnvHashMap;
+
+    let mut path_ids: FnvHashMap<PathId, usize> = FnvHashMap::default();
+    path_ids.reserve(gfa.paths.len());
+
+    for (index, path) in gfa.paths.iter().enumerate() {
+        let path_id = graph.create_path(&path.path_name, false).unwrap();
+        path_ids.insert(path_id, index);
+    }
+
+    graph.with_all_paths_mut_ctx_chn_new(|path_id, sender, path_ref| {
+        let &index = path_ids.get(&path_id).unwrap();
+        let path = &gfa.paths[index];
+        path_ref.append_handles_iter_chn(
+            sender,
+            path.iter().map(|(node, orient)| {
+                let node = node + id_offset;
+                Handle::new(node, orient)
+            }),
+        );
+    });
+
+    let test_records = get_graph_rows(&graph);
+
+    let mut expected_file = File::open("tests/gfas/A-3105.gfa.test").unwrap();
+    let mut expected_contents = String::new();
+    expected_file
+        .read_to_string(&mut expected_contents)
+        .unwrap();
+
+    println!("deserializing baseline records");
+    let expected_test_records =
+        TestRecords::deserialize(&expected_contents).unwrap();
+
+    println!("comparing");
+    assert_eq!(test_records, expected_test_records);
+}
