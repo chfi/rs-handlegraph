@@ -53,9 +53,9 @@ impl RecordIndex for PathLinkRecordIx {
 /// list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PackedStep {
-    pub(crate) handle: Handle,
-    pub(crate) prev: StepPtr,
-    pub(crate) next: StepPtr,
+    pub handle: Handle,
+    pub prev: StepPtr,
+    pub next: StepPtr,
 }
 
 #[derive(Debug, Clone)]
