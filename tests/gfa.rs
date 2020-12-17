@@ -6,10 +6,18 @@ use handlegraph::{
         HashGraph,
     },
     mutablehandlegraph::*,
+    packed::*,
     pathhandlegraph::*,
 };
 
 use handlegraph::packedgraph::PackedGraph;
+
+use gfa::{gfa::GFA, parser::GFAParser};
+
+use std::fs::File;
+use std::io::Read;
+
+use anyhow::Result;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodeRow {
@@ -300,4 +308,61 @@ pub fn get_graph_rows(graph: &PackedGraph) -> TestRecords {
         path_rows,
         occur_rows,
     }
+}
+
+#[test]
+fn gfa_a3105_simple_construction() {
+    let parser = GFAParser::new();
+    let gfa: GFA<usize, ()> =
+        parser.parse_file("tests/gfas/A-3105.gfa").unwrap();
+
+    println!("parsed GFA");
+    let min_id = gfa.segments.iter().map(|seg| seg.name).min().unwrap();
+    let id_offset = if min_id == 0 { 1 } else { 0 };
+
+    let mut graph = PackedGraph::default();
+
+    println!("adding segments");
+    for segment in gfa.segments.iter() {
+        let id = (segment.name + id_offset) as u64;
+        graph.create_handle(&segment.sequence, id);
+    }
+
+    println!("adding links");
+    for link in gfa.links.iter() {
+        let from_id = (link.from_segment + id_offset) as u64;
+        let to_id = (link.to_segment + id_offset) as u64;
+
+        let from = Handle::new(from_id, link.from_orient);
+        let to = Handle::new(to_id, link.to_orient);
+
+        graph.create_edge(Edge(from, to));
+    }
+
+    println!("adding paths");
+    let mut count = 0;
+    for path in gfa.paths.iter() {
+        println!("  {}", count);
+        count += 1;
+        let path_id = graph.create_path(&path.path_name, false).unwrap();
+        for (node, orient) in path.iter() {
+            let handle = Handle::new(node as u64, orient);
+            graph.path_append_step(path_id, handle);
+        }
+    }
+
+    let test_records = get_graph_rows(&graph);
+
+    let mut expected_file = File::open("tests/gfas/A-3105.gfa.test").unwrap();
+    let mut expected_contents = String::new();
+    expected_file
+        .read_to_string(&mut expected_contents)
+        .unwrap();
+
+    println!("deserializing baseline records");
+    let expected_test_records =
+        TestRecords::deserialize(&expected_contents).unwrap();
+
+    println!("comparing");
+    assert_eq!(test_records, expected_test_records);
 }
