@@ -310,11 +310,9 @@ pub fn get_graph_rows(graph: &PackedGraph) -> TestRecords {
     }
 }
 
-#[test]
-fn gfa_a3105_simple_construction() {
+fn test_gfa_simple_construction(gfa_path: &str, record_path: &str) {
     let parser = GFAParser::new();
-    let gfa: GFA<usize, ()> =
-        parser.parse_file("tests/gfas/A-3105.gfa").unwrap();
+    let gfa: GFA<usize, ()> = parser.parse_file(gfa_path).unwrap();
 
     println!("parsed GFA");
     let min_id = gfa.segments.iter().map(|seg| seg.name).min().unwrap();
@@ -353,7 +351,7 @@ fn gfa_a3105_simple_construction() {
 
     let test_records = get_graph_rows(&graph);
 
-    let mut expected_file = File::open("tests/gfas/A-3105.gfa.test").unwrap();
+    let mut expected_file = File::open(record_path).unwrap();
     let mut expected_contents = String::new();
     expected_file
         .read_to_string(&mut expected_contents)
@@ -367,11 +365,9 @@ fn gfa_a3105_simple_construction() {
     assert_eq!(test_records, expected_test_records);
 }
 
-#[test]
-fn gfa_a3105_fast_construction() {
+fn test_gfa_fast_construction(gfa_path: &str, record_path: &str) {
     let parser = GFAParser::new();
-    let gfa: GFA<usize, ()> =
-        parser.parse_file("tests/gfas/A-3105.gfa").unwrap();
+    let gfa: GFA<usize, ()> = parser.parse_file(gfa_path).unwrap();
 
     println!("parsed GFA");
     let min_id = gfa.segments.iter().map(|seg| seg.name).min().unwrap();
@@ -420,7 +416,7 @@ fn gfa_a3105_fast_construction() {
 
     let test_records = get_graph_rows(&graph);
 
-    let mut expected_file = File::open("tests/gfas/A-3105.gfa.test").unwrap();
+    let mut expected_file = File::open(record_path).unwrap();
     let mut expected_contents = String::new();
     expected_file
         .read_to_string(&mut expected_contents)
@@ -432,4 +428,20 @@ fn gfa_a3105_fast_construction() {
 
     println!("comparing");
     assert_eq!(test_records, expected_test_records);
+}
+
+#[test]
+fn gfa_a3105_simple_construction() {
+    test_gfa_simple_construction(
+        "tests/gfas/A-3105.gfa",
+        "tests/gfas/A-3105.gfa.test",
+    );
+}
+
+#[test]
+fn gfa_a3105_fast_construction() {
+    test_gfa_fast_construction(
+        "tests/gfas/A-3105.gfa",
+        "tests/gfas/A-3105.gfa.test",
+    );
 }
