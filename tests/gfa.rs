@@ -445,3 +445,36 @@ fn gfa_a3105_fast_construction() {
         "tests/gfas/A-3105.gfa.test",
     );
 }
+
+#[test]
+fn gfa_drb3_3125_simple_construction() {
+    test_gfa_simple_construction(
+        "tests/gfas/DRB3-3125.smooth.gfa",
+        "tests/gfas/DRB3-3125.smooth.gfa.test",
+    );
+}
+
+#[test]
+fn gfa_drb3_3125_fast_construction() {
+    test_gfa_fast_construction(
+        "tests/gfas/DRB3-3125.smooth.gfa",
+        "tests/gfas/DRB3-3125.smooth.gfa.test",
+    );
+}
+
+#[test]
+fn gfa_l3139_simple_construction() {
+    test_gfa_simple_construction(
+        "tests/gfas/L-3139.gfa",
+        "tests/gfas/L-3139.gfa.test",
+    );
+}
+
+#[test]
+fn gfa_l3139_fast_construction() {
+    test_gfa_fast_construction(
+        "tests/gfas/L-3139.gfa",
+        "tests/gfas/L-3139.gfa.test",
+    );
+}
+
