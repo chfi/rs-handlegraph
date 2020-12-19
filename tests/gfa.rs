@@ -478,3 +478,18 @@ fn gfa_l3139_fast_construction() {
     );
 }
 
+#[test]
+fn gfa_mica_100507436_simple_construction() {
+    test_gfa_simple_construction(
+        "tests/gfas/MICA-100507436.sort.gfa",
+        "tests/gfas/MICA-100507436.sort.gfa.test",
+    );
+}
+
+#[test]
+fn gfa_mica_100507436_fast_construction() {
+    test_gfa_fast_construction(
+        "tests/gfas/MICA-100507436.sort.gfa",
+        "tests/gfas/MICA-100507436.sort.gfa.test",
+    );
+}
