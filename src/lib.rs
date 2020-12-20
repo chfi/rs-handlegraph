@@ -57,3 +57,5 @@ pub mod packedgraph;
 pub mod conversion;
 pub mod packed;
 pub mod util;
+
+pub mod consensus;
