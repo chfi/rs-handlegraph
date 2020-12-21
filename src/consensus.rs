@@ -132,5 +132,60 @@ pub fn create_consensus_graph(
         .filter(|path_id| is_consensus[path_id.0 as usize])
         .collect();
 
+    let get_path_seq_len =
+        |path: PathId, begin: StepPtr, end: StepPtr| -> usize {
+            let mut step = begin;
+            let mut len = 0;
+            while step != end {
+                let handle = smoothed.path_handle_at_step(path, step).unwrap();
+                len += smoothed.node_len(handle);
+                step = smoothed.path_next_step(path, step).unwrap();
+            }
+
+            len
+        };
+
+    let get_path_seq =
+        |path: PathId, begin: StepPtr, end: StepPtr| -> Vec<u8> {
+            let mut step = begin;
+            let mut seq = Vec::new();
+            while step != end {
+                let handle = smoothed.path_handle_at_step(path, step).unwrap();
+                seq.extend(smoothed.sequence(handle));
+                step = smoothed.path_next_step(path, step).unwrap();
+            }
+
+            seq
+        };
+
+    let novel_seq_len = |path: PathId,
+                         begin: StepPtr,
+                         end: StepPtr,
+                         seen_nodes: &FnvHashSet<NodeId>,
+                         graph: &PackedGraph|
+     -> usize {
+        unimplemented!();
+    };
+
+    let mark_seen_nodes = |path: PathId,
+                           begin: StepPtr,
+                           end: StepPtr,
+                           seen_nodes: &mut FnvHashSet<NodeId>,
+                           graph: &PackedGraph| {
+        unimplemented!();
+    };
+
+    let compute_best_link =
+        |links: &[LinkPath], seen_nodes: &mut FnvHashSet<NodeId>| {
+            unimplemented!();
+        };
+
+    let add_path_segment = |link: &LinkPath,
+                            begin: StepPtr,
+                            end: StepPtr,
+                            cns: &mut PackedGraph| {
+        unimplemented!();
+    };
+
     res_graph
 }
