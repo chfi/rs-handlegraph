@@ -187,5 +187,36 @@ pub fn create_consensus_graph(
         unimplemented!();
     };
 
+    for &nc_path in non_consensus_paths.iter() {
+        let mut link: LinkPath;
+
+        let path = smoothed.get_path_ref(nc_path).unwrap();
+
+        let mut last_seen_consensus: Option<PathId> = None;
+        let mut on_consensus = false;
+
+        for step in path.steps() {
+            // check if we're on the step with any consensus
+
+            // if we're on the consensus
+            if on_consensus {
+                // we haven't seen any consensus before?
+                if last_seen_consensus.is_none() {
+                } else {
+                    /*
+                        if link.from_cons_path == curr_consensus
+                        && jump_length < consensus_jump_max {
+                        link.begin = step;
+                        link.end = step;
+                        link.length = 0;
+                    } else { // or it's different
+                    }
+                        */
+                }
+            } else {
+            }
+        }
+    }
+
     res_graph
 }
