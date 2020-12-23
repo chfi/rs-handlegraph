@@ -74,4 +74,14 @@ fn combine_handles(
 
 pub fn unchop(graph: &mut PackedGraph) {
     //
+    // let mut node_rank: FnvHashMap<NodeId, usize> = FnvHashMap::default();
+    // node_rank.reserve(graph.node_count());
+
+    let mut node_rank: FnvHashMap<NodeId, usize> = graph
+        .handles()
+        .enumerate()
+        .map(|(rank, handle)| (handle.id(), rank))
+        .collect();
+
+    // TODO find the components to merge
 }
