@@ -18,7 +18,8 @@ succinct = "0.5"
 rayon = "1.5"
 crossbeam-channel = "0.5"
 anyhow = "1.0"
-ena = "0.14.0"
+# ena = "0.14.0"
+red_union_find = "0.3.0"
 boomphf = "0.5.8"
 
 [dev-dependencies]

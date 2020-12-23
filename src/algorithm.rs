@@ -12,7 +12,7 @@ use fnv::{FnvHashMap, FnvHashSet};
 
 use boomphf::*;
 
-use ena::unify::*;
+use red_union_find::UF;
 
 use rayon::prelude::*;
 
@@ -22,10 +22,35 @@ pub fn simple_components(
     graph: &PackedGraph,
     min_size: usize,
 ) -> Vec<Vec<Handle>> {
-    let bphf_data: Vec<_> =
-        graph.handles().map(|h| (h.0, h.flip().0)).collect();
+    let mut bphf_data = Vec::with_capacity(graph.node_count() * 2 + 1);
+    for handle in graph.handles() {
+        bphf_data.push(handle.0);
+        bphf_data.push(handle.flip().0);
+    }
 
     let bphf = Mphf::new_parallel(1.7, &bphf_data, None);
+
+    // TODO this isn't strictly portable, but UF<T> requires T:
+    // Into<usize>, which u64 doesn't implement, at least not on
+    // stable -- this should work fine, though.
+    let mut union_find: UF<usize> = UF::new_reflexive(bphf_data.len() + 1);
+    for handle in graph.handles() {
+        let h_i = bphf.hash(&handle.0);
+        let h_j = bphf.hash(&handle.flip().0);
+        union_find.union(h_i as usize, h_j as usize);
+    }
+
+    for Edge(from, to) in graph.edges() {
+        if from.id() == to.id()
+            && graph.degree(from, Direction::Right) == 1
+            && graph.degree(to, Direction::Left) == 1
+            && perfect_neighbors(graph, from, to)
+        {
+            let from = bphf.hash(&from.0);
+            let to = bphf.hash(&to.0);
+            union_find.union(from as usize, to as usize);
+        }
+    }
 
     unimplemented!();
 }
