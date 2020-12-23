@@ -58,4 +58,5 @@ pub mod conversion;
 pub mod packed;
 pub mod util;
 
+pub mod algorithm;
 pub mod consensus;
