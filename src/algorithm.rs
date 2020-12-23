@@ -10,23 +10,38 @@ use crate::packedgraph::*;
 
 use fnv::{FnvHashMap, FnvHashSet};
 
+use boomphf::*;
+
+use ena::unify::*;
+
 use rayon::prelude::*;
 
 pub mod unchop;
+
+pub fn simple_components(
+    graph: &PackedGraph,
+    min_size: usize,
+) -> Vec<Vec<Handle>> {
+    let bphf_data: Vec<_> =
+        graph.handles().map(|h| (h.0, h.flip().0)).collect();
+
+    let bphf = Mphf::new_parallel(1.7, &bphf_data, None);
+
+    unimplemented!();
+}
 
 pub fn perfect_neighbors(
     graph: &PackedGraph,
     left: Handle,
     right: Handle,
 ) -> bool {
-    let mut perfect = true;
     let mut expected_next = 0usize;
 
     for (path_id, step_ptr) in graph.steps_on_handle(left).unwrap() {
         let step_is_rev =
             graph.path_handle_at_step(path_id, step_ptr).unwrap() != left;
 
-        let mut next_step = if step_is_rev {
+        let next_step = if step_is_rev {
             graph.path_prev_step(path_id, step_ptr)
         } else {
             graph.path_next_step(path_id, step_ptr)
