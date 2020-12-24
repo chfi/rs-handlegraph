@@ -99,17 +99,17 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
         };
 
         loop {
-            if graph.path_handle_at_step(path_id, back_step).unwrap()
-                == last_step
-            {
-                break;
-            }
-
             back_step = if runs_reverse {
                 graph.path_prev_step(path_id, back_step).unwrap()
             } else {
                 graph.path_next_step(path_id, back_step).unwrap()
             };
+
+            if graph.path_handle_at_step(path_id, back_step).unwrap()
+                == last_step
+            {
+                break;
+            }
         }
 
         if runs_reverse {
@@ -179,4 +179,75 @@ pub fn unchop(graph: &mut PackedGraph) {
         ordered_handles.into_iter().map(|(_, h)| h).collect();
 
     graph.apply_ordering(&handle_order);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hnd(x: u64) -> Handle {
+        Handle::pack(x, false)
+    }
+
+    fn vec_hnd(v: Vec<u64>) -> Vec<Handle> {
+        v.into_iter().map(hnd).collect::<Vec<_>>()
+    }
+
+    #[test]
+    fn concat_nodes_basic() {
+        let mut graph = PackedGraph::default();
+
+        let n1 = graph.append_handle(b"CAAATAAG");
+        let n2 = graph.append_handle(b"A");
+        let n3 = graph.append_handle(b"G");
+        let n4 = graph.append_handle(b"T");
+        let n5 = graph.append_handle(b"C");
+        let n6 = graph.append_handle(b"TTG");
+
+        graph.create_edge(Edge(n1, n2));
+        graph.create_edge(Edge(n1, n5));
+        graph.create_edge(Edge(n2, n3));
+        graph.create_edge(Edge(n5, n6));
+        graph.create_edge(Edge(n3, n4));
+        graph.create_edge(Edge(n6, n4));
+
+        let prep_path =
+            |graph: &mut PackedGraph, name: &[u8], steps: Vec<Handle>| {
+                let path = graph.create_path(name, false).unwrap();
+                (path, steps)
+            };
+
+        let (path_1, p_1_steps) =
+            prep_path(&mut graph, b"path1", vec![n1, n2, n3, n4]);
+
+        let (path_2, p_2_steps) =
+            prep_path(&mut graph, b"path2", vec![n1, n5, n6, n4]);
+
+        let steps_vecs = vec![p_1_steps, p_2_steps];
+
+        graph.zip_all_paths_mut_ctx(
+            steps_vecs.into_par_iter(),
+            |steps, _path_id, path| {
+                steps
+                    .into_iter()
+                    .map(|h| path.append_handle(h))
+                    .collect::<Vec<_>>()
+            },
+        );
+
+        // let comps = simple_components(&graph, 2);
+
+        crate::packedgraph::tests::print_path_debug(&graph, path_1.0);
+        crate::packedgraph::tests::print_path_debug(&graph, path_2.0);
+
+        println!(" concatenating nodes ");
+
+        let n7 = concat_nodes(&mut graph, &[n2, n3]);
+        let n8 = concat_nodes(&mut graph, &[n5, n6]);
+
+        crate::packedgraph::tests::print_path_debug(&graph, path_1.0);
+        crate::packedgraph::tests::print_path_debug(&graph, path_2.0);
+
+        // assert_eq!(comps, vec![vec_hnd(vec![2, 3]), vec_hnd(vec![5, 6])]);
+    }
 }

@@ -435,7 +435,7 @@ impl TransformNodeIds for PackedGraph {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use rayon::prelude::*;
 
     use super::index::list::*;
@@ -472,7 +472,7 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    fn print_path_debug(graph: &PackedGraph, id: u64) {
+    pub(crate) fn print_path_debug(graph: &PackedGraph, id: u64) {
         let path_ref = graph.paths.path_ref(PathId(id)).unwrap();
         let head = path_ref.head;
         let tail = path_ref.tail;
@@ -481,7 +481,7 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    fn print_node_records(graph: &PackedGraph, ids: &[u64]) {
+    pub(crate) fn print_node_records(graph: &PackedGraph, ids: &[u64]) {
         println!("{:4}  {:6}  {:5}  {:5}", "Node", "Record", "Left", "Right");
         for &id in ids.iter() {
             let (record, left, right) =
@@ -500,7 +500,7 @@ mod tests {
     }
 
     #[allow(dead_code)]
-    fn print_edge_records(graph: &PackedGraph) {
+    pub(crate) fn print_edge_records(graph: &PackedGraph) {
         println!("{:6}  {:6}  {:6}", "EdgeIx", "Target", "Next");
 
         for ix in 0..graph.edges.record_count() {
