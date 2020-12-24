@@ -1108,6 +1108,9 @@ where
         if let Some(ix) = to_step.next.to_record_ix(2, 0) {
             steps.links.set_pack(ix, end);
         }
+        if let Some(ix) = end.to_record_ix(2, 1) {
+            steps.links.set_pack(ix, to_step.next);
+        }
 
         Some((start, end, res))
     }
