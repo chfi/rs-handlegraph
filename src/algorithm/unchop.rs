@@ -42,16 +42,40 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
     let mut neighbors =
         graph.neighbors(left, Direction::Left).collect::<Vec<_>>();
 
+    let mut left_neighbors: FnvHashSet<Handle> = FnvHashSet::default();
+
     for &other in neighbors.iter() {
-        graph.create_edge(Edge(other, left));
+        if Some(other) == handles.last().copied() {
+            left_neighbors.insert(new_handle);
+        } else if Some(other) == handles.first().copied().map(Handle::flip) {
+            left_neighbors.insert(new_handle.flip());
+        } else {
+            left_neighbors.insert(other);
+        }
     }
 
     // create the right neighbors
     neighbors.clear();
     neighbors.extend(graph.neighbors(right, Direction::Right));
 
-    for &other in neighbors.iter() {
-        graph.create_edge(Edge(right, other));
+    let mut right_neighbors: FnvHashSet<Handle> = FnvHashSet::default();
+
+    for other in neighbors {
+        if Some(other) == handles.first().copied() {
+            // right_neighbors.insert(new_handle);
+        } else if Some(other) == handles.last().copied().map(Handle::flip) {
+            right_neighbors.insert(new_handle.flip());
+        } else {
+            right_neighbors.insert(other);
+        }
+    }
+
+    for other in left_neighbors {
+        graph.create_edge(Edge(other, new_handle));
+    }
+
+    for other in right_neighbors {
+        graph.create_edge(Edge(new_handle, other));
     }
 
     // TODO update paths
