@@ -52,7 +52,84 @@ pub fn simple_components(
         }
     }
 
-    unimplemented!();
+    let mut simple_components: FnvHashMap<u64, Vec<Handle>> =
+        FnvHashMap::default();
+
+    for handle in graph.handles() {
+        let a_id = union_find.find(handle.0 as usize);
+        simple_components
+            .entry(a_id as u64)
+            .or_default()
+            .push(handle);
+    }
+
+    let mut handle_components: Vec<Vec<Handle>> = Vec::new();
+
+    for comp in simple_components.values_mut() {
+        if comp.len() < min_size {
+            continue;
+        }
+
+        comp.sort_by(|a, b| b.cmp(a));
+
+        let comp_set: FnvHashSet<Handle> = comp.iter().copied().collect();
+
+        let mut handle = *comp.first().unwrap();
+        let base = handle;
+        let mut has_prev: bool;
+
+        loop {
+            has_prev = graph.degree(handle, Direction::Left) == 1;
+            let mut prev = handle;
+
+            if has_prev {
+                graph
+                    .neighbors(handle, Direction::Left)
+                    .for_each(|p| prev = p);
+            }
+
+            if handle != prev
+                && prev != base
+                && comp_set.len() == prev.0 as usize
+            {
+                handle = prev;
+            } else {
+                break;
+            }
+        }
+
+        let base = handle;
+        let mut has_next: bool;
+
+        let mut sorted_comp: Vec<Handle> = Vec::new();
+
+        loop {
+            sorted_comp.push(handle);
+            has_next = graph.degree(handle, Direction::Right) == 1;
+            let mut next = handle;
+
+            if has_next {
+                graph
+                    .neighbors(handle, Direction::Right)
+                    .for_each(|p| next = p);
+            }
+
+            if handle != next
+                && next != base
+                && comp_set.len() == next.0 as usize
+            {
+                handle = next;
+            } else {
+                break;
+            }
+        }
+
+        if sorted_comp.len() >= min_size {
+            handle_components.push(sorted_comp);
+        }
+    }
+
+    handle_components
 }
 
 pub fn perfect_neighbors(
