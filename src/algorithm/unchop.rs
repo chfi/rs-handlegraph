@@ -79,6 +79,48 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
     }
 
     // TODO update paths
+    let mut to_rewrite: Vec<(PathId, StepPtr, StepPtr, bool)> = Vec::new();
+
+    for (path_id, front_step) in
+        graph.steps_on_handle(*handles.first().unwrap()).unwrap()
+    {
+        let runs_reverse = graph.path_handle_at_step(path_id, front_step)
+            != handles.first().copied();
+
+        let mut back_step = front_step;
+
+        let last_step = if runs_reverse {
+            let h = *handles.last().unwrap();
+            h.flip()
+        } else {
+            *handles.last().unwrap()
+        };
+
+        loop {
+            if graph.path_handle_at_step(path_id, back_step).unwrap()
+                == last_step
+            {
+                break;
+            }
+
+            back_step = if runs_reverse {
+                graph.path_prev_step(path_id, back_step).unwrap()
+            } else {
+                graph.path_next_step(path_id, back_step).unwrap()
+            };
+        }
+
+        if runs_reverse {
+            to_rewrite.push((path_id, back_step, front_step, true));
+        } else {
+            to_rewrite.push((path_id, front_step, back_step, false));
+        }
+    }
+
+    for (path_id, from, to, rev) in to_rewrite {
+        let new_seg = if rev { new_handle.flip() } else { new_handle };
+        graph.path_rewrite_segment(path_id, from, to, &[new_seg]);
+    }
 
     // remove the old nodes
     for &handle in handles.iter() {
