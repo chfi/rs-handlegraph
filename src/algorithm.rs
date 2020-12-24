@@ -88,10 +88,7 @@ pub fn simple_components(
                     .for_each(|p| prev = p);
             }
 
-            if handle != prev
-                && prev != base
-                && comp_set.len() == prev.0 as usize
-            {
+            if handle != prev && prev != base && comp_set.contains(&prev) {
                 handle = prev;
             } else {
                 break;
@@ -114,10 +111,7 @@ pub fn simple_components(
                     .for_each(|p| next = p);
             }
 
-            if handle != next
-                && next != base
-                && comp_set.len() == next.0 as usize
-            {
+            if handle != next && next != base && comp_set.contains(&next) {
                 handle = next;
             } else {
                 break;

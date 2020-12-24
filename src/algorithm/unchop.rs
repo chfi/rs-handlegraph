@@ -130,14 +130,6 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
     Some(new_handle)
 }
 
-fn combine_handles(
-    graph: &mut PackedGraph,
-    handles: &[Handle],
-) -> Option<Handle> {
-    //
-    unimplemented!();
-}
-
 pub fn unchop(graph: &mut PackedGraph) {
     //
     // let mut node_rank: FnvHashMap<NodeId, usize> = FnvHashMap::default();
