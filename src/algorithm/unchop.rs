@@ -12,6 +12,8 @@ use fnv::{FnvHashMap, FnvHashSet};
 
 use rayon::prelude::*;
 
+use super::simple_components;
+
 /// Merge the handles in the provided slice to a single node, whose
 /// sequence is the concatenation of the handles' sequences
 /// left-to-right.
@@ -131,15 +133,50 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
 }
 
 pub fn unchop(graph: &mut PackedGraph) {
-    //
-    // let mut node_rank: FnvHashMap<NodeId, usize> = FnvHashMap::default();
-    // node_rank.reserve(graph.node_count());
-
-    let mut node_rank: FnvHashMap<NodeId, usize> = graph
+    let node_rank: FnvHashMap<NodeId, usize> = graph
         .handles()
         .enumerate()
         .map(|(rank, handle)| (handle.id(), rank))
         .collect();
 
-    // TODO find the components to merge
+    let components = simple_components(graph, 2);
+
+    let to_merge: FnvHashSet<NodeId> = components
+        .iter()
+        .flat_map(|comp| comp.iter().map(|&h| h.id()))
+        .collect();
+
+    let mut ordered_handles: Vec<(f64, Handle)> = graph
+        .handles()
+        .filter_map(|handle| {
+            if to_merge.contains(&handle.id()) {
+                Some((node_rank[&handle.id()] as f64, handle))
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for comp in components.iter() {
+        if comp.len() >= 2 {
+            let rank_sum: f64 =
+                comp.iter().map(|h| node_rank[&h.id()] as f64).sum();
+
+            let rank_v = rank_sum / (comp.len() as f64);
+
+            let n = concat_nodes(graph, &comp).unwrap();
+            ordered_handles.push((rank_v, n));
+        } else {
+            for &handle in comp.iter() {
+                ordered_handles.push((node_rank[&handle.id()] as f64, handle));
+            }
+        }
+    }
+
+    ordered_handles.sort_by(|a, b| b.partial_cmp(a).unwrap());
+
+    let handle_order: Vec<Handle> =
+        ordered_handles.into_iter().map(|(_, h)| h).collect();
+
+    graph.apply_ordering(&handle_order);
 }
