@@ -22,7 +22,8 @@ pub fn simple_components(
     graph: &PackedGraph,
     min_size: usize,
 ) -> Vec<Vec<Handle>> {
-    let mut bphf_data = Vec::with_capacity(graph.node_count() * 2 + 1);
+    let mut bphf_data = Vec::with_capacity((1 + graph.node_count()) * 2);
+
     for handle in graph.handles() {
         bphf_data.push(handle.0);
         bphf_data.push(handle.flip().0);
@@ -34,6 +35,7 @@ pub fn simple_components(
     // Into<usize>, which u64 doesn't implement, at least not on
     // stable -- this should work fine, though.
     let mut union_find: UF<usize> = UF::new_reflexive(bphf_data.len() + 1);
+
     for handle in graph.handles() {
         let h_i = bphf.hash(&handle.0);
         let h_j = bphf.hash(&handle.flip().0);
@@ -41,7 +43,7 @@ pub fn simple_components(
     }
 
     for Edge(from, to) in graph.edges() {
-        if from.id() == to.id()
+        if from.id() != to.id()
             && graph.degree(from, Direction::Right) == 1
             && graph.degree(to, Direction::Left) == 1
             && perfect_neighbors(graph, from, to)
@@ -56,7 +58,7 @@ pub fn simple_components(
         FnvHashMap::default();
 
     for handle in graph.handles() {
-        let a_id = union_find.find(handle.0 as usize);
+        let a_id = union_find.find(bphf.hash(&handle.0) as usize);
         simple_components
             .entry(a_id as u64)
             .or_default()
@@ -83,9 +85,7 @@ pub fn simple_components(
             let mut prev = handle;
 
             if has_prev {
-                graph
-                    .neighbors(handle, Direction::Left)
-                    .for_each(|p| prev = p);
+                prev = graph.neighbors(handle, Direction::Left).next().unwrap();
             }
 
             if handle != prev && prev != base && comp_set.contains(&prev) {
@@ -106,9 +106,8 @@ pub fn simple_components(
             let mut next = handle;
 
             if has_next {
-                graph
-                    .neighbors(handle, Direction::Right)
-                    .for_each(|p| next = p);
+                next =
+                    graph.neighbors(handle, Direction::Right).next().unwrap();
             }
 
             if handle != next && next != base && comp_set.contains(&next) {
@@ -164,4 +163,40 @@ pub fn perfect_neighbors(
     let observed_next = graph.steps_on_handle(right).unwrap().count();
 
     observed_next == expected_next
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hnd(x: u64) -> Handle {
+        Handle::pack(x, false)
+    }
+
+    fn vec_hnd(v: Vec<u64>) -> Vec<Handle> {
+        v.into_iter().map(hnd).collect::<Vec<_>>()
+    }
+
+    #[test]
+    fn simple_components_basic() {
+        let mut graph = PackedGraph::default();
+
+        let n1 = graph.append_handle(b"CAAATAAG");
+        let n2 = graph.append_handle(b"A");
+        let n3 = graph.append_handle(b"G");
+        let n4 = graph.append_handle(b"T");
+        let n5 = graph.append_handle(b"C");
+        let n6 = graph.append_handle(b"TTG");
+
+        graph.create_edge(Edge(n1, n2));
+        graph.create_edge(Edge(n1, n5));
+        graph.create_edge(Edge(n2, n3));
+        graph.create_edge(Edge(n5, n6));
+        graph.create_edge(Edge(n3, n4));
+        graph.create_edge(Edge(n6, n4));
+
+        let comps = simple_components(&graph, 2);
+
+        assert_eq!(comps, vec![vec_hnd(vec![2, 3]), vec_hnd(vec![5, 6])]);
+    }
 }
