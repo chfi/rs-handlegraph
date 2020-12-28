@@ -147,7 +147,7 @@ pub fn unchop(graph: &mut PackedGraph) {
         .collect();
 
     let mut ordered_handles: Vec<(f64, Handle)> = graph
-        .handles()
+        .handles_par()
         .filter_map(|handle| {
             if !to_merge.contains(&handle.id()) {
                 Some((node_rank[&handle.id()] as f64, handle))
@@ -173,7 +173,7 @@ pub fn unchop(graph: &mut PackedGraph) {
         }
     }
 
-    ordered_handles.sort_by(|a, b| b.partial_cmp(a).unwrap());
+    ordered_handles.par_sort_by(|a, b| b.partial_cmp(a).unwrap());
 
     let handle_order: Vec<Handle> =
         ordered_handles.into_iter().map(|(_, h)| h).collect();
