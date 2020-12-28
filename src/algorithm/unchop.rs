@@ -193,8 +193,7 @@ mod tests {
         v.into_iter().map(hnd).collect::<Vec<_>>()
     }
 
-    #[test]
-    fn concat_nodes_basic() {
+    fn test_graph_1() -> PackedGraph {
         let mut graph = PackedGraph::default();
 
         let n1 = graph.append_handle(b"CAAATAAG");
@@ -217,10 +216,10 @@ mod tests {
                 (path, steps)
             };
 
-        let (path_1, p_1_steps) =
+        let (_path_1, p_1_steps) =
             prep_path(&mut graph, b"path1", vec![n1, n2, n3, n4]);
 
-        let (path_2, p_2_steps) =
+        let (_path_2, p_2_steps) =
             prep_path(&mut graph, b"path2", vec![n1, n5, n6, n4]);
 
         let steps_vecs = vec![p_1_steps, p_2_steps];
@@ -235,19 +234,61 @@ mod tests {
             },
         );
 
-        // let comps = simple_components(&graph, 2);
+        graph
+    }
 
-        crate::packedgraph::tests::print_path_debug(&graph, path_1.0);
-        crate::packedgraph::tests::print_path_debug(&graph, path_2.0);
+    #[test]
+    fn concat_nodes_basic() {
+        let mut graph = test_graph_1();
+
+        let path_1 = graph.get_path_id(b"path1").unwrap();
+        let path_2 = graph.get_path_id(b"path2").unwrap();
+
+        let get_steps = |graph: &PackedGraph, path: PathId| {
+            graph
+                .get_path_ref(path)
+                .map(|p| p.steps().map(|(_, s)| s.handle).collect::<Vec<_>>())
+                .unwrap()
+        };
+
+        let p1_steps = get_steps(&graph, path_1);
+        let p2_steps = get_steps(&graph, path_2);
+
+        assert_eq!(p1_steps, vec_hnd(vec![1, 2, 3, 4]));
+        assert_eq!(p2_steps, vec_hnd(vec![1, 5, 6, 4]));
+
+        for i in 1..=6 {
+            assert!(graph.has_node(i));
+        }
+
+        println!("Path 1: {:?}", p1_steps);
+        println!("Path 2: {:?}", p2_steps);
 
         println!(" concatenating nodes ");
 
-        let n7 = concat_nodes(&mut graph, &[n2, n3]);
-        let n8 = concat_nodes(&mut graph, &[n5, n6]);
+        let _n7 = concat_nodes(&mut graph, &[hnd(2), hnd(3)]);
+        let _n8 = concat_nodes(&mut graph, &[hnd(5), hnd(6)]);
 
-        crate::packedgraph::tests::print_path_debug(&graph, path_1.0);
-        crate::packedgraph::tests::print_path_debug(&graph, path_2.0);
+        assert!(graph.has_node(1));
+        assert!(graph.has_node(4));
+        assert!(graph.has_node(7));
+        assert!(graph.has_node(8));
 
-        // assert_eq!(comps, vec![vec_hnd(vec![2, 3]), vec_hnd(vec![5, 6])]);
+        assert!(!graph.has_node(2));
+        assert!(!graph.has_node(3));
+        assert!(!graph.has_node(5));
+        assert!(!graph.has_node(6));
+
+        let p1_steps = get_steps(&graph, path_1);
+        let p2_steps = get_steps(&graph, path_2);
+
+        assert_eq!(p1_steps, vec_hnd(vec![1, 7, 4]));
+        assert_eq!(p2_steps, vec_hnd(vec![1, 8, 4]));
+
+        println!("Path 1: {:?}", p1_steps);
+        println!("Path 2: {:?}", p2_steps);
     }
+
+    #[test]
+    fn unchop_simple() {}
 }
