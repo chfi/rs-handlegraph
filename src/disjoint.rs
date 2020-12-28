@@ -120,3 +120,37 @@ impl DisjointSets {
         id_2
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn disj_set_evens_odds() {
+        let disj = DisjointSets::new(100);
+
+        rayon::join(
+            || {
+                for ix in 1..50 {
+                    let ix = (ix * 2) as u64;
+                    disj.unite(0, ix);
+                }
+            },
+            || {
+                for ix in 1..50 {
+                    let ix = ((ix * 2) + 1) as u64;
+                    disj.unite(1, ix);
+                }
+            },
+        );
+
+        let zero = disj.find(0);
+        let one = disj.find(1);
+
+        let evens_zero = (0..50).all(|x| disj.find(x * 2) == zero);
+        let odds_one = (0..50).all(|x| disj.find((x * 2) + 1) == one);
+
+        assert!(evens_zero);
+        assert!(odds_one);
+    }
+}
