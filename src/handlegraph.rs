@@ -119,6 +119,15 @@ pub trait IntoEdges: Sized {
     fn edges(self) -> Self::Edges;
 }
 
+/// Parallel access to all the edges in the graph.
+pub trait IntoEdgesPar {
+    /// The Rayon `ParallelIterator` through all the edges in the graph.
+    type EdgesPar: ParallelIterator<Item = Edge>;
+
+    /// Return a parallel iterator on all the edges in the graph.
+    fn edges_par(self) -> Self::EdgesPar;
+}
+
 /// Access to the neighbors of handles in the graph, and querying the
 /// graph for a node's degree.
 ///

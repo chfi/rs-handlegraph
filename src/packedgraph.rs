@@ -20,6 +20,8 @@ use crate::{
     },
 };
 
+use rayon::prelude::*;
+
 use self::graph::SeqRecordIx;
 
 mod defragment;
@@ -83,12 +85,28 @@ impl<'a> IntoHandles for &'a PackedGraph {
     }
 }
 
+impl<'a> IntoHandlesPar for &'a PackedGraph {
+    type HandlesPar = rayon::iter::IterBridge<NodeIdHandles<IndexMapIter<'a>>>;
+
+    fn handles_par(self) -> Self::HandlesPar {
+        self.handles().par_bridge()
+    }
+}
+
 impl<'a> IntoEdges for &'a PackedGraph {
     type Edges = EdgesIter<&'a PackedGraph>;
 
     #[inline]
     fn edges(self) -> Self::Edges {
         EdgesIter::new(self)
+    }
+}
+
+impl<'a> IntoEdgesPar for &'a PackedGraph {
+    type EdgesPar = rayon::iter::IterBridge<EdgesIter<&'a PackedGraph>>;
+
+    fn edges_par(self) -> Self::EdgesPar {
+        self.edges().par_bridge()
     }
 }
 
