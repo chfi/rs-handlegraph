@@ -55,6 +55,7 @@ pub mod hashgraph;
 pub mod packedgraph;
 
 pub mod conversion;
+pub mod disjoint;
 pub mod packed;
 pub mod util;
 
