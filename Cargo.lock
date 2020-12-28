@@ -206,7 +206,6 @@ dependencies = [
  "gfa",
  "quickcheck",
  "rayon",
- "red_union_find",
  "succinct",
 ]
 
@@ -398,15 +397,6 @@ dependencies = [
  "crossbeam-utils",
  "lazy_static",
  "num_cpus",
-]
-
-[[package]]
-name = "red_union_find"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0426d3646caee56b6e52f7baa12e730ec2e6b25e1a172aa81b4ec638bcbce343"
-dependencies = [
- "num-traits",
 ]
 
 [[package]]

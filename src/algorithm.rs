@@ -12,8 +12,6 @@ use fnv::{FnvHashMap, FnvHashSet};
 
 use boomphf::*;
 
-use red_union_find::UF;
-
 use crate::disjoint::DisjointSets;
 
 use rayon::prelude::*;
