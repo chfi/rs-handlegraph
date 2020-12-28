@@ -426,9 +426,16 @@ impl TransformNodeIds for PackedGraph {
 
     fn apply_ordering(&mut self, order: &[Handle]) {
         assert!(order.len() == self.node_count());
+
+        let rank: fnv::FnvHashMap<NodeId, usize> = self
+            .handles()
+            .enumerate()
+            .map(|(ix, h)| (h.id(), ix))
+            .collect();
+
         PackedGraph::transform_node_ids(self, |node| {
-            let ix = u64::from(node);
-            let handle = order[(ix + 1) as usize];
+            let ix = rank.get(&node).unwrap();
+            let handle = order[*ix];
             handle.id()
         });
     }

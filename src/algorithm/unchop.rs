@@ -149,7 +149,7 @@ pub fn unchop(graph: &mut PackedGraph) {
     let mut ordered_handles: Vec<(f64, Handle)> = graph
         .handles()
         .filter_map(|handle| {
-            if to_merge.contains(&handle.id()) {
+            if !to_merge.contains(&handle.id()) {
                 Some((node_rank[&handle.id()] as f64, handle))
             } else {
                 None
@@ -290,5 +290,40 @@ mod tests {
     }
 
     #[test]
-    fn unchop_simple() {}
+    fn unchop_simple() {
+        let mut graph = test_graph_1();
+
+        let path_1 = graph.get_path_id(b"path1").unwrap();
+        let path_2 = graph.get_path_id(b"path2").unwrap();
+
+        let get_steps = |graph: &PackedGraph, path: PathId| {
+            graph
+                .get_path_ref(path)
+                .map(|p| p.steps().map(|(_, s)| s.handle).collect::<Vec<_>>())
+                .unwrap()
+        };
+
+        let p1_steps = get_steps(&graph, path_1);
+        let p2_steps = get_steps(&graph, path_2);
+
+        assert_eq!(p1_steps, vec_hnd(vec![1, 2, 3, 4]));
+        assert_eq!(p2_steps, vec_hnd(vec![1, 5, 6, 4]));
+
+        for i in 1..=6 {
+            assert!(graph.has_node(i));
+        }
+
+        println!("Path 1: {:?}", p1_steps);
+        println!("Path 2: {:?}", p2_steps);
+
+        println!(" unchopping ");
+
+        unchop(&mut graph);
+
+        let p1_steps = get_steps(&graph, path_1);
+        let p2_steps = get_steps(&graph, path_2);
+
+        println!("Path 1: {:?}", p1_steps);
+        println!("Path 2: {:?}", p2_steps);
+    }
 }
