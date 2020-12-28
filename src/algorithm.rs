@@ -14,6 +14,8 @@ use boomphf::*;
 
 use red_union_find::UF;
 
+use crate::disjoint::DisjointSets;
+
 use rayon::prelude::*;
 
 pub mod unchop;
@@ -31,18 +33,15 @@ pub fn simple_components(
 
     let bphf = Mphf::new_parallel(1.7, &bphf_data, None);
 
-    // TODO this isn't strictly portable, but UF<T> requires T:
-    // Into<usize>, which u64 doesn't implement, at least not on
-    // stable -- this should work fine, though.
-    let mut union_find: UF<usize> = UF::new_reflexive(bphf_data.len() + 1);
+    let disj_set = DisjointSets::new(bphf_data.len() + 1);
 
-    for handle in graph.handles() {
+    graph.handles_par().for_each(|handle| {
         let h_i = bphf.hash(&handle.0);
         let h_j = bphf.hash(&handle.flip().0);
-        union_find.union(h_i as usize, h_j as usize);
-    }
+        disj_set.unite(h_i, h_j);
+    });
 
-    for Edge(from, to) in graph.edges() {
+    graph.edges_par().for_each(|Edge(from, to)| {
         if from.id() != to.id()
             && graph.degree(from, Direction::Right) == 1
             && graph.degree(to, Direction::Left) == 1
@@ -50,15 +49,15 @@ pub fn simple_components(
         {
             let from = bphf.hash(&from.0);
             let to = bphf.hash(&to.0);
-            union_find.union(from as usize, to as usize);
+            disj_set.unite(from, to);
         }
-    }
+    });
 
     let mut simple_components: FnvHashMap<u64, Vec<Handle>> =
         FnvHashMap::default();
 
     for handle in graph.handles() {
-        let a_id = union_find.find(bphf.hash(&handle.0) as usize);
+        let a_id = disj_set.find(bphf.hash(&handle.0));
         simple_components
             .entry(a_id as u64)
             .or_default()
