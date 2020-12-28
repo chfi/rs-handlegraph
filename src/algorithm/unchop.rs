@@ -320,8 +320,28 @@ mod tests {
 
         unchop(&mut graph);
 
+        let get_handle = |graph: &PackedGraph, id: u64| {
+            let lefts = graph
+                .neighbors(hnd(id), Direction::Left)
+                .map(|h| u64::from(h.id()))
+                .collect::<Vec<_>>();
+            let rights = graph
+                .neighbors(hnd(id), Direction::Right)
+                .map(|h| u64::from(h.id()))
+                .collect::<Vec<_>>();
+            (lefts, id, rights)
+        };
+
+        assert_eq!(get_handle(&graph, 8), (vec![], 8, vec![1, 7]));
+        assert_eq!(get_handle(&graph, 4), (vec![1, 7], 4, vec![]));
+        assert_eq!(get_handle(&graph, 7), (vec![8], 7, vec![4]));
+        assert_eq!(get_handle(&graph, 1), (vec![8], 1, vec![4]));
+
         let p1_steps = get_steps(&graph, path_1);
         let p2_steps = get_steps(&graph, path_2);
+
+        assert_eq!(p1_steps, vec_hnd(vec![8, 7, 4]));
+        assert_eq!(p2_steps, vec_hnd(vec![8, 1, 4]));
 
         println!("Path 1: {:?}", p1_steps);
         println!("Path 2: {:?}", p2_steps);
