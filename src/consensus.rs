@@ -287,7 +287,7 @@ fn compute_best_link(
     let (&best_hash, &best_count) =
         hash_counts.iter().max_by_key(|(_, c)| *c).unwrap();
 
-    let most_frequent_link = unique_links
+    let most_frequent_link: &LinkPath = unique_links
         .iter()
         .find(|&&link| link.hash == best_hash)
         .copied()
@@ -369,26 +369,42 @@ fn compute_best_link(
     // references to elements in unique_links, it looks like; need
     // to fix that
 
+    let mut link_rank = 0u64;
+
     if has_perfect_edge {
         // nothing, apparently
     } else if let Some(p_link) = perfect_link {
-        // TODO mark_seen_nodes()
-        // p_link.rank += 1;
-        consensus_links.push(p_link.clone());
+        let mut p_link = p_link.to_owned();
+        mark_seen_nodes(
+            graph,
+            &mut seen_nodes,
+            p_link.path,
+            p_link.begin,
+            p_link.end,
+        );
+        p_link.rank = link_rank;
+        link_rank += 1;
+        consensus_links.push(p_link);
     } else if most_frequent_link.from_cons_path
         != most_frequent_link.to_cons_path
     {
-
-        // most_frequent_link.lank +=
+        let mut link = most_frequent_link.to_owned();
+        link.rank = link_rank;
+        link_rank += 1;
+        mark_seen_nodes(
+            graph,
+            &mut seen_nodes,
+            link.path,
+            link.begin,
+            link.end,
+        );
+        consensus_links.push(link);
     }
-
-    let mut link_rank = 0u64;
 
     for link in unique_links {
         if link.hash == best_hash {
             continue;
         }
-        // TODO novel_sequence_length
         let novel_bp: usize = novel_seq_len(
             graph,
             &mut seen_nodes,
@@ -399,10 +415,20 @@ fn compute_best_link(
 
         if link.jump_len >= consensus_jump_max || novel_bp >= consensus_jump_max
         {
-            // TODO link.rank = link_rank;
+            let mut link = link.to_owned();
+
+            link.rank = link_rank;
             link_rank += 1;
-            consensus_links.push(link.clone());
-            // TODO mark_seen_nodes
+
+            mark_seen_nodes(
+                graph,
+                &mut seen_nodes,
+                link.path,
+                link.begin,
+                link.end,
+            );
+
+            consensus_links.push(link);
         }
     }
 }
