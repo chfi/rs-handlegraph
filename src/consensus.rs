@@ -113,8 +113,12 @@ pub fn create_consensus_graph(
         .collect();
 
     let mut handle_is_consensus: Vec<bool> = vec![false; smoothed.node_count()];
-    let mut handle_consensus_path_ids: Vec<PathId> =
-        vec![PathId(0); smoothed.node_count()];
+
+    let mut handle_consensus_path_ids: FnvHashMap<NodeId, Vec<PathId>> =
+        FnvHashMap::default();
+
+    // let mut handle_consensus_path_ids: Vec<PathId> =
+    //     vec![PathId(0); smoothed.node_count()];
 
     for &path_id in consensus_paths.iter() {
         if let Some(path_ref) = smoothed.get_path_ref(path_id) {
@@ -122,7 +126,12 @@ pub fn create_consensus_graph(
                 let node_id = step.handle().id();
                 let index = usize::from(node_id) - 1;
                 handle_is_consensus[index] = true;
-                handle_consensus_path_ids[index] = path_id;
+
+                handle_consensus_path_ids
+                    .entry(node_id)
+                    .or_default()
+                    .push(path_id);
+                // handle_consensus_path_ids[index] = path_id;
             }
         }
     }
@@ -219,4 +228,102 @@ pub fn create_consensus_graph(
     }
 
     res_graph
+}
+
+fn compute_best_link(
+    graph: &PackedGraph,
+    consensus_jump_max: usize,
+    links: &[LinkPath],
+    consensus_links: &mut Vec<LinkPath>,
+    perfect_edges: &mut Vec<(Handle, Handle)>,
+) {
+    let mut hash_counts: FnvHashMap<u64, u64> = FnvHashMap::default();
+    let mut unique_links: Vec<&LinkPath> = Vec::new();
+
+    let mut link_rank = 0usize;
+
+    for link in links {
+        let c = hash_counts.entry(link.hash).or_default();
+        if *c == 0 {
+            unique_links.push(link);
+        }
+        *c += 1;
+    }
+
+    let hash_lengths: FnvHashMap<u64, usize> =
+        links.iter().map(|link| (link.hash, link.length)).collect();
+
+    let (&best_hash, &best_count) =
+        hash_counts.iter().max_by_key(|(_, c)| *c).unwrap();
+
+    let most_frequent_link = unique_links
+        .iter()
+        .find(|&&link| link.hash == best_hash)
+        .unwrap();
+
+    let from_cons_path = most_frequent_link.from_cons_path;
+    let to_cons_path = most_frequent_link.to_cons_path;
+
+    let from_first = graph.path_first_step(from_cons_path).unwrap();
+    let from_last = graph.path_last_step(from_cons_path).unwrap();
+    let to_first = graph.path_first_step(to_cons_path).unwrap();
+    let to_last = graph.path_last_step(to_cons_path).unwrap();
+
+    let from_end_fwd: Handle = graph
+        .path_handle_at_step(from_cons_path, from_last)
+        .unwrap();
+    let from_end_rev = from_end_fwd.flip();
+
+    let to_begin_fwd: Handle =
+        graph.path_handle_at_step(to_cons_path, to_first).unwrap();
+    let to_begin_rev = to_begin_fwd.flip();
+
+    let from_begin_fwd = graph
+        .path_handle_at_step(from_cons_path, from_first)
+        .unwrap();
+    let from_begin_rev = from_begin_fwd.flip();
+
+    let to_end_fwd = graph.path_handle_at_step(to_cons_path, to_last).unwrap();
+    let to_end_rev = to_end_fwd.flip();
+
+    let mut has_perfect_edge = false;
+    let mut has_perfect_link = false;
+    let mut perfect_link = None;
+
+    if graph.has_edge(from_end_fwd, to_begin_fwd) {
+        perfect_edges.push((from_end_fwd, to_begin_fwd));
+        has_perfect_edge = true;
+    } else if graph.has_edge(to_end_fwd, from_begin_fwd) {
+        perfect_edges.push((to_end_fwd, from_begin_fwd));
+        has_perfect_edge = true;
+    } else {
+        for link in unique_links.iter() {
+            let mut step = link.begin;
+
+            loop {
+                let next = graph.path_next_step(link.path, step).unwrap();
+
+                let b: Handle =
+                    graph.path_handle_at_step(link.path, step).unwrap();
+                let e: Handle =
+                    graph.path_handle_at_step(link.path, next).unwrap();
+
+                if b == from_end_fwd && e == to_begin_fwd
+                    || b == from_end_rev && e == to_begin_rev
+                    || b == to_begin_fwd && e == from_end_fwd
+                    || b == to_begin_rev && e == from_end_rev
+                {
+                    has_perfect_link = true;
+                    perfect_link = Some(link);
+                    break;
+                }
+            }
+
+            if has_perfect_link {
+                break;
+            }
+        }
+    }
+
+    unimplemented!();
 }
