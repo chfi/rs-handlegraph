@@ -6,7 +6,7 @@ use std::ops::Add;
 /// graph implementation
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 #[repr(transparent)]
-pub struct NodeId(u64);
+pub struct NodeId(pub u64);
 
 crate::impl_space_usage_stack_newtype!(NodeId);
 

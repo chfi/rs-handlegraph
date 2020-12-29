@@ -14,8 +14,8 @@ use rayon::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct LinkPath {
-    pub from_cons_name: Vec<u8>,
-    pub to_cons_name: Vec<u8>,
+    // pub from_cons_name: Vec<u8>,
+    // pub to_cons_name: Vec<u8>,
     pub from_cons_path: PathId,
     pub to_cons_path: PathId,
     length: usize,
@@ -26,6 +26,30 @@ pub struct LinkPath {
     is_reverse: bool,
     jump_len: usize,
     rank: u64,
+}
+
+impl LinkPath {
+    fn new(
+        from_cons_path: PathId,
+        to_cons_path: PathId,
+        path: PathId,
+        step: StepPtr,
+    ) -> Self {
+        Self {
+            // from_cons_name: Vec::new(),
+            // to_cons_name: Vec::new(),
+            from_cons_path,
+            to_cons_path,
+            length: 0,
+            hash: 0,
+            path,
+            begin: step,
+            end: step,
+            is_reverse: false,
+            jump_len: 0,
+            rank: 0,
+        }
+    }
 }
 
 impl PartialEq for LinkPath {
@@ -167,38 +191,98 @@ pub fn create_consensus_graph(
             seq
         };
 
-    let add_path_segment = |link: &LinkPath,
-                            begin: StepPtr,
-                            end: StepPtr,
-                            cns: &mut PackedGraph| {
-        unimplemented!();
-    };
+    // let mut link_set: FnvHashSet<LinkPath> = FnvHashSet::default();
 
-    for &nc_path in non_consensus_paths.iter() {
-        let mut link: LinkPath;
+    for &path_id in non_consensus_paths.iter() {
+        let mut link: Option<LinkPath> = None;
 
-        let path = smoothed.get_path_ref(nc_path).unwrap();
+        let path = smoothed.get_path_ref(path_id).unwrap();
 
         let mut last_seen_consensus: Option<PathId> = None;
-        let mut on_consensus = false;
 
         for step in path.steps() {
             // check if we're on the step with any consensus
 
-            // if we're on the consensus
-            if on_consensus {
-                // we haven't seen any consensus before?
-                if last_seen_consensus.is_none() {
+            let handle = step.handle();
+            let node_id = handle.id();
+            // let mut on_consensus = false;
+            let mut curr_consensus: PathId;
+
+            let curr_consensus =
+                if handle_is_consensus[(node_id.0 as usize) - 1] {
+                    // on_consensus = true;
+                    Some(consensus_paths[(node_id.0 as usize) - 1])
                 } else {
-                    /*
-                        if link.from_cons_path == curr_consensus
-                        && jump_length < consensus_jump_max {
-                        link.begin = step;
-                        link.end = step;
+                    None
+                };
+
+            // if we're on the consensus
+            if let Some(curr_cons) = curr_consensus {
+                // we haven't seen any consensus before?
+
+                if last_seen_consensus.is_none() {
+                    link = Some(LinkPath::new(
+                        curr_cons, curr_cons, path_id, step.0,
+                    ));
+                    last_seen_consensus = Some(curr_cons);
+                } else if let Some(link) = link.as_mut() {
+                    // let link_ = link.clone().unwrap();
+
+                    let last_handle = smoothed
+                        .path_handle_at_step(link.path, link.end)
+                        .unwrap();
+                    let curr_handle = step.handle();
+
+                    // TODO start_in_vector, end_in_vector
+                    let jump_len = 0usize;
+
+                    if Some(link.from_cons_path) == curr_consensus
+                        && jump_len < consensus_jump_max
+                    {
+                        link.begin = step.0;
+                        link.end = step.0;
                         link.length = 0;
-                    } else { // or it's different
+                        link.is_reverse = step.handle().is_reverse();
+                    } else {
+                        // or it's different
+                        link.to_cons_path = curr_consensus.unwrap();
+
+                        link.end = step.0;
+
+                        link.length = get_path_seq_len(
+                            link.path,
+                            smoothed
+                                .path_next_step(link.path, link.begin)
+                                .unwrap(),
+                            link.end,
+                        );
+
+                        // TODO Seq & hash
+                        if link.from_cons_path > link.to_cons_path {
+                            std::mem::swap(
+                                &mut link.from_cons_path,
+                                &mut link.to_cons_path,
+                            );
+                        }
+
+                        link.jump_len = jump_len;
+
+                        // TODO append link
+
+                        // reset link
+                        *link = LinkPath {
+                            from_cons_path: curr_consensus.unwrap(),
+                            to_cons_path: curr_consensus.unwrap(),
+                            length: 0,
+                            hash: 0,
+                            path: path_id,
+                            begin: step.0,
+                            end: step.0,
+                            is_reverse: step.handle().is_reverse(),
+                            jump_len,
+                            rank: 0,
+                        };
                     }
-                        */
                 }
             } else {
             }
