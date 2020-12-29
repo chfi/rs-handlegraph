@@ -167,23 +167,6 @@ pub fn create_consensus_graph(
             seq
         };
 
-    let novel_seq_len = |path: PathId,
-                         begin: StepPtr,
-                         end: StepPtr,
-                         seen_nodes: &FnvHashSet<NodeId>,
-                         graph: &PackedGraph|
-     -> usize {
-        unimplemented!();
-    };
-
-    let mark_seen_nodes = |path: PathId,
-                           begin: StepPtr,
-                           end: StepPtr,
-                           seen_nodes: &mut FnvHashSet<NodeId>,
-                           graph: &PackedGraph| {
-        unimplemented!();
-    };
-
     let add_path_segment = |link: &LinkPath,
                             begin: StepPtr,
                             end: StepPtr,
@@ -223,6 +206,61 @@ pub fn create_consensus_graph(
     }
 
     res_graph
+}
+
+fn novel_seq_len(
+    graph: &PackedGraph,
+    seen_nodes: &mut FnvHashSet<NodeId>,
+    path: PathId,
+    begin: StepPtr,
+    end: StepPtr,
+) -> usize {
+    let mut novel_bp = 0usize;
+
+    let mut step = begin;
+
+    loop {
+        let handle = graph.path_handle_at_step(path, step).unwrap();
+        let id = handle.id();
+
+        if !seen_nodes.contains(&id) {
+            novel_bp += graph.node_len(handle);
+            seen_nodes.insert(id);
+        }
+
+        if step == end {
+            break;
+        }
+
+        step = graph.path_next_step(path, step).unwrap();
+    }
+
+    novel_bp
+}
+
+fn mark_seen_nodes(
+    graph: &PackedGraph,
+    seen_nodes: &mut FnvHashSet<NodeId>,
+    path: PathId,
+    begin: StepPtr,
+    end: StepPtr,
+) {
+    let mut step = begin;
+
+    loop {
+        let handle = graph.path_handle_at_step(path, step).unwrap();
+        let id = handle.id();
+
+        if !seen_nodes.contains(&id) {
+            seen_nodes.insert(id);
+        }
+
+        if step == end {
+            break;
+        }
+
+        step = graph.path_next_step(path, step).unwrap();
+    }
 }
 
 fn compute_best_link(
@@ -325,7 +363,7 @@ fn compute_best_link(
 
     // let perfect_link = perfect_link.unwrap();
 
-    let mut seen_nodes: FnvHashSet<Handle> = FnvHashSet::default();
+    let mut seen_nodes: FnvHashSet<NodeId> = FnvHashSet::default();
 
     // TODO the original implementation requires multiple mutable
     // references to elements in unique_links, it looks like; need
@@ -351,11 +389,17 @@ fn compute_best_link(
             continue;
         }
         // TODO novel_sequence_length
-        let novel_bp: usize = unimplemented!();
+        let novel_bp: usize = novel_seq_len(
+            graph,
+            &mut seen_nodes,
+            link.path,
+            link.begin,
+            link.end,
+        );
 
         if link.jump_len >= consensus_jump_max || novel_bp >= consensus_jump_max
         {
-            link.rank = link_rank;
+            // TODO link.rank = link_rank;
             link_rank += 1;
             consensus_links.push(link.clone());
             // TODO mark_seen_nodes
