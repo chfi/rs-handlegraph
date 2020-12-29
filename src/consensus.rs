@@ -184,11 +184,6 @@ pub fn create_consensus_graph(
         unimplemented!();
     };
 
-    let compute_best_link =
-        |links: &[LinkPath], seen_nodes: &mut FnvHashSet<NodeId>| {
-            unimplemented!();
-        };
-
     let add_path_segment = |link: &LinkPath,
                             begin: StepPtr,
                             end: StepPtr,
@@ -240,8 +235,6 @@ fn compute_best_link(
     let mut hash_counts: FnvHashMap<u64, u64> = FnvHashMap::default();
     let mut unique_links: Vec<&LinkPath> = Vec::new();
 
-    let mut link_rank = 0usize;
-
     for link in links {
         let c = hash_counts.entry(link.hash).or_default();
         if *c == 0 {
@@ -259,6 +252,7 @@ fn compute_best_link(
     let most_frequent_link = unique_links
         .iter()
         .find(|&&link| link.hash == best_hash)
+        .copied()
         .unwrap();
 
     let from_cons_path = most_frequent_link.from_cons_path;
@@ -288,7 +282,7 @@ fn compute_best_link(
 
     let mut has_perfect_edge = false;
     let mut has_perfect_link = false;
-    let mut perfect_link = None;
+    let mut perfect_link: Option<LinkPath> = None;
 
     if graph.has_edge(from_end_fwd, to_begin_fwd) {
         perfect_edges.push((from_end_fwd, to_begin_fwd));
@@ -314,7 +308,11 @@ fn compute_best_link(
                     || b == to_begin_rev && e == from_end_rev
                 {
                     has_perfect_link = true;
-                    perfect_link = Some(link);
+                    perfect_link = Some(link.clone().clone());
+                    break;
+                }
+
+                if step == link.end {
                     break;
                 }
             }
@@ -325,5 +323,42 @@ fn compute_best_link(
         }
     }
 
-    unimplemented!();
+    // let perfect_link = perfect_link.unwrap();
+
+    let mut seen_nodes: FnvHashSet<Handle> = FnvHashSet::default();
+
+    // TODO the original implementation requires multiple mutable
+    // references to elements in unique_links, it looks like; need
+    // to fix that
+
+    if has_perfect_edge {
+        // nothing, apparently
+    } else if let Some(p_link) = perfect_link {
+        // TODO mark_seen_nodes()
+        // p_link.rank += 1;
+        consensus_links.push(p_link.clone());
+    } else if most_frequent_link.from_cons_path
+        != most_frequent_link.to_cons_path
+    {
+
+        // most_frequent_link.lank +=
+    }
+
+    let mut link_rank = 0u64;
+
+    for link in unique_links {
+        if link.hash == best_hash {
+            continue;
+        }
+        // TODO novel_sequence_length
+        let novel_bp: usize = unimplemented!();
+
+        if link.jump_len >= consensus_jump_max || novel_bp >= consensus_jump_max
+        {
+            link.rank = link_rank;
+            link_rank += 1;
+            consensus_links.push(link.clone());
+            // TODO mark_seen_nodes
+        }
+    }
 }
