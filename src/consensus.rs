@@ -414,6 +414,57 @@ pub fn create_consensus_graph(
         },
     );
 
+    // add link paths not in the consensus paths
+    let mut link_path_names: Vec<String> = Vec::new();
+
+    for link in consensus_links.iter() {
+        if link.length > 0 {
+            let from_cons_name =
+                smoothed.get_path_name_vec(link.from_cons_path).unwrap();
+            let to_cons_name =
+                smoothed.get_path_name_vec(link.to_cons_path).unwrap();
+            let link_name = format!(
+                "Link_{}_{}_{}",
+                from_cons_name.as_bstr(),
+                to_cons_name.as_bstr(),
+                link.rank
+            );
+
+            let path_cons_graph = consensus_graph
+                .create_path(link_name.as_bytes(), false)
+                .unwrap();
+
+            link_path_names.push(link_name);
+
+            let mut step = link.begin;
+
+            loop {
+                let handle =
+                    smoothed.path_handle_at_step(link.path, step).unwrap();
+
+                let mut cons_handle = if !consensus_graph.has_node(handle.id())
+                {
+                    let seq = smoothed.sequence_vec(handle);
+                    consensus_graph.create_handle(&seq, handle.id())
+                } else {
+                    handle
+                };
+
+                if handle.is_reverse() {
+                    cons_handle = cons_handle.flip();
+                }
+
+                consensus_graph.path_append_step(path_cons_graph, cons_handle);
+
+                if step == link.end {
+                    break;
+                }
+
+                step = smoothed.path_next_step(link.path, step).unwrap();
+            }
+        }
+    }
+
     consensus_graph
 }
 
