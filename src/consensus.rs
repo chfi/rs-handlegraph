@@ -338,6 +338,46 @@ pub fn create_consensus_graph(
         }
     }
 
+    let mut perfect_edges: Vec<(Handle, Handle)> = Vec::new();
+
+    let mut consensus_links: Vec<LinkPath> = Vec::new();
+    let mut curr_links: Vec<&LinkPath> = Vec::new();
+
+    let mut curr_from_cons_path: Option<PathId> = None;
+    let mut curr_to_cons_path: Option<PathId> = None;
+
+    for link_path_set in link_multiset.values() {
+        for link_path in link_path_set.iter() {
+            if curr_links.is_empty() {
+                curr_from_cons_path = Some(link_path.from_cons_path);
+                curr_to_cons_path = Some(link_path.to_cons_path);
+            } else if curr_from_cons_path != Some(link_path.from_cons_path)
+                || curr_to_cons_path != Some(link_path.to_cons_path)
+            {
+                compute_best_link(
+                    smoothed,
+                    consensus_jump_max,
+                    &curr_links,
+                    &mut consensus_links,
+                    &mut perfect_edges,
+                );
+
+                curr_links.clear();
+                curr_from_cons_path = Some(link_path.from_cons_path);
+                curr_to_cons_path = Some(link_path.to_cons_path);
+            }
+            curr_links.push(link_path);
+        }
+    }
+
+    compute_best_link(
+        smoothed,
+        consensus_jump_max,
+        &curr_links,
+        &mut consensus_links,
+        &mut perfect_edges,
+    );
+
     res_graph
 }
 
@@ -417,7 +457,7 @@ fn mark_seen_nodes(
 fn compute_best_link(
     graph: &PackedGraph,
     consensus_jump_max: usize,
-    links: &[LinkPath],
+    links: &[&LinkPath],
     consensus_links: &mut Vec<LinkPath>,
     perfect_edges: &mut Vec<(Handle, Handle)>,
 ) {
@@ -427,7 +467,7 @@ fn compute_best_link(
     for link in links {
         let c = hash_counts.entry(link.hash).or_default();
         if *c == 0 {
-            unique_links.push(link);
+            unique_links.push(*link);
         }
         *c += 1;
     }
