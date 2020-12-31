@@ -294,6 +294,24 @@ pub fn create_consensus_graph(
     res_graph
 }
 
+fn start_in_vector(graph: &PackedGraph, handle: Handle) -> usize {
+    let (offset, len) = graph.nodes.get_node_seq_range(handle).unwrap();
+    if handle.is_reverse() {
+        offset + len
+    } else {
+        offset
+    }
+}
+
+fn end_in_vector(graph: &PackedGraph, handle: Handle) -> usize {
+    let (offset, len) = graph.nodes.get_node_seq_range(handle).unwrap();
+    if handle.is_reverse() {
+        offset
+    } else {
+        offset + len
+    }
+}
+
 fn novel_seq_len(
     graph: &PackedGraph,
     seen_nodes: &mut FnvHashSet<NodeId>,
