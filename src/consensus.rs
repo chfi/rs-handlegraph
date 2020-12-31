@@ -465,6 +465,29 @@ pub fn create_consensus_graph(
         }
     }
 
+    // add the edges
+    let mut edges: FnvHashSet<Edge> = FnvHashSet::default();
+
+    for path_id in consensus_graph.path_ids() {
+        let path_ref = consensus_graph.get_path_ref(path_id).unwrap();
+        let mut steps = path_ref.steps();
+        let mut prev = steps.next().unwrap();
+
+        for step in steps {
+            let prev_h = prev.handle();
+            let curr_h = step.handle();
+
+            edges.insert(Edge(prev_h, curr_h));
+            prev = step;
+        }
+    }
+
+    for (from, to) in perfect_edges {
+        edges.insert(Edge(from, to));
+    }
+
+    consensus_graph.create_edges_iter(edges.into_iter());
+
     consensus_graph
 }
 
