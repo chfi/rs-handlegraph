@@ -8,11 +8,16 @@ use crate::{
 use crate::packedgraph::paths::StepPtr;
 use crate::packedgraph::*;
 
+use fnv::FnvHasher;
 use fnv::{FnvHashMap, FnvHashSet};
 
 use rayon::prelude::*;
 
-#[derive(Debug, Clone)]
+use std::hash::{Hash, Hasher};
+
+use bstr::ByteSlice;
+
+#[derive(Debug, Clone, Hash)]
 pub struct LinkPath {
     // pub from_cons_name: Vec<u8>,
     // pub to_cons_name: Vec<u8>,
@@ -65,6 +70,8 @@ impl PartialEq for LinkPath {
             && (self.hash == other.hash)
     }
 }
+
+impl Eq for LinkPath {}
 
 impl PartialOrd for LinkPath {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
@@ -191,7 +198,11 @@ pub fn create_consensus_graph(
             seq
         };
 
-    // let mut link_set: FnvHashSet<LinkPath> = FnvHashSet::default();
+    // we're emulating a multiset by having the key be the hash field
+    // of the link path, and then the value a hashset, where
+    // LinkPath's Hash impl is the derived one
+    let mut link_multiset: FnvHashMap<u64, FnvHashSet<LinkPath>> =
+        FnvHashMap::default();
 
     for &path_id in non_consensus_paths.iter() {
         let mut link: Option<LinkPath> = None;
@@ -228,15 +239,19 @@ pub fn create_consensus_graph(
                     ));
                     last_seen_consensus = Some(curr_cons);
                 } else if let Some(link) = link.as_mut() {
-                    // let link_ = link.clone().unwrap();
-
                     let last_handle = smoothed
                         .path_handle_at_step(link.path, link.end)
                         .unwrap();
                     let curr_handle = step.handle();
 
-                    // TODO start_in_vector, end_in_vector
-                    let jump_len = 0usize;
+                    let jump_len = {
+                        let start =
+                            start_in_vector(&smoothed, curr_handle) as isize;
+                        let end =
+                            end_in_vector(&smoothed, last_handle) as isize;
+                        let diff = (start - end).abs();
+                        diff as usize
+                    };
 
                     if Some(link.from_cons_path) == curr_consensus
                         && jump_len < consensus_jump_max
@@ -259,7 +274,33 @@ pub fn create_consensus_graph(
                             link.end,
                         );
 
-                        // TODO Seq & hash
+                        let mut hasher = FnvHasher::default();
+
+                        let seq = get_path_seq(
+                            path_id,
+                            smoothed
+                                .path_next_step(path_id, link.begin)
+                                .unwrap(),
+                            link.end,
+                        );
+
+                        let beg_h = smoothed
+                            .path_handle_at_step(path_id, link.begin)
+                            .unwrap();
+                        let end_h = smoothed
+                            .path_handle_at_step(path_id, link.end)
+                            .unwrap();
+
+                        let handle_str = format!(
+                            "{}:{}:{}",
+                            u64::from(beg_h.id()),
+                            u64::from(end_h.id()),
+                            seq.as_bstr()
+                        );
+
+                        handle_str.hash(&mut hasher);
+                        link.hash = hasher.finish();
+
                         if link.from_cons_path > link.to_cons_path {
                             std::mem::swap(
                                 &mut link.from_cons_path,
@@ -269,10 +310,7 @@ pub fn create_consensus_graph(
 
                         link.jump_len = jump_len;
 
-                        // TODO append link
-
-                        // reset link
-                        *link = LinkPath {
+                        let mut new_link = LinkPath {
                             from_cons_path: curr_consensus.unwrap(),
                             to_cons_path: curr_consensus.unwrap(),
                             length: 0,
@@ -284,6 +322,15 @@ pub fn create_consensus_graph(
                             jump_len,
                             rank: 0,
                         };
+
+                        // swap to reset the link
+                        std::mem::swap(&mut new_link, link);
+
+                        // append the link
+                        link_multiset
+                            .entry(new_link.hash)
+                            .or_default()
+                            .insert(new_link);
                     }
                 }
             } /* else {
