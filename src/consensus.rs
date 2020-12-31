@@ -123,8 +123,6 @@ pub fn create_consensus_graph(
     consensus_jump_max: usize,
     base: Vec<u8>,
 ) -> PackedGraph {
-    let mut res_graph = PackedGraph::default();
-
     let consensus_paths: Vec<PathId> = consensus_path_names
         .iter()
         .filter_map(|path_name| smoothed.get_path_id(path_name))
@@ -378,7 +376,45 @@ pub fn create_consensus_graph(
         &mut perfect_edges,
     );
 
-    res_graph
+    let mut consensus_graph = PackedGraph::default();
+
+    // consensus path -> smoothed cons path
+    let mut path_map: FnvHashMap<PathId, PathId> = FnvHashMap::default();
+
+    // add consensus paths to consensus graph
+    for &path_id in consensus_paths.iter() {
+        let path_name = smoothed.get_path_name_vec(path_id).unwrap();
+
+        let new_path_id =
+            consensus_graph.create_path(&path_name, false).unwrap();
+
+        path_map.insert(new_path_id, path_id);
+
+        let path_ref = smoothed.get_path_ref(path_id).unwrap();
+
+        for step in path_ref.steps() {
+            let handle = step.handle();
+
+            if !consensus_graph.has_node(handle.id()) {
+                let seq = smoothed.sequence_vec(handle);
+                consensus_graph.create_handle(&seq, handle.id());
+            }
+        }
+    }
+
+    consensus_graph.with_all_paths_mut_ctx_chn_new(
+        |cons_path_id, sender, cons_path_ref| {
+            let path_id = *path_map.get(&cons_path_id).unwrap();
+            let path_ref = smoothed.get_path_ref(path_id).unwrap();
+
+            cons_path_ref.append_handles_iter_chn(
+                sender,
+                path_ref.steps().map(|step| step.handle()),
+            );
+        },
+    );
+
+    consensus_graph
 }
 
 fn start_in_vector(graph: &PackedGraph, handle: Handle) -> usize {
