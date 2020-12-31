@@ -205,16 +205,18 @@ pub fn create_consensus_graph(
 
             let handle = step.handle();
             let node_id = handle.id();
-            // let mut on_consensus = false;
-            let mut curr_consensus: PathId;
 
-            let curr_consensus =
-                if handle_is_consensus[(node_id.0 as usize) - 1] {
-                    // on_consensus = true;
-                    Some(consensus_paths[(node_id.0 as usize) - 1])
-                } else {
-                    None
-                };
+            let ix = node_id.0 as usize - 1;
+
+            let curr_consensus = if handle_is_consensus[ix] {
+                // on_consensus = true;
+                handle_consensus_path_ids
+                    .get(&node_id)
+                    .and_then(|x| x.first())
+                    .copied()
+            } else {
+                None
+            };
 
             // if we're on the consensus
             if let Some(curr_cons) = curr_consensus {
@@ -284,8 +286,8 @@ pub fn create_consensus_graph(
                         };
                     }
                 }
-            } else {
-            }
+            } /* else {
+              }*/
         }
     }
 
