@@ -415,6 +415,13 @@ impl NodeRecords {
         Some(record_ix)
     }
 
+    #[inline]
+    pub fn get_node_seq_range(&self, handle: Handle) -> Option<(usize, usize)> {
+        let rec_id = self.handle_record(handle)?;
+        let seq_ix = SeqRecordIx::from_one_based_ix(rec_id)?;
+        Some(self.sequences.get_record(seq_ix))
+    }
+
     pub(super) fn clear_node_record(&mut self, n_id: NodeId) -> Option<()> {
         let rec_id = self.id_index_map.get_index(n_id)?;
 

@@ -87,8 +87,9 @@ impl Sequences {
         self.offsets.set_pack(ix, offset);
     }
 
+    /// Returns the offset and length of the sequence.
     #[inline]
-    fn get_record(&self, seq_ix: SeqRecordIx) -> (usize, usize) {
+    pub fn get_record(&self, seq_ix: SeqRecordIx) -> (usize, usize) {
         let ix = seq_ix.at_0();
 
         let offset: usize = self.offsets.get_unpack(ix);
