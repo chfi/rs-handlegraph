@@ -488,6 +488,32 @@ pub fn create_consensus_graph(
 
     consensus_graph.create_edges_iter(edges.into_iter());
 
+    {
+        let mut link_steps = |path_id: PathId,
+                              step_a: StepPtr,
+                              step_b: StepPtr| {
+            let from = smoothed.path_handle_at_step(path_id, step_a).unwrap();
+            let to = smoothed.path_handle_at_step(path_id, step_b).unwrap();
+
+            if consensus_graph.has_node(from.id())
+                && consensus_graph.has_node(to.id())
+            {
+                consensus_graph.create_edge(Edge(from, to));
+            }
+        };
+
+        for link in consensus_links.iter() {
+            let next = smoothed.path_next_step(link.path, link.begin).unwrap();
+
+            link_steps(link.path, link.begin, next);
+
+            let prev = smoothed.path_prev_step(link.path, link.end).unwrap();
+            if prev != link.begin {
+                link_steps(link.path, prev, link.end);
+            }
+        }
+    }
+
     consensus_graph
 }
 
