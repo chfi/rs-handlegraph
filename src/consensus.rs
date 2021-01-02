@@ -136,9 +136,9 @@ pub fn create_consensus_graph(
         })
         .collect();
 
-    let is_consensus: Vec<bool> = smoothed
+    let is_consensus: FnvHashMap<PathId, bool> = smoothed
         .path_ids()
-        .map(|path_id| consensus_paths.contains(&path_id))
+        .map(|path_id| (path_id, consensus_paths.contains(&path_id)))
         .collect();
 
     let mut handle_is_consensus: Vec<bool> = vec![false; smoothed.node_count()];
@@ -167,7 +167,7 @@ pub fn create_consensus_graph(
 
     let non_consensus_paths: Vec<PathId> = smoothed
         .path_ids()
-        .filter(|path_id| is_consensus[path_id.0 as usize])
+        .filter(|path_id| is_consensus[path_id])
         .collect();
 
     let get_path_seq_len =
@@ -512,6 +512,50 @@ pub fn create_consensus_graph(
                 link_steps(link.path, prev, link.end);
             }
         }
+    }
+
+    // validation
+
+    for path_id in smoothed.path_ids().filter(|p| consensus_paths.contains(&p))
+    {
+        let path_name = smoothed.get_path_name_vec(path_id).unwrap();
+
+        if consensus_graph.get_path_id(&path_name).is_none() {
+            panic!(
+                "error: consensus path {} not present in consensus graph",
+                path_name.as_bstr()
+            );
+        }
+
+        let path_ref = smoothed.get_path_ref(path_id).unwrap();
+
+        for step in path_ref.steps() {
+            let s_seq = smoothed.sequence(step.handle());
+            let c_seq = consensus_graph.sequence(step.handle());
+            assert!(
+                s_seq.eq(c_seq),
+                "error: node {} has different sequences in the graphs",
+                step.handle().id()
+            );
+        }
+    }
+
+    let consensus_graph_path_ids =
+        consensus_graph.path_ids().collect::<Vec<_>>();
+
+    for path_id in consensus_graph_path_ids {
+        let path_ref = smoothed.get_path_ref(path_id).unwrap();
+
+        let mut steps = path_ref.steps();
+        let first = steps.next().unwrap();
+
+        let edges_iter = steps.scan(first, |prev, curr| {
+            let edge = Edge(prev.handle(), curr.handle());
+            *prev = curr;
+            Some(edge)
+        });
+
+        consensus_graph.create_edges_iter(edges_iter);
     }
 
     consensus_graph
