@@ -558,6 +558,60 @@ pub fn create_consensus_graph(
         consensus_graph.create_edges_iter(edges_iter);
     }
 
+    crate::algorithm::unchop::unchop(&mut consensus_graph);
+
+    let link_paths = link_path_names
+        .iter()
+        .filter_map(|name| consensus_graph.get_path_id(name.as_bytes()))
+        .collect::<Vec<_>>();
+
+    let mut consensus_paths = consensus_paths;
+    consensus_paths.clear();
+
+    let consensus_paths_set: FnvHashSet<PathId> = consensus_path_names
+        .iter()
+        .filter_map(|name| {
+            let path_id = consensus_graph.get_path_id(name.as_bytes())?;
+
+            consensus_paths.push(path_id);
+            Some(path_id)
+        })
+        .collect();
+
+    // remove paths that are contained in others
+    // and add less than consensus_jump_max bp of sequence
+
+    let mut links_by_start_end = link_paths
+        .iter()
+        .filter_map(|&link_path| {
+            let first = consensus_graph.path_first_step(link_path)?;
+            let last = consensus_graph.path_last_step(link_path)?;
+
+            let h_a = consensus_graph.path_handle_at_step(link_path, first)?;
+            let h_b = consensus_graph.path_handle_at_step(link_path, last)?;
+
+            let start = h_a.id().min(h_b.id());
+            let end = h_a.id().max(h_b.id());
+
+            Some(LinkRange {
+                start,
+                end,
+                path: link_path,
+            })
+        })
+        .collect::<Vec<_>>();
+
+    links_by_start_end.par_sort_by(|a, b| {
+        use std::cmp::Ordering;
+        if a.start < b.end {
+            Ordering::Less
+        } else if a.start == b.end && a.end > b.end {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
+    });
+
     consensus_graph
 }
 
@@ -802,4 +856,34 @@ fn compute_best_link(
             consensus_links.push(link);
         }
     }
+}
+
+fn save_path_fragment(
+    consensus: &PackedGraph,
+    updated_links: &mut Vec<(String, Vec<Handle>)>,
+    link: PathId,
+    save_rank: &mut usize,
+    first_novel: StepPtr,
+    step: StepPtr,
+) {
+    let path_name = consensus.get_path_name_vec(link).unwrap();
+    let string = format!("{}_{}", path_name.as_bstr(), save_rank);
+    *save_rank += 1;
+
+    let mut handles = Vec::new();
+
+    let mut q = first_novel;
+
+    loop {
+        let handle = consensus.path_handle_at_step(link, q).unwrap();
+        handles.push(handle);
+
+        q = consensus.path_next_step(link, q).unwrap();
+
+        if q == step {
+            break;
+        }
+    }
+
+    updated_links.push((string, handles));
 }
