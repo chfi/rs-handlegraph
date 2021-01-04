@@ -1,5 +1,5 @@
 use crate::{
-    handle::{Edge, Handle, NodeId},
+    handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
     mutablehandlegraph::*,
     pathhandlegraph::*,
@@ -886,4 +886,103 @@ fn save_path_fragment(
     }
 
     updated_links.push((string, handles));
+}
+
+fn novelify(
+    consensus: &PackedGraph,
+    consensus_paths_set: &FnvHashSet<PathId>,
+    updated_links: &mut Vec<(String, Vec<Handle>)>,
+    links_to_remove: &mut Vec<PathId>,
+    consensus_jump_max: usize,
+    group: &[LinkRange],
+) {
+    let mut internal_nodes: FnvHashSet<NodeId> = FnvHashSet::default();
+
+    for &link_range in group {
+        let path_ref = consensus.get_path_ref(link_range.path).unwrap();
+        internal_nodes.extend(path_ref.steps().map(|step| step.handle().id()));
+    }
+
+    let mut seen_nodes: FnvHashSet<NodeId> = FnvHashSet::default();
+    let mut reached_ext_nodes: FnvHashSet<NodeId> = FnvHashSet::default();
+
+    for &link in group {
+        links_to_remove.push(link.path);
+
+        let begin = consensus.path_first_step(link.path).unwrap();
+        let end = consensus.path_last_step(link.path).unwrap();
+
+        let mut in_novel = false;
+        let mut reaches_external = false;
+
+        let mut novel_bp = 0usize;
+        let mut first_novel = None;
+
+        let mut save_rank = 0usize;
+
+        let path_ref = consensus.get_path_ref(link.path).unwrap();
+
+        for step in path_ref.steps() {
+            if !seen_nodes.contains(&step.handle().id()) {
+                let mut mark_ext = |other: Handle| {
+                    let o_id = other.id();
+
+                    if !reached_ext_nodes.contains(&o_id) {
+                        reached_ext_nodes.insert(o_id);
+                        for (path_id, _step_ptr) in
+                            consensus.steps_on_handle(other).unwrap()
+                        {
+                            let path_consensus =
+                                consensus_paths_set.contains(&path_id);
+                            reaches_external |= path_consensus;
+                        }
+                    }
+                };
+
+                consensus
+                    .neighbors(step.handle(), Direction::Right)
+                    .for_each(&mut mark_ext);
+
+                consensus
+                    .neighbors(step.handle(), Direction::Left)
+                    .for_each(mark_ext);
+
+                seen_nodes.insert(step.handle().id());
+
+                novel_bp += consensus.node_len(step.handle());
+                if !in_novel {
+                    first_novel = Some(step.0);
+                    in_novel = true;
+                }
+            } else {
+                if in_novel {
+                    in_novel = false;
+                    if reaches_external || novel_bp >= consensus_jump_max {
+                        save_path_fragment(
+                            consensus,
+                            updated_links,
+                            link.path,
+                            &mut save_rank,
+                            first_novel.unwrap(),
+                            step.0,
+                        );
+                        reaches_external = false;
+                        novel_bp = 0;
+                    }
+                }
+            }
+        }
+        if in_novel {
+            if reaches_external || novel_bp >= consensus_jump_max {
+                save_path_fragment(
+                    consensus,
+                    updated_links,
+                    link.path,
+                    &mut save_rank,
+                    first_novel.unwrap(),
+                    end,
+                );
+            }
+        }
+    }
 }
