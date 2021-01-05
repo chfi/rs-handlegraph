@@ -652,6 +652,79 @@ pub fn create_consensus_graph(
         consensus_graph.remove_handle(handle);
     }
 
+    crate::algorithm::unchop::unchop(&mut consensus_graph);
+
+    // remove edges connecting the same path w/ a gap less than consensus_jump_max
+    let mut edges_to_remove: FnvHashSet<Edge> = FnvHashSet::default();
+    let mut edges_to_keep: FnvHashSet<Edge> = FnvHashSet::default();
+
+    for path_id in consensus_graph.path_ids() {
+        let mut step_to_pos: FnvHashMap<(PathId, StepPtr), usize> =
+            FnvHashMap::default();
+
+        let path_ref = consensus_graph.get_path_ref(path_id).unwrap();
+
+        let mut pos = 0usize;
+        for step in path_ref.steps() {
+            step_to_pos.insert((path_id, step.0), pos);
+            pos += consensus_graph.node_len(step.handle());
+        }
+
+        for step in path_ref.steps() {
+            let key = (path_id, step.0);
+            let pos = *step_to_pos.get(&key).unwrap()
+                + consensus_graph.node_len(step.handle());
+
+            if consensus_graph.degree(step.handle(), Direction::Right) > 1 {
+                for other in
+                    consensus_graph.neighbors(step.handle(), Direction::Right)
+                {
+                    let count =
+                        consensus_graph.steps_on_handle(other).unwrap().count();
+
+                    let edge = Edge(step.handle(), other);
+
+                    if edges_to_keep.contains(&edge) {
+                        // ok?
+                    } else if count > 1 {
+                        edges_to_keep.insert(edge);
+                    } else {
+                        let mut ok = false;
+
+                        for occur in
+                            consensus_graph.steps_on_handle(other).unwrap()
+                        {
+                            // in_path
+                            if occur.0 == path_id {
+                                let key: (PathId, StepPtr) = (occur.0, occur.1);
+
+                                let o_pos = *step_to_pos.get(&key).unwrap();
+                                if o_pos == pos
+                                    || o_pos - pos >= consensus_jump_max
+                                {
+                                    ok = true;
+                                }
+                            } else {
+                                ok = true;
+                            }
+                        }
+
+                        if !ok && !edges_to_keep.contains(&edge) {
+                            edges_to_remove.insert(edge);
+                        } else {
+                            edges_to_remove.remove(&edge);
+                            edges_to_keep.insert(edge);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for edge in edges_to_remove {
+        consensus_graph.remove_edge(edge);
+    }
+
     consensus_graph
 }
 
