@@ -725,6 +725,104 @@ pub fn create_consensus_graph(
         consensus_graph.remove_edge(edge);
     }
 
+    crate::algorithm::unchop::unchop(&mut consensus_graph);
+
+    let mut link_paths = link_paths;
+    link_paths.clear();
+
+    for name in link_path_names_to_keep {
+        if let Some(path_id) = consensus_graph.get_path_id(name.as_bytes()) {
+            link_paths.push(path_id);
+        }
+    }
+
+    let mut node_coverage: FnvHashMap<NodeId, usize> = consensus_graph
+        .handles()
+        .map(|handle| {
+            let cov = consensus_graph.steps_on_handle(handle).unwrap().count();
+            (handle.id(), cov)
+        })
+        .collect();
+
+    let mut to_create: Vec<(String, Vec<Handle>)> = Vec::new();
+
+    for link in link_paths {
+        let mut step = consensus_graph.path_first_step(link).unwrap();
+
+        let mut id = consensus_graph
+            .path_handle_at_step(link, step)
+            .unwrap()
+            .id();
+
+        loop {
+            *node_coverage.get_mut(&id).unwrap() -= 1;
+            step = consensus_graph.path_next_step(link, step).unwrap();
+            id = consensus_graph
+                .path_handle_at_step(link, step)
+                .unwrap()
+                .id();
+
+            if step == consensus_graph.path_last_step(link).unwrap()
+                || *node_coverage.get(&id).unwrap() <= 1
+            {
+                break;
+            }
+        }
+
+        let begin = step;
+
+        let mut step = consensus_graph.path_last_step(link).unwrap();
+        let mut id = consensus_graph
+            .path_handle_at_step(link, step)
+            .unwrap()
+            .id();
+
+        loop {
+            *node_coverage.get_mut(&id).unwrap() -= 1;
+            step = consensus_graph.path_prev_step(link, step).unwrap();
+            id = consensus_graph
+                .path_handle_at_step(link, step)
+                .unwrap()
+                .id();
+
+            if step == consensus_graph.path_first_step(link).unwrap()
+                || *node_coverage.get(&id).unwrap() <= 1
+            {
+                break;
+            }
+        }
+
+        let end = consensus_graph.path_next_step(link, step).unwrap();
+
+        let mut step = begin;
+
+        let mut new_path: Vec<Handle> = Vec::new();
+
+        loop {
+            let handle =
+                consensus_graph.path_handle_at_step(link, step).unwrap();
+            new_path.push(handle);
+
+            step = consensus_graph.path_next_step(link, step).unwrap();
+
+            if step == end {
+                break;
+            }
+        }
+
+        id = new_path.first().unwrap().id();
+
+        if new_path.is_empty()
+            || new_path.len() == 1 && *node_coverage.get(&id).unwrap() > 1
+        {
+            *node_coverage.get_mut(&id).unwrap() -= 1;
+        } else {
+            let name = consensus_graph.get_path_name_vec(link).unwrap();
+            let name_str = std::str::from_utf8(&name).unwrap();
+            to_create.push((name_str.to_owned(), new_path));
+        }
+    }
+
     consensus_graph
 }
 
