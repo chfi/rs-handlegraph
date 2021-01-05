@@ -612,6 +612,46 @@ pub fn create_consensus_graph(
         }
     });
 
+    let mut updated_links: Vec<(String, Vec<Handle>)> = Vec::new();
+    let mut links_to_remove: Vec<PathId> = Vec::new();
+
+    novelify(
+        &consensus_graph,
+        &consensus_paths_set,
+        &mut updated_links,
+        &mut links_to_remove,
+        consensus_jump_max,
+        &links_by_start_end,
+    );
+
+    for link in links_to_remove {
+        consensus_graph.destroy_path(link);
+    }
+
+    let mut link_path_names_to_keep: Vec<String> = Vec::new();
+
+    for (name, handles) in updated_links {
+        let path = consensus_graph.create_path(name.as_bytes(), false).unwrap();
+        link_path_names_to_keep.push(name);
+
+        for handle in handles {
+            consensus_graph.path_append_step(path, handle);
+        }
+    }
+
+    // remove coverage = 0 nodes
+
+    let empty_handles = consensus_graph
+        .handles()
+        .filter(|&handle| {
+            consensus_graph.steps_on_handle(handle).unwrap().count() != 0
+        })
+        .collect::<Vec<_>>();
+
+    for handle in empty_handles {
+        consensus_graph.remove_handle(handle);
+    }
+
     consensus_graph
 }
 
