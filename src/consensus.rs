@@ -8,6 +8,8 @@ use crate::{
 use crate::packedgraph::paths::StepPtr;
 use crate::packedgraph::*;
 
+use crate::packedgraph::defragment::*;
+
 use fnv::FnvHasher;
 use fnv::{FnvHashMap, FnvHashSet};
 
@@ -895,6 +897,22 @@ pub fn create_consensus_graph(
             }
         }
     }
+
+    // TODO optimize
+    consensus_graph.defragment();
+
+    let empty_handles = consensus_graph
+        .handles()
+        .filter(|&handle| {
+            consensus_graph.steps_on_handle(handle).unwrap().count() != 0
+        })
+        .collect::<Vec<_>>();
+
+    for handle in empty_handles {
+        consensus_graph.remove_handle(handle);
+    }
+
+    crate::algorithm::unchop::unchop(&mut consensus_graph);
 
     consensus_graph
 }

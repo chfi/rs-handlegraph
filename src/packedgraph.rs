@@ -24,7 +24,7 @@ use rayon::prelude::*;
 
 use self::graph::SeqRecordIx;
 
-mod defragment;
+pub mod defragment;
 pub mod edges;
 pub mod graph;
 pub mod index;
