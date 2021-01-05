@@ -730,7 +730,7 @@ pub fn create_consensus_graph(
     let mut link_paths = link_paths;
     link_paths.clear();
 
-    for name in link_path_names_to_keep {
+    for name in link_path_names_to_keep.iter() {
         if let Some(path_id) = consensus_graph.get_path_id(name.as_bytes()) {
             link_paths.push(path_id);
         }
@@ -744,9 +744,9 @@ pub fn create_consensus_graph(
         })
         .collect();
 
-    let mut to_create: Vec<(String, Vec<Handle>)> = Vec::new();
+    let mut to_create: Vec<(Vec<u8>, Vec<Handle>)> = Vec::new();
 
-    for link in link_paths {
+    for &link in link_paths.iter() {
         let mut step = consensus_graph.path_first_step(link).unwrap();
 
         let mut id = consensus_graph
@@ -818,8 +818,81 @@ pub fn create_consensus_graph(
             *node_coverage.get_mut(&id).unwrap() -= 1;
         } else {
             let name = consensus_graph.get_path_name_vec(link).unwrap();
-            let name_str = std::str::from_utf8(&name).unwrap();
-            to_create.push((name_str.to_owned(), new_path));
+            to_create.push((name, new_path));
+        }
+    }
+
+    let mut link_path_names_to_keep: Vec<Vec<u8>> = Vec::new();
+
+    for (path_name, handles) in to_create {
+        let path = consensus_graph.create_path(&path_name, false).unwrap();
+        link_path_names_to_keep.push(path_name);
+
+        for handle in handles {
+            consensus_graph.path_append_step(path, handle);
+        }
+    }
+
+    for &link in link_paths.iter() {
+        consensus_graph.destroy_path(link);
+    }
+
+    crate::algorithm::unchop::unchop(&mut consensus_graph);
+
+    link_paths.clear();
+
+    link_paths.extend(
+        link_path_names_to_keep
+            .iter()
+            .filter_map(|name| consensus_graph.get_path_id(name)),
+    );
+
+    {
+        let is_degree_1_tip = |handle: Handle| -> bool {
+            let deg_fwd = consensus_graph.degree(handle, Direction::Right);
+            let deg_rev = consensus_graph.degree(handle, Direction::Left);
+
+            (deg_fwd == 0 || deg_rev == 0) && (deg_fwd + deg_rev == 1)
+        };
+
+        let mut link_tips: Vec<Handle> = Vec::new();
+        let mut paths_to_remove: Vec<PathId> = Vec::new();
+
+        for &path in link_paths.iter() {
+            let h_first = consensus_graph
+                .path_first_step(path)
+                .and_then(|step| {
+                    consensus_graph.path_handle_at_step(path, step)
+                })
+                .unwrap();
+
+            if is_degree_1_tip(h_first)
+                && consensus_graph.node_len(h_first) < consensus_jump_max
+            {
+                link_tips.push(h_first);
+            }
+
+            let h_last = consensus_graph
+                .path_last_step(path)
+                .and_then(|step| {
+                    consensus_graph.path_handle_at_step(path, step)
+                })
+                .unwrap();
+
+            if is_degree_1_tip(h_last)
+                && consensus_graph.node_len(h_first) < consensus_jump_max
+            {
+                link_tips.push(h_last);
+            }
+        }
+
+        for tip in link_tips {
+            let to_destroy: Vec<(PathId, StepPtr)> =
+                consensus_graph.steps_on_handle(tip).unwrap().collect();
+
+            for (path, step) in to_destroy {
+                consensus_graph.path_rewrite_segment(path, step, step, &[]);
+            }
         }
     }
 
