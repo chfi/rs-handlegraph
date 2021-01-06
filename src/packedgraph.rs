@@ -44,6 +44,9 @@ use occurrences::OccurrencesIter;
 use paths::packedpath::StepPtr;
 use sequence::DecodeIter;
 
+#[cfg(test)]
+pub(crate) mod quickcheck;
+
 impl HandleGraph for PackedGraph {
     #[inline]
     fn min_node_id(&self) -> NodeId {
