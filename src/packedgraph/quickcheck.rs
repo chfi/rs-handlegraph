@@ -76,15 +76,41 @@ pub enum GraphWideOp {
     ApplyOrdering { order: Vec<Handle> },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodePropertiesDelta {
     pub node_count: isize,
     pub total_len: isize,
-    pub max_id: NodeId,
     pub new_handles: Vec<(Handle, Vec<u8>)>,
     pub removed_handles: Vec<Handle>,
 }
 
+impl NodePropertiesDelta {
+    pub fn compose(mut self, rhs: Self) -> Self {
+        let node_count = self.node_count + rhs.node_count;
+        let total_len = self.total_len + rhs.total_len;
+
+        let new_handles = std::mem::take(&mut self.new_handles);
+        let new_handles = new_handles
+            .into_iter()
+            .filter(|(h, _)| rhs.removed_handles.contains(h))
+            .collect::<Vec<_>>();
+
+        let mut removed_handles: FnvHashSet<_> =
+            self.removed_handles.into_iter().collect();
+        removed_handles.extend(rhs.removed_handles.into_iter());
+
+        let removed_handles: Vec<_> = removed_handles.into_iter().collect();
+
+        Self {
+            node_count,
+            total_len,
+            new_handles,
+            removed_handles,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LocalEdgeDelta {
     pub handle: Handle,
     pub new_left: Vec<Edge>,
@@ -95,11 +121,79 @@ pub struct LocalEdgeDelta {
     pub right_degree: isize,
 }
 
+impl LocalEdgeDelta {
+    pub fn compose(mut self, mut rhs: Self) -> Self {
+        let new_left = std::mem::take(&mut self.new_left);
+        let new_left = new_left
+            .into_iter()
+            .filter(|e| rhs.removed_left.contains(e))
+            .collect::<Vec<_>>();
+
+        let new_right = std::mem::take(&mut self.new_right);
+        let new_right = new_right
+            .into_iter()
+            .filter(|e| rhs.removed_right.contains(e))
+            .collect::<Vec<_>>();
+
+        let left_degree = self.left_degree + rhs.left_degree;
+        let right_degree = self.right_degree + rhs.right_degree;
+
+        let mut removed_left = std::mem::take(&mut self.removed_left);
+        removed_left.append(&mut rhs.removed_left);
+        removed_left.sort();
+        removed_left.dedup();
+
+        let mut removed_right = std::mem::take(&mut self.removed_right);
+        removed_right.append(&mut rhs.removed_right);
+        removed_right.sort();
+        removed_right.dedup();
+
+        Self {
+            handle: self.handle,
+            new_left,
+            new_right,
+            removed_left,
+            removed_right,
+            left_degree,
+            right_degree,
+        }
+    }
+}
+
 pub struct EdgePropertiesDelta {
     pub edge_count: isize,
     pub new_edges: Vec<Edge>,
     pub removed_edges: Vec<Edge>,
     pub edge_deltas: Vec<LocalEdgeDelta>,
+}
+
+impl EdgePropertiesDelta {
+    pub fn compose(mut self, mut rhs: Self) -> Self {
+        let edge_count = self.edge_count + rhs.edge_count;
+
+        let new_edges = std::mem::take(&mut self.new_edges);
+        let new_edges = new_edges
+            .into_iter()
+            .filter(|e| rhs.removed_edges.contains(e))
+            .collect::<Vec<_>>();
+
+        let mut removed_edges = std::mem::take(&mut self.removed_edges);
+        removed_edges.append(&mut rhs.removed_edges);
+        removed_edges.sort();
+        removed_edges.dedup();
+
+        let mut edge_deltas = std::mem::take(&mut self.edge_deltas);
+        edge_deltas.append(&mut rhs.edge_deltas);
+        edge_deltas.sort();
+        edge_deltas.dedup();
+
+        Self {
+            edge_count,
+            new_edges,
+            removed_edges,
+            edge_deltas,
+        }
+    }
 }
 
 pub struct PathPropertiesDelta {
