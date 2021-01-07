@@ -157,6 +157,58 @@ pub struct GraphOpDelta {
     paths: PathPropertiesDelta,
 }
 
+pub struct DeltaEq {
+    graph: PackedGraph,
+    delta: GraphOpDelta,
+}
+
+impl DeltaEq {
+    pub fn new(graph: &PackedGraph, delta: GraphOpDelta) -> Self {
+        let graph = graph.clone();
+
+        Self { graph, delta }
+    }
+
+    pub fn eq_delta(&self, other: &PackedGraph) -> bool {
+        let expected_node_count =
+            (self.graph.node_count() as isize) + self.delta.nodes.node_count;
+
+        if other.node_count() as isize != expected_node_count {
+            return false;
+        }
+
+        let expected_total_len =
+            (self.graph.total_length() as isize) + self.delta.nodes.total_len;
+
+        if other.total_length() as isize != expected_total_len {
+            return false;
+        }
+
+        let expected_edge_count =
+            (self.graph.edge_count() as isize) + self.delta.edges.edge_count;
+
+        if other.edge_count() as isize != expected_edge_count {
+            return false;
+        }
+
+        let expected_path_count =
+            (self.graph.path_count() as isize) + self.delta.paths.path_count;
+
+        if other.path_count() as isize != expected_path_count {
+            return false;
+        }
+
+        // let expected_total_len =
+        //     (self.graph.total_length() as isize) + self.delta.nodes.total_len;
+
+        // if other.total_length() as isize != expected_total_len {
+        //     return false;
+        // }
+
+        true
+    }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodePropertiesDelta {
     pub node_count: isize,
