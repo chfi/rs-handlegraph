@@ -196,6 +196,52 @@ impl EdgePropertiesDelta {
     }
 }
 
+pub struct LocalStep {
+    pub prev: (StepPtr, Handle),
+    pub this: (StepPtr, Handle),
+    pub next: (StepPtr, Handle),
+}
+
+pub struct SinglePathDelta {
+    pub step_count: isize,
+    pub seq_len: isize,
+    pub new_steps: Vec<LocalStep>,
+    pub removed_steps: Vec<StepPtr>,
+    pub new_head: StepPtr,
+    pub new_tail: StepPtr,
+}
+
+impl SinglePathDelta {
+    pub fn compose(mut self, mut rhs: Self) -> Self {
+        let step_count = self.step_count + rhs.step_count;
+        let seq_len = self.seq_len + rhs.seq_len;
+
+        let new_steps = std::mem::take(&mut self.new_steps);
+        // TODO fix this
+        // let new_steps = new_steps
+        //     .into_iter()
+        //     .filter(|e| rhs.removed_steps.iter().find()
+        //     .collect::<Vec<_>>();
+
+        let mut removed_steps = std::mem::take(&mut self.removed_steps);
+        removed_steps.append(&mut rhs.removed_steps);
+        removed_steps.sort();
+        removed_steps.dedup();
+
+        let new_head = rhs.new_head;
+        let new_tail = rhs.new_tail;
+
+        Self {
+            step_count,
+            seq_len,
+            new_steps,
+            removed_steps,
+            new_head,
+            new_tail,
+        }
+    }
+}
+
 pub struct PathPropertiesDelta {
     pub path_count: isize,
     pub total_steps: isize,
@@ -203,17 +249,27 @@ pub struct PathPropertiesDelta {
     pub removed_paths: Vec<(PathId, Vec<u8>)>,
 }
 
-pub struct LocalStep {
-    pub prev: (StepPtr, Handle),
-    pub this: (StepPtr, Handle),
-    pub next: (StepPtr, Handle),
-}
+impl PathPropertiesDelta {
+    pub fn compose(mut self, mut rhs: Self) -> Self {
+        let path_count = self.path_count + rhs.path_count;
+        let total_steps = self.total_steps + rhs.total_steps;
 
-pub struct SinglePathPropertiesDelta {
-    pub step_count: isize,
-    pub seq_len: isize,
-    pub new_steps: Vec<LocalStep>,
-    pub removed_steps: Vec<StepPtr>,
-    pub new_head: StepPtr,
-    pub new_tail: StepPtr,
+        let new_paths = std::mem::take(&mut self.new_paths);
+        let new_paths = new_paths
+            .into_iter()
+            .filter(|e| rhs.removed_paths.contains(e))
+            .collect::<Vec<_>>();
+
+        let mut removed_paths = std::mem::take(&mut self.removed_paths);
+        removed_paths.append(&mut rhs.removed_paths);
+        removed_paths.sort();
+        removed_paths.dedup();
+
+        Self {
+            path_count,
+            total_steps,
+            new_paths,
+            removed_paths,
+        }
+    }
 }
