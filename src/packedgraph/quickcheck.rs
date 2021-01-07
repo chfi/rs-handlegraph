@@ -43,17 +43,91 @@ pub enum GraphOp {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CreateOp {
-    Handle { id: Option<NodeId>, seq: Vec<u8> },
+    Handle { id: NodeId, rev: bool, seq: Vec<u8> },
     Edge { edge: Edge },
     EdgesIter { edges: Vec<Edge> },
     Path { name: Vec<u8> },
 }
 
+impl CreateOp {
+    pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {
+        let mut res = GraphOpDelta::default();
+
+        match self {
+            CreateOp::Handle { id, rev, seq } => {
+                let nodes = NodePropertiesDelta {
+                    node_count: 1,
+                    total_len: seq.len() as isize,
+                    new_handles: vec![(
+                        Handle::pack(*id, *rev),
+                        seq.to_owned(),
+                    )],
+                    removed_handles: Vec::new(),
+                };
+                res.nodes = nodes;
+            }
+            CreateOp::Edge { edge } => {
+                let edges = EdgePropertiesDelta {
+                    edge_count: 1,
+                    new_edges: vec![*edge],
+                    removed_edges: Vec::new(),
+                    // TODO fix this
+                    edge_deltas: Vec::new(),
+                };
+                res.edges = edges;
+            }
+            CreateOp::EdgesIter { edges } => {
+                unimplemented!();
+            }
+            CreateOp::Path { name } => {
+                unimplemented!();
+            }
+        }
+
+        res
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RemoveOp {
-    Handle { id: NodeId },
+    Handle { handle: Handle },
     Edge { edge: Edge },
     Path { name: Vec<u8> },
+}
+
+impl RemoveOp {
+    pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {
+        let mut res = GraphOpDelta::default();
+
+        match self {
+            RemoveOp::Handle { handle } => {
+                let handle = *handle;
+                let seq_len = graph.node_len(handle) as isize;
+                let nodes = NodePropertiesDelta {
+                    node_count: -1,
+                    total_len: -seq_len,
+                    new_handles: Vec::new(),
+                    removed_handles: vec![handle],
+                };
+                res.nodes = nodes;
+            }
+            RemoveOp::Edge { edge } => {
+                let edges = EdgePropertiesDelta {
+                    edge_count: -1,
+                    new_edges: Vec::new(),
+                    removed_edges: vec![*edge],
+                    // TODO fix this
+                    edge_deltas: Vec::new(),
+                };
+                res.edges = edges;
+            }
+            RemoveOp::Path { name } => {
+                unimplemented!();
+            }
+        }
+
+        res
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -74,6 +148,13 @@ pub enum MutPathOp {
 pub enum GraphWideOp {
     Defragment,
     ApplyOrdering { order: Vec<Handle> },
+}
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct GraphOpDelta {
+    nodes: NodePropertiesDelta,
+    edges: EdgePropertiesDelta,
+    paths: PathPropertiesDelta,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -160,6 +241,7 @@ impl LocalEdgeDelta {
     }
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EdgePropertiesDelta {
     pub edge_count: isize,
     pub new_edges: Vec<Edge>,
@@ -242,6 +324,7 @@ impl SinglePathDelta {
     }
 }
 
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathPropertiesDelta {
     pub path_count: isize,
     pub total_steps: isize,
