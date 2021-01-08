@@ -43,7 +43,7 @@ pub enum GraphOp {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CreateOp {
-    Handle { id: NodeId, rev: bool, seq: Vec<u8> },
+    Handle { id: NodeId, seq: Vec<u8> },
     Edge { edge: Edge },
     EdgesIter { edges: Vec<Edge> },
     Path { name: Vec<u8> },
@@ -53,12 +53,12 @@ impl CreateOp {
     pub fn derive_delta(&self, _graph: &PackedGraph) -> GraphOpDelta {
         let mut res = GraphOpDelta::default();
         match self {
-            CreateOp::Handle { id, rev, seq } => {
+            CreateOp::Handle { id, seq } => {
                 let nodes = NodePropertiesDelta {
                     node_count: 1,
                     total_len: seq.len() as isize,
                     new_handles: vec![(
-                        Handle::pack(*id, *rev),
+                        Handle::pack(*id, false),
                         seq.to_owned(),
                     )],
                     removed_handles: Vec::new(),
@@ -88,7 +88,7 @@ impl CreateOp {
 
     pub fn apply(&self, graph: &mut PackedGraph) {
         match self {
-            CreateOp::Handle { id, rev, seq } => {
+            CreateOp::Handle { id, seq } => {
                 println!("adding id: {:?}", id);
                 graph.create_handle(seq, *id);
             }
@@ -250,15 +250,16 @@ pub struct NodePropertiesDelta {
 }
 
 impl NodePropertiesDelta {
-    pub fn compose(mut self, rhs: Self) -> Self {
+    pub fn compose(mut self, mut rhs: Self) -> Self {
         let node_count = self.node_count + rhs.node_count;
         let total_len = self.total_len + rhs.total_len;
 
         let new_handles = std::mem::take(&mut self.new_handles);
-        let new_handles = new_handles
+        let mut new_handles = new_handles
             .into_iter()
-            .filter(|(h, _)| rhs.removed_handles.contains(h))
+            .filter(|(h, _)| !rhs.removed_handles.contains(h))
             .collect::<Vec<_>>();
+        new_handles.append(&mut rhs.new_handles);
 
         let mut removed_handles: FnvHashSet<_> =
             self.removed_handles.into_iter().collect();
@@ -291,13 +292,13 @@ impl LocalEdgeDelta {
         let new_left = std::mem::take(&mut self.new_left);
         let new_left = new_left
             .into_iter()
-            .filter(|e| rhs.removed_left.contains(e))
+            .filter(|e| !rhs.removed_left.contains(e))
             .collect::<Vec<_>>();
 
         let new_right = std::mem::take(&mut self.new_right);
         let new_right = new_right
             .into_iter()
-            .filter(|e| rhs.removed_right.contains(e))
+            .filter(|e| !rhs.removed_right.contains(e))
             .collect::<Vec<_>>();
 
         let left_degree = self.left_degree + rhs.left_degree;
@@ -340,7 +341,7 @@ impl EdgePropertiesDelta {
         let new_edges = std::mem::take(&mut self.new_edges);
         let new_edges = new_edges
             .into_iter()
-            .filter(|e| rhs.removed_edges.contains(e))
+            .filter(|e| !rhs.removed_edges.contains(e))
             .collect::<Vec<_>>();
 
         let mut removed_edges = std::mem::take(&mut self.removed_edges);
@@ -424,7 +425,7 @@ impl PathPropertiesDelta {
         let new_paths = std::mem::take(&mut self.new_paths);
         let new_paths = new_paths
             .into_iter()
-            .filter(|e| rhs.removed_paths.contains(e))
+            .filter(|e| !rhs.removed_paths.contains(e))
             .collect::<Vec<_>>();
 
         let mut removed_paths = std::mem::take(&mut self.removed_paths);
@@ -443,21 +444,44 @@ impl PathPropertiesDelta {
 
 #[test]
 fn adding_nodes_prop() {
-    let mut graph = crate::packedgraph::tests::test_graph_no_paths();
+    let mut graph_1 = crate::packedgraph::tests::test_graph_no_paths();
+    let mut graph_2 = crate::packedgraph::tests::test_graph_no_paths();
 
-    let op = CreateOp::Handle {
+    let op_1 = CreateOp::Handle {
         id: 10u64.into(),
-        rev: false,
         seq: vec![b'A', b'G', b'G', b'T', b'C'],
     };
 
-    let delta = op.derive_delta(&graph);
+    let op_2 = CreateOp::Handle {
+        id: 11u64.into(),
+        seq: vec![b'A', b'A', b'A'],
+    };
 
-    let delta_eq = DeltaEq::new(&graph, delta.clone());
+    let delta_1 = op_1.derive_delta(&graph_1);
+    let delta_eq_1 = DeltaEq::new(&graph_1, delta_1.clone());
+    op_1.apply(&mut graph_1);
 
-    op.apply(&mut graph);
+    println!("---------------------------");
+    println!("  op 1");
+    println!("{:#?}", delta_1);
+    println!("compare: {}", delta_eq_1.eq_delta(&graph_1));
+    println!();
 
-    println!("{:#?}", delta);
+    let delta_2 = op_2.derive_delta(&graph_1);
+    let delta_eq_2 = DeltaEq::new(&graph_1, delta_2.clone());
+    op_2.apply(&mut graph_1);
 
-    println!("compare: {}", delta_eq.eq_delta(&graph));
+    println!("---------------------------");
+    println!("  op 2");
+    println!("{:#?}", delta_2);
+    println!("compare: {}", delta_eq_2.eq_delta(&graph_1));
+    println!();
+
+    let delta_compose = delta_1.compose(delta_2);
+    let comp_eq = DeltaEq::new(&graph_2, delta_compose.clone());
+    println!("---------------------------");
+    println!("  composed ops");
+    println!("{:#?}", delta_compose);
+    println!("compare: {}", comp_eq.eq_delta(&graph_1));
+    println!();
 }
