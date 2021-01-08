@@ -576,7 +576,7 @@ pub(crate) mod tests {
             .collect::<Vec<_>>()
     }
 
-    fn test_graph_no_paths() -> PackedGraph {
+    pub(crate) fn test_graph_no_paths() -> PackedGraph {
         use bstr::B;
 
         let mut graph = PackedGraph::new();
@@ -636,7 +636,7 @@ pub(crate) mod tests {
         graph
     }
 
-    fn test_graph_with_paths() -> PackedGraph {
+    pub(crate) fn test_graph_with_paths() -> PackedGraph {
         let mut graph = test_graph_no_paths();
         /* Paths
                 path_1: 1 8 4 6

@@ -50,9 +50,8 @@ pub enum CreateOp {
 }
 
 impl CreateOp {
-    pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {
+    pub fn derive_delta(&self, _graph: &PackedGraph) -> GraphOpDelta {
         let mut res = GraphOpDelta::default();
-
         match self {
             CreateOp::Handle { id, rev, seq } => {
                 let nodes = NodePropertiesDelta {
@@ -85,6 +84,25 @@ impl CreateOp {
         }
 
         res
+    }
+
+    pub fn apply(&self, graph: &mut PackedGraph) {
+        match self {
+            CreateOp::Handle { id, rev, seq } => {
+                println!("adding id: {:?}", id);
+                graph.create_handle(seq, *id);
+            }
+            CreateOp::Edge { edge } => {
+                graph.create_edge(*edge);
+            }
+            CreateOp::EdgesIter { edges } => {
+                // TODO
+            }
+            CreateOp::Path { name } => {
+                graph.create_path(name, false);
+                //
+            }
+        }
     }
 }
 
@@ -155,6 +173,20 @@ pub struct GraphOpDelta {
     nodes: NodePropertiesDelta,
     edges: EdgePropertiesDelta,
     paths: PathPropertiesDelta,
+}
+
+impl GraphOpDelta {
+    pub fn compose(mut self, mut rhs: Self) -> Self {
+        let nodes = self.nodes.compose(std::mem::take(&mut rhs.nodes));
+        let edges = self.edges.compose(std::mem::take(&mut rhs.edges));
+        let paths = self.paths.compose(std::mem::take(&mut rhs.paths));
+
+        Self {
+            nodes,
+            edges,
+            paths,
+        }
+    }
 }
 
 pub struct DeltaEq {
@@ -407,4 +439,25 @@ impl PathPropertiesDelta {
             removed_paths,
         }
     }
+}
+
+#[test]
+fn adding_nodes_prop() {
+    let mut graph = crate::packedgraph::tests::test_graph_no_paths();
+
+    let op = CreateOp::Handle {
+        id: 10u64.into(),
+        rev: false,
+        seq: vec![b'A', b'G', b'G', b'T', b'C'],
+    };
+
+    let delta = op.derive_delta(&graph);
+
+    let delta_eq = DeltaEq::new(&graph, delta.clone());
+
+    op.apply(&mut graph);
+
+    println!("{:#?}", delta);
+
+    println!("compare: {}", delta_eq.eq_delta(&graph));
 }
