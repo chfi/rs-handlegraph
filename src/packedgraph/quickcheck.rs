@@ -31,23 +31,9 @@ use quickcheck::{Arbitrary, Gen, QuickCheck};
 
 use fnv::{FnvHashMap, FnvHashSet};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum GraphOp {
-    Create { op: CreateOp },
-    Remove { op: RemoveOp },
-    MutHandle { op: MutHandleOp },
-    MutPath { path: PathId, op: MutPathOp },
-    MutMultiPaths { ops: (PathId, MutPathOp) },
-    GraphWide { op: GraphWideOp },
-}
+mod ops;
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum CreateOp {
-    Handle { id: NodeId, seq: Vec<u8> },
-    Edge { edge: Edge },
-    EdgesIter { edges: Vec<Edge> },
-    Path { name: Vec<u8> },
-}
+use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
 
 impl CreateOp {
     pub fn derive_delta(&self, _graph: &PackedGraph) -> GraphOpDelta {
@@ -106,13 +92,6 @@ impl CreateOp {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum RemoveOp {
-    Handle { handle: Handle },
-    Edge { edge: Edge },
-    Path { name: Vec<u8> },
-}
-
 impl RemoveOp {
     pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {
         let mut res = GraphOpDelta::default();
@@ -148,25 +127,6 @@ impl RemoveOp {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MutHandleOp {
-    Flip { handle: Handle },
-    Divide { handle: Handle, offsets: Vec<usize> },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum MutPathOp {
-    AppendStep { handle: Handle },
-    PrependStep { handle: Handle },
-    FlipStep { handle: Handle },
-    RewriteSegment { handle: Handle },
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub enum GraphWideOp {
-    Defragment,
-    ApplyOrdering { order: Vec<Handle> },
-}
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct GraphOpDelta {
@@ -186,6 +146,21 @@ impl GraphOpDelta {
             edges,
             paths,
         }
+    }
+
+    pub fn compose_nodes(mut self, mut nodes: NodesDelta) -> Self {
+        self.nodes = self.nodes.compose(nodes);
+        self
+    }
+
+    pub fn compose_edges(mut self, mut edges: EdgesDelta) -> Self {
+        self.edges = self.edges.compose(edges);
+        self
+    }
+
+    pub fn compose_paths(mut self, mut paths: PathsDelta) -> Self {
+        self.paths = self.paths.compose(paths);
+        self
     }
 }
 
