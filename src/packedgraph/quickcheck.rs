@@ -32,6 +32,7 @@ use quickcheck::{Arbitrary, Gen, QuickCheck};
 use fnv::{FnvHashMap, FnvHashSet};
 
 mod ops;
+mod traits;
 
 use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
 
@@ -457,6 +458,7 @@ fn adding_nodes_prop() {
     println!("---------------------------");
     println!("  composed ops");
     println!("{:#?}", delta_compose);
-    println!("compare: {}", comp_eq.eq_delta(&graph_1));
+    println!("compare to new:  {}", comp_eq.eq_delta(&graph_1));
+    println!("compare to orig: {}", comp_eq.eq_delta(&graph_2));
     println!();
 }
