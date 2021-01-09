@@ -39,8 +39,9 @@ pub struct GraphOpDelta {
 pub struct NodesDelta {
     pub node_count: isize,
     pub total_len: isize,
-    pub new_handles: Vec<(Handle, Vec<u8>)>,
-    pub removed_handles: Vec<Handle>,
+    pub handles: AddDelDelta<Handle>,
+    // pub new_handles: Vec<(Handle, Vec<u8>)>,
+    // pub removed_handles: Vec<Handle>,
     // pub handles: Vec<AddDel<Handle>>,
 }
 
@@ -65,10 +66,19 @@ pub struct PathsDelta {
   Delta classifications
 */
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AddDelDelta<T: Sized + Copy> {
     vec: Vec<AddDel<T>>,
     count: usize,
+}
+
+impl<T: Sized + Copy> Default for AddDelDelta<T> {
+    fn default() -> Self {
+        Self {
+            vec: Vec::new(),
+            count: 0,
+        }
+    }
 }
 
 impl<T: Sized + Copy> AddDelDelta<T> {
@@ -83,6 +93,18 @@ impl<T: Sized + Copy> AddDelDelta<T> {
         self.vec.push(AddDel::Del(self.count, v));
         self.count += 1;
     }
+
+    #[inline]
+    pub fn append(&mut self, other: &Self) {
+        let new_count = self.count + other.count;
+        let offset = self.count;
+
+        self.vec.extend(
+            other.vec.iter().copied().map(|ad| ad.offset_count(offset)),
+        );
+
+        self.count = new_count;
+    }
 }
 
 impl<T> AddDelDelta<T>
@@ -93,7 +115,8 @@ where
     pub fn compact(&mut self) {
         let vec = std::mem::take(&mut self.vec);
 
-        let mut seen: FnvHashSet<(bool, T)> = FnvHashSet::default();
+        // let mut seen: FnvHashSet<(bool, T)> = FnvHashSet::default();
+        let mut seen: FnvHashSet<T> = FnvHashSet::default();
         seen.reserve(vec.len());
 
         // this contains the temporally last occurrence for each
@@ -102,7 +125,7 @@ where
             .into_iter()
             .rev()
             .filter(|ad| {
-                let v = (ad.is_add(), ad.value());
+                let v = ad.value();
                 if seen.contains(&v) {
                     false
                 } else {
@@ -238,6 +261,14 @@ impl<T: Sized + Copy> AddDel<T> {
             AddDel::Del(c, t) => AddDel::Del(c, f(t)),
         }
     }
+
+    #[inline]
+    pub fn offset_count(&self, offset: usize) -> Self {
+        match *self {
+            AddDel::Add(c, t) => AddDel::Add(c + offset, t),
+            AddDel::Del(c, t) => AddDel::Del(c + offset, t),
+        }
+    }
 }
 
 /*
@@ -271,24 +302,15 @@ impl GraphDelta for NodesDelta {
         let node_count = self.node_count + rhs.node_count;
         let total_len = self.total_len + rhs.total_len;
 
-        let new_handles = std::mem::take(&mut self.new_handles);
-        let mut new_handles = new_handles
-            .into_iter()
-            .filter(|(h, _)| !rhs.removed_handles.contains(h))
-            .collect::<Vec<_>>();
-        new_handles.append(&mut rhs.new_handles);
-
-        let mut removed_handles: FnvHashSet<_> =
-            self.removed_handles.into_iter().collect();
-        removed_handles.extend(rhs.removed_handles.into_iter());
-
-        let removed_handles: Vec<_> = removed_handles.into_iter().collect();
+        println!("in nodes compose");
+        let mut handles = std::mem::take(&mut self.handles);
+        handles.append(&rhs.handles);
+        handles.compact();
 
         Self {
             node_count,
             total_len,
-            new_handles,
-            removed_handles,
+            handles,
         }
     }
 

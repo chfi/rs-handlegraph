@@ -36,24 +36,24 @@ mod ops;
 mod traits;
 
 pub use delta::{
-    EdgesDelta, GraphOpDelta, LocalEdgeDelta, LocalStep, NodesDelta,
-    PathsDelta, SinglePathDelta,
+    AddDel, AddDelDelta, EdgesDelta, GraphOpDelta, LocalEdgeDelta, LocalStep,
+    NodesDelta, PathsDelta, SinglePathDelta,
 };
 use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
+use traits::{DeriveDelta, GraphApply, GraphDelta};
 
 impl CreateOp {
     pub fn derive_delta(&self, _graph: &PackedGraph) -> GraphOpDelta {
         let mut res = GraphOpDelta::default();
         match self {
             CreateOp::Handle { id, seq } => {
+                let mut handles: AddDelDelta<Handle> = Default::default();
+                handles.add(Handle::pack(*id, false));
+
                 let nodes = NodesDelta {
                     node_count: 1,
                     total_len: seq.len() as isize,
-                    new_handles: vec![(
-                        Handle::pack(*id, false),
-                        seq.to_owned(),
-                    )],
-                    removed_handles: Vec::new(),
+                    handles,
                 };
                 res.nodes = nodes;
             }
@@ -106,11 +106,14 @@ impl RemoveOp {
             RemoveOp::Handle { handle } => {
                 let handle = *handle;
                 let seq_len = graph.node_len(handle) as isize;
+
+                let mut handles: AddDelDelta<Handle> = Default::default();
+                handles.del(handle);
+
                 let nodes = NodesDelta {
                     node_count: -1,
                     total_len: -seq_len,
-                    new_handles: Vec::new(),
-                    removed_handles: vec![handle],
+                    handles,
                 };
                 res.nodes = nodes;
             }
@@ -130,6 +133,22 @@ impl RemoveOp {
         }
 
         res
+    }
+
+    pub fn apply(&self, graph: &mut PackedGraph) {
+        match self {
+            RemoveOp::Handle { handle } => {
+                // println!("removing id: {:?}", handle.id());
+                graph.remove_handle(*handle);
+            }
+            RemoveOp::Edge { edge } => {
+                graph.remove_edge(*edge);
+            }
+            RemoveOp::Path { name } => {
+                let path_id = graph.get_path_id(name).unwrap();
+                graph.destroy_path(path_id);
+            }
+        }
     }
 }
 
@@ -214,6 +233,7 @@ impl DeltaEq {
     }
 }
 
+/*
 impl NodesDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {
         let node_count = self.node_count + rhs.node_count;
@@ -240,6 +260,7 @@ impl NodesDelta {
         }
     }
 }
+*/
 
 impl LocalEdgeDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {
@@ -375,9 +396,13 @@ fn adding_nodes_prop() {
         seq: vec![b'A', b'G', b'G', b'T', b'C'],
     };
 
-    let op_2 = CreateOp::Handle {
-        id: 11u64.into(),
-        seq: vec![b'A', b'A', b'A'],
+    // let op_2 = CreateOp::Handle {
+    //     id: 11u64.into(),
+    //     seq: vec![b'A', b'A', b'A'],
+    // };
+
+    let op_2 = RemoveOp::Handle {
+        handle: Handle::pack(10u64, false),
     };
 
     let delta_1 = op_1.derive_delta(&graph_1);
