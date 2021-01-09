@@ -31,9 +31,14 @@ use quickcheck::{Arbitrary, Gen, QuickCheck};
 
 use fnv::{FnvHashMap, FnvHashSet};
 
+mod delta;
 mod ops;
 mod traits;
 
+pub use delta::{
+    EdgesDelta, GraphOpDelta, LocalEdgeDelta, LocalStep, NodesDelta,
+    PathsDelta, SinglePathDelta,
+};
 use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
 
 impl CreateOp {
@@ -41,7 +46,7 @@ impl CreateOp {
         let mut res = GraphOpDelta::default();
         match self {
             CreateOp::Handle { id, seq } => {
-                let nodes = NodePropertiesDelta {
+                let nodes = NodesDelta {
                     node_count: 1,
                     total_len: seq.len() as isize,
                     new_handles: vec![(
@@ -53,7 +58,7 @@ impl CreateOp {
                 res.nodes = nodes;
             }
             CreateOp::Edge { edge } => {
-                let edges = EdgePropertiesDelta {
+                let edges = EdgesDelta {
                     edge_count: 1,
                     new_edges: vec![*edge],
                     removed_edges: Vec::new(),
@@ -101,7 +106,7 @@ impl RemoveOp {
             RemoveOp::Handle { handle } => {
                 let handle = *handle;
                 let seq_len = graph.node_len(handle) as isize;
-                let nodes = NodePropertiesDelta {
+                let nodes = NodesDelta {
                     node_count: -1,
                     total_len: -seq_len,
                     new_handles: Vec::new(),
@@ -110,7 +115,7 @@ impl RemoveOp {
                 res.nodes = nodes;
             }
             RemoveOp::Edge { edge } => {
-                let edges = EdgePropertiesDelta {
+                let edges = EdgesDelta {
                     edge_count: -1,
                     new_edges: Vec::new(),
                     removed_edges: vec![*edge],
@@ -126,14 +131,6 @@ impl RemoveOp {
 
         res
     }
-}
-
-
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct GraphOpDelta {
-    nodes: NodePropertiesDelta,
-    edges: EdgePropertiesDelta,
-    paths: PathPropertiesDelta,
 }
 
 impl GraphOpDelta {
@@ -217,15 +214,7 @@ impl DeltaEq {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NodePropertiesDelta {
-    pub node_count: isize,
-    pub total_len: isize,
-    pub new_handles: Vec<(Handle, Vec<u8>)>,
-    pub removed_handles: Vec<Handle>,
-}
-
-impl NodePropertiesDelta {
+impl NodesDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {
         let node_count = self.node_count + rhs.node_count;
         let total_len = self.total_len + rhs.total_len;
@@ -250,17 +239,6 @@ impl NodePropertiesDelta {
             removed_handles,
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct LocalEdgeDelta {
-    pub handle: Handle,
-    pub new_left: Vec<Edge>,
-    pub new_right: Vec<Edge>,
-    pub removed_left: Vec<Edge>,
-    pub removed_right: Vec<Edge>,
-    pub left_degree: isize,
-    pub right_degree: isize,
 }
 
 impl LocalEdgeDelta {
@@ -302,15 +280,7 @@ impl LocalEdgeDelta {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct EdgePropertiesDelta {
-    pub edge_count: isize,
-    pub new_edges: Vec<Edge>,
-    pub removed_edges: Vec<Edge>,
-    pub edge_deltas: Vec<LocalEdgeDelta>,
-}
-
-impl EdgePropertiesDelta {
+impl EdgesDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {
         let edge_count = self.edge_count + rhs.edge_count;
 
@@ -337,21 +307,6 @@ impl EdgePropertiesDelta {
             edge_deltas,
         }
     }
-}
-
-pub struct LocalStep {
-    pub prev: (StepPtr, Handle),
-    pub this: (StepPtr, Handle),
-    pub next: (StepPtr, Handle),
-}
-
-pub struct SinglePathDelta {
-    pub step_count: isize,
-    pub seq_len: isize,
-    pub new_steps: Vec<LocalStep>,
-    pub removed_steps: Vec<StepPtr>,
-    pub new_head: StepPtr,
-    pub new_tail: StepPtr,
 }
 
 impl SinglePathDelta {
@@ -385,15 +340,7 @@ impl SinglePathDelta {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct PathPropertiesDelta {
-    pub path_count: isize,
-    pub total_steps: isize,
-    pub new_paths: Vec<(PathId, Vec<u8>)>,
-    pub removed_paths: Vec<(PathId, Vec<u8>)>,
-}
-
-impl PathPropertiesDelta {
+impl PathsDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {
         let path_count = self.path_count + rhs.path_count;
         let total_steps = self.total_steps + rhs.total_steps;
