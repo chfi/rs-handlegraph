@@ -41,6 +41,7 @@ pub struct NodesDelta {
     pub total_len: isize,
     pub new_handles: Vec<(Handle, Vec<u8>)>,
     pub removed_handles: Vec<Handle>,
+    // pub handles: Vec<AddDel<Handle>>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -49,6 +50,7 @@ pub struct EdgesDelta {
     pub new_edges: Vec<Edge>,
     pub removed_edges: Vec<Edge>,
     pub edge_deltas: Vec<LocalEdgeDelta>,
+    // pub edges: Vec<AddDel<Edge>>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -57,6 +59,185 @@ pub struct PathsDelta {
     pub total_steps: isize,
     pub new_paths: Vec<(PathId, Vec<u8>)>,
     pub removed_paths: Vec<(PathId, Vec<u8>)>,
+}
+
+/*
+  Delta classifications
+*/
+
+#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub struct AddDelDelta<T: Sized + Copy> {
+    vec: Vec<AddDel<T>>,
+    count: usize,
+}
+
+impl<T: Sized + Copy> AddDelDelta<T> {
+    #[inline]
+    pub fn add(&mut self, v: T) {
+        self.vec.push(AddDel::Add(self.count, v));
+        self.count += 1;
+    }
+
+    #[inline]
+    pub fn del(&mut self, v: T) {
+        self.vec.push(AddDel::Del(self.count, v));
+        self.count += 1;
+    }
+}
+
+impl<T> AddDelDelta<T>
+where
+    T: Sized + Copy + Eq + std::hash::Hash,
+{
+    #[inline]
+    pub fn compact(&mut self) {
+        let vec = std::mem::take(&mut self.vec);
+
+        let mut seen: FnvHashSet<(bool, T)> = FnvHashSet::default();
+        seen.reserve(vec.len());
+
+        // this contains the temporally last occurrence for each
+        // element
+        let mut canonical: Vec<AddDel<T>> = vec
+            .into_iter()
+            .rev()
+            .filter(|ad| {
+                let v = (ad.is_add(), ad.value());
+                if seen.contains(&v) {
+                    false
+                } else {
+                    seen.insert(v);
+                    true
+                }
+            })
+            .collect();
+
+        canonical.reverse();
+        canonical.shrink_to_fit();
+        self.vec = canonical;
+
+        // let mut value_ops: FnvHashMap<T, Vec<AddDel<()>>> =
+        //     FnvHashMap::default();
+        // value_ops.reserve(vec.len());
+
+        // for &ad in vec.iter() {
+        //     let t = ad.value();
+        //     value_ops.entry(t).or_default().push(ad.map(|_| ()));
+        // }
+
+        /*
+        let mut seen: FnvHashSet<(bool, T)> = FnvHashSet::default();
+        seen.reserve(vec.len());
+
+        let mut seen_adds: FnvHashSet<T> = FnvHashSet::default();
+        let mut seen_dels: FnvHashSet<T> = FnvHashSet::default();
+
+        let mut canonical_adds: Vec<AddDel<T>> = Vec::with_capacity(vec.len());
+        let mut canonical_dels: Vec<AddDel<T>> = Vec::with_capacity(vec.len());
+
+        for ad in vec.into_iter().rev() {
+            if ad.is_add() {
+                if !seen_adds.contains(&ad.value()) {
+                    seen_adds.insert(ad.value());
+                    canonical_adds.push(ad);
+                }
+            } else {
+                if !seen_dels.contains(&ad.value()) {
+                    seen_dels.insert(ad.value());
+                    canonical_dels.push(ad);
+                }
+            }
+        }
+
+        canonical_adds.reverse();
+        canonical_dels.reverse();
+        */
+
+        /*
+        let (mut adds, mut dels): (Vec<_>, Vec<_>) =
+            vec.into_iter().partition(AddDel::is_add);
+
+        let mut modified: FnvHashSet<_> = {
+            let adds_set: FnvHashSet<_> = adds.iter().collect();
+            let dels_set: FnvHashSet<_> = dels.iter().collect();
+
+            let intersection = adds_set.intersection(&dels_set);
+            intersection.cloned().collect()
+        };
+            */
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AddDel<T: Sized + Copy> {
+    Add(usize, T),
+    Del(usize, T),
+}
+
+impl<T: Sized + Copy> AddDel<T> {
+    #[inline]
+    pub fn add_init(v: T) -> Self {
+        AddDel::Add(0, v)
+    }
+
+    #[inline]
+    pub fn del_init(v: T) -> Self {
+        AddDel::Del(0, v)
+    }
+
+    #[inline]
+    pub fn add(&self, v: T) -> Self {
+        AddDel::Add(self.count(), v)
+    }
+
+    #[inline]
+    pub fn del(&self, v: T) -> Self {
+        AddDel::Del(self.count(), v)
+    }
+
+    #[inline]
+    pub fn is_add(&self) -> bool {
+        match self {
+            AddDel::Add(_, _) => true,
+            AddDel::Del(_, _) => false,
+        }
+    }
+
+    #[inline]
+    pub fn is_del(&self) -> bool {
+        match self {
+            AddDel::Add(_, _) => false,
+            AddDel::Del(_, _) => true,
+        }
+    }
+
+    #[inline]
+    pub fn count(&self) -> usize {
+        match self {
+            AddDel::Add(c, _) => *c,
+            AddDel::Del(c, _) => *c,
+        }
+    }
+
+    #[inline]
+    pub fn value(&self) -> T {
+        match self {
+            AddDel::Add(_, v) => *v,
+            AddDel::Del(_, v) => *v,
+        }
+    }
+
+    #[inline]
+    pub fn map<F, U>(&self, f: F) -> AddDel<U>
+    where
+        U: Sized + Copy,
+        F: Fn(T) -> U,
+    {
+        match *self {
+            AddDel::Add(c, t) => AddDel::Add(c, f(t)),
+            AddDel::Del(c, t) => AddDel::Del(c, f(t)),
+        }
+    }
 }
 
 /*
