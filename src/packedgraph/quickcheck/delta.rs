@@ -44,9 +44,36 @@ impl GraphOpDelta {
         self.edges.edges.iter()
     }
 
-    // pub fn nodes_iter(&self) -> std::slice::Iter<'_, AddDel<Handle>> {
+    // pub fn paths_iter(&self) -> std::slice::Iter<'_, AddDel<PathId>> {
     //     self.nodes.handles.iter()
     // }
+
+    pub fn compose(mut self, mut rhs: Self) -> Self {
+        let nodes = self.nodes.compose(std::mem::take(&mut rhs.nodes));
+        let edges = self.edges.compose(std::mem::take(&mut rhs.edges));
+        let paths = self.paths.compose(std::mem::take(&mut rhs.paths));
+
+        Self {
+            nodes,
+            edges,
+            paths,
+        }
+    }
+
+    pub fn compose_nodes(mut self, mut nodes: NodesDelta) -> Self {
+        self.nodes = self.nodes.compose(nodes);
+        self
+    }
+
+    pub fn compose_edges(mut self, mut edges: EdgesDelta) -> Self {
+        self.edges = self.edges.compose(edges);
+        self
+    }
+
+    pub fn compose_paths(mut self, mut paths: PathsDelta) -> Self {
+        self.paths = self.paths.compose(paths);
+        self
+    }
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -59,9 +86,7 @@ pub struct NodesDelta {
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EdgesDelta {
     pub edge_count: isize,
-    // pub new_edges: Vec<Edge>,
-    // pub removed_edges: Vec<Edge>,
-    // pub edge_deltas: Vec<LocalEdgeDelta>,
+    // pub degree_deltas: Vec<NodeDegreeDelta>,
     pub edges: AddDelDelta<Edge>,
 }
 
@@ -141,13 +166,8 @@ where
         let mut canonical: Vec<AddDel<T>> = Vec::with_capacity(vec.len());
 
         for &ad in vec.iter() {
-            let k = ad.value();
-
-            if ad.is_add() {
-                *parity.entry(k).or_default() += 1;
-            } else {
-                *parity.entry(k).or_default() -= 1;
-            }
+            let diff = if ad.is_add() { 1 } else { -1 };
+            *parity.entry(ad.value()).or_default() += diff;
         }
 
         for ad in vec.into_iter().rev() {
@@ -275,10 +295,6 @@ impl GraphDelta for GraphOpDelta {
     fn into_graph_delta(self) -> GraphOpDelta {
         self
     }
-
-    fn make_eq(&self, graph: &PackedGraph) -> DeltaEq {
-        DeltaEq::new(graph, self.clone())
-    }
 }
 
 impl GraphDelta for NodesDelta {
@@ -303,10 +319,6 @@ impl GraphDelta for NodesDelta {
             nodes: self,
             ..GraphOpDelta::default()
         }
-    }
-
-    fn make_eq(&self, graph: &PackedGraph) -> DeltaEq {
-        unimplemented!();
     }
 }
 
@@ -335,10 +347,6 @@ impl GraphDelta for EdgesDelta {
             edges: self,
             ..GraphOpDelta::default()
         }
-    }
-
-    fn make_eq(&self, graph: &PackedGraph) -> DeltaEq {
-        unimplemented!();
     }
 }
 
@@ -372,10 +380,6 @@ impl GraphDelta for PathsDelta {
             ..GraphOpDelta::default()
         }
     }
-
-    fn make_eq(&self, graph: &PackedGraph) -> DeltaEq {
-        unimplemented!();
-    }
 }
 
 /*
@@ -383,12 +387,8 @@ These may be scrapped in the future
 */
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct LocalEdgeDelta {
-    pub handle: Handle,
-    pub new_left: Vec<Edge>,
-    pub new_right: Vec<Edge>,
-    pub removed_left: Vec<Edge>,
-    pub removed_right: Vec<Edge>,
+pub struct NodeDegreeDelta {
+    pub id: NodeId,
     pub left_degree: isize,
     pub right_degree: isize,
 }

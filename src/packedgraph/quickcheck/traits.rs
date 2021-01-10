@@ -38,6 +38,4 @@ pub trait GraphDelta: Sized + Clone {
     fn compose(self, rhs: Self) -> Self;
 
     fn into_graph_delta(self) -> GraphOpDelta;
-
-    fn make_eq(&self, graph: &PackedGraph) -> DeltaEq;
 }

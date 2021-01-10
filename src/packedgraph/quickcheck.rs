@@ -36,7 +36,7 @@ mod ops;
 mod traits;
 
 pub use delta::{
-    AddDel, AddDelDelta, EdgesDelta, GraphOpDelta, LocalEdgeDelta, LocalStep,
+    AddDel, AddDelDelta, EdgesDelta, GraphOpDelta, LocalStep, NodeDegreeDelta,
     NodesDelta, PathsDelta, SinglePathDelta,
 };
 use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
@@ -69,7 +69,17 @@ impl CreateOp {
                 res.edges = edges;
             }
             CreateOp::EdgesIter { edges } => {
-                unimplemented!();
+                let mut edges_ad: AddDelDelta<Edge> = Default::default();
+                let edge_count = edges.len() as isize;
+
+                for &edge in edges {
+                    edges_ad.add(edge);
+                }
+
+                res.edges = EdgesDelta {
+                    edges: edges_ad,
+                    edge_count,
+                };
             }
             CreateOp::Path { name } => {
                 unimplemented!();
@@ -89,11 +99,10 @@ impl CreateOp {
                 graph.create_edge(*edge);
             }
             CreateOp::EdgesIter { edges } => {
-                // TODO
+                graph.create_edges_iter(edges.iter().copied());
             }
             CreateOp::Path { name } => {
                 graph.create_path(name, false);
-                //
             }
         }
     }
@@ -108,19 +117,30 @@ impl RemoveOp {
                 let handle = *handle;
                 let seq_len = graph.node_len(handle) as isize;
 
-                let degree_delta = graph.degree(handle, Direction::Left)
-                    + graph.degree(handle, Direction::Right);
-
                 let mut handles: AddDelDelta<Handle> = Default::default();
                 handles.del(handle);
 
-                let nodes = NodesDelta {
+                res.nodes = NodesDelta {
                     node_count: -1,
                     total_len: -seq_len,
                     handles,
                 };
 
-                res.nodes = nodes;
+                let mut edges: AddDelDelta<Edge> = Default::default();
+                let mut edge_count = 0isize;
+
+                for left in graph.neighbors(handle, Direction::Left) {
+                    edges.add(Edge(left, handle));
+                    edges.add(Edge(handle.flip(), left.flip()));
+                    edge_count -= 2;
+                }
+                for right in graph.neighbors(handle, Direction::Right) {
+                    edges.add(Edge(handle, right));
+                    edges.add(Edge(right.flip(), handle.flip()));
+                    edge_count -= 2;
+                }
+
+                res.edges = EdgesDelta { edges, edge_count };
             }
             RemoveOp::Edge { edge } => {
                 let mut edges: AddDelDelta<Edge> = Default::default();
@@ -158,35 +178,6 @@ impl RemoveOp {
                 graph.destroy_path(path_id);
             }
         }
-    }
-}
-
-impl GraphOpDelta {
-    pub fn compose(mut self, mut rhs: Self) -> Self {
-        let nodes = self.nodes.compose(std::mem::take(&mut rhs.nodes));
-        let edges = self.edges.compose(std::mem::take(&mut rhs.edges));
-        let paths = self.paths.compose(std::mem::take(&mut rhs.paths));
-
-        Self {
-            nodes,
-            edges,
-            paths,
-        }
-    }
-
-    pub fn compose_nodes(mut self, mut nodes: NodesDelta) -> Self {
-        self.nodes = self.nodes.compose(nodes);
-        self
-    }
-
-    pub fn compose_edges(mut self, mut edges: EdgesDelta) -> Self {
-        self.edges = self.edges.compose(edges);
-        self
-    }
-
-    pub fn compose_paths(mut self, mut paths: PathsDelta) -> Self {
-        self.paths = self.paths.compose(paths);
-        self
     }
 }
 
@@ -232,6 +223,10 @@ impl DeltaEq {
             return false;
         }
 
+        let expected_edge_count =
+            (self.graph.edge_count() as isize) + self.delta.edges.edge_count;
+
+        /*
         let expected_edge_count = {
             let mut expected = self.graph.edge_count() as isize;
             expected += self.delta.edges.edge_count;
@@ -251,6 +246,7 @@ impl DeltaEq {
 
             expected
         };
+        */
 
         if other.edge_count() as isize != expected_edge_count {
             println!("wrong edge count:");
@@ -310,42 +306,11 @@ impl NodesDelta {
 }
 */
 
-impl LocalEdgeDelta {
+impl NodeDegreeDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {
-        let new_left = std::mem::take(&mut self.new_left);
-        let new_left = new_left
-            .into_iter()
-            .filter(|e| !rhs.removed_left.contains(e))
-            .collect::<Vec<_>>();
-
-        let new_right = std::mem::take(&mut self.new_right);
-        let new_right = new_right
-            .into_iter()
-            .filter(|e| !rhs.removed_right.contains(e))
-            .collect::<Vec<_>>();
-
-        let left_degree = self.left_degree + rhs.left_degree;
-        let right_degree = self.right_degree + rhs.right_degree;
-
-        let mut removed_left = std::mem::take(&mut self.removed_left);
-        removed_left.append(&mut rhs.removed_left);
-        removed_left.sort();
-        removed_left.dedup();
-
-        let mut removed_right = std::mem::take(&mut self.removed_right);
-        removed_right.append(&mut rhs.removed_right);
-        removed_right.sort();
-        removed_right.dedup();
-
-        Self {
-            handle: self.handle,
-            new_left,
-            new_right,
-            removed_left,
-            removed_right,
-            left_degree,
-            right_degree,
-        }
+        self.right_degree += rhs.right_degree;
+        self.left_degree += rhs.left_degree;
+        self
     }
 }
 
