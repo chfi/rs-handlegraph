@@ -222,10 +222,113 @@ impl GraphApply for RemoveOp {
   MutHandleOp trait imps
 */
 
+impl DeriveDelta for MutHandleOp {
+    fn derive_compose(
+        &self,
+        graph: &PackedGraph,
+        mut lhs: GraphOpDelta,
+    ) -> GraphOpDelta {
+        match self {
+            MutHandleOp::Divide { handle, offsets } => {
+                let node_len = graph.node_len(*handle);
+
+                let (_, offsets_sum_len) = offsets.iter().copied().fold(
+                    (0, 0),
+                    |(last, sum), offset| {
+                        let len = offset - last;
+                        (offset, sum + len)
+                    },
+                );
+
+                let new_count = if offsets_sum_len < node_len {
+                    offsets.len() + 1
+                } else {
+                    offsets.len()
+                };
+
+                let mut next_id = u64::from(graph.max_node_id()) + 1;
+
+                let mut handles: AddDelDelta<Handle> = Default::default();
+                let mut edges: AddDelDelta<Edge> = Default::default();
+
+                let mut node_count = 0isize;
+                let mut edge_count = 0isize;
+
+                let mut prev_h = handle;
+
+                for i in 0..offsets.len() {
+                    let curr_h = Handle::pack(next_id, false);
+
+                    handles.add(curr_h, count);
+                    edges.add(Edge(prev_h, curr_h), count);
+
+                    prev_h = curr_h;
+                    next_id += 1;
+
+                    node_count += 1;
+                    edge_count += 2;
+                }
+
+                lhs.nodes = NodesDelta {
+                    node_count,
+                    total_len: 0,
+                    handles,
+                };
+
+                lhs.edges = EdgesDelta { edge_count, edges };
+
+                lhs
+            }
+        }
+    }
+}
+
+impl GraphApply for MutHandleOp {
+    fn apply(&self, graph: &mut PackedGraph) {
+        match self {
+            MutHandleOp::Divide { handle, offsets } => {
+                graph.divide_handle(*handle, offsets);
+            }
+        }
+    }
+}
+
 /*
   MutPathOp trait imps
 */
 
+impl DeriveDelta for MutPathOp {
+    fn derive_compose(
+        &self,
+        graph: &PackedGraph,
+        mut lhs: GraphOpDelta,
+    ) -> GraphOpDelta {
+        unimplemented!();
+    }
+}
+
+impl GraphApply for MutPathOp {
+    fn apply(&self, graph: &mut PackedGraph) {
+        unimplemented!();
+    }
+}
+
 /*
   GraphWideOp trait imps
 */
+
+impl DeriveDelta for GraphWideOp {
+    fn derive_compose(
+        &self,
+        graph: &PackedGraph,
+        mut lhs: GraphOpDelta,
+    ) -> GraphOpDelta {
+        unimplemented!();
+    }
+}
+
+impl GraphApply for GraphWideOp {
+    fn apply(&self, graph: &mut PackedGraph) {
+        unimplemented!();
+    }
+}
