@@ -36,62 +36,13 @@ mod ops;
 mod traits;
 
 pub use delta::{
-    AddDel, AddDelDelta, EdgesDelta, GraphOpDelta, LocalStep, NodesDelta,
-    PathsDelta,
+    AddDel, AddDelDelta, DeltaEq, EdgesDelta, GraphOpDelta, LocalStep,
+    NodesDelta, PathsDelta,
 };
 use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
 use traits::{DeriveDelta, GraphApply, GraphDelta};
 
 impl CreateOp {
-    /*
-    pub fn derive_delta(&self, _graph: &PackedGraph) -> GraphOpDelta {
-        let mut res = GraphOpDelta::default();
-        match self {
-            CreateOp::Handle { id, seq } => {
-                let mut handles: AddDelDelta<Handle> = Default::default();
-                // let mut handles: AddDelDelta_<Handle> = Default::default();
-                handles.add(Handle::pack(*id, false));
-
-                let nodes = NodesDelta {
-                    node_count: 1,
-                    total_len: seq.len() as isize,
-                    handles,
-                };
-
-                res.nodes = nodes;
-            }
-            CreateOp::Edge { edge } => {
-                let mut edges: AddDelDelta<Edge> = Default::default();
-                edges.add(*edge);
-
-                let edges = EdgesDelta {
-                    edge_count: 1,
-                    edges,
-                };
-                res.edges = edges;
-            }
-            CreateOp::EdgesIter { edges } => {
-                let mut edges_ad: AddDelDelta<Edge> = Default::default();
-                let edge_count = edges.len() as isize;
-
-                for &edge in edges {
-                    edges_ad.add(edge);
-                }
-
-                res.edges = EdgesDelta {
-                    edges: edges_ad,
-                    edge_count,
-                };
-            }
-            CreateOp::Path { name } => {
-                unimplemented!();
-            }
-        }
-
-        res
-    }
-    */
-
     pub fn apply(&self, graph: &mut PackedGraph) {
         match self {
             CreateOp::Handle { id, seq } => {
@@ -112,59 +63,6 @@ impl CreateOp {
 }
 
 impl RemoveOp {
-    /*
-    pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {
-        let mut res = GraphOpDelta::default();
-
-        match self {
-            RemoveOp::Handle { handle } => {
-                let handle = *handle;
-                let seq_len = graph.node_len(handle) as isize;
-
-                let mut handles: AddDelDelta<Handle> = Default::default();
-                handles.del(handle);
-
-                res.nodes = NodesDelta {
-                    node_count: -1,
-                    total_len: -seq_len,
-                    handles,
-                };
-
-                let mut edges: AddDelDelta<Edge> = Default::default();
-                let mut edge_count = 0isize;
-
-                for left in graph.neighbors(handle, Direction::Left) {
-                    edges.add(Edge(left, handle));
-                    edges.add(Edge(handle.flip(), left.flip()));
-                    edge_count -= 2;
-                }
-                for right in graph.neighbors(handle, Direction::Right) {
-                    edges.add(Edge(handle, right));
-                    edges.add(Edge(right.flip(), handle.flip()));
-                    edge_count -= 2;
-                }
-
-                res.edges = EdgesDelta { edges, edge_count };
-            }
-            RemoveOp::Edge { edge } => {
-                let mut edges: AddDelDelta<Edge> = Default::default();
-                edges.del(*edge);
-
-                let edges = EdgesDelta {
-                    edge_count: -1,
-                    edges,
-                };
-                res.edges = edges;
-            }
-            RemoveOp::Path { name } => {
-                unimplemented!();
-            }
-        }
-
-        res
-    }
-    */
-
     pub fn apply(&self, graph: &mut PackedGraph) {
         match self {
             RemoveOp::Handle { handle } => {
@@ -229,107 +127,6 @@ impl MutHandleOp {
     }
 }
 */
-
-pub struct DeltaEq {
-    graph: PackedGraph,
-    delta: GraphOpDelta,
-}
-
-impl DeltaEq {
-    pub fn new(graph: &PackedGraph, delta: GraphOpDelta) -> Self {
-        let graph = graph.clone();
-
-        Self { graph, delta }
-    }
-
-    pub fn eq_delta(&self, other: &PackedGraph) -> bool {
-        let expected_node_count =
-            (self.graph.node_count() as isize) + self.delta.nodes.node_count;
-
-        println!("  ------------------------  ");
-        println!("      eq_delta");
-
-        if other.node_count() as isize != expected_node_count {
-            println!(
-                "node count: {} != {}, delta {}",
-                self.graph.node_count(),
-                other.node_count(),
-                self.delta.nodes.node_count
-            );
-            return false;
-        }
-
-        for handle_delta in self.delta.nodes_iter() {
-            if handle_delta.is_add() {
-                if !other.has_node(handle_delta.value().id()) {
-                    return false;
-                }
-            } else {
-                if other.has_node(handle_delta.value().id()) {
-                    return false;
-                }
-            }
-        }
-
-        let expected_total_len =
-            (self.graph.total_length() as isize) + self.delta.nodes.total_len;
-
-        if other.total_length() as isize != expected_total_len {
-            println!(
-                "total len: {} != {}, delta {}",
-                self.graph.total_length(),
-                other.total_length(),
-                self.delta.nodes.total_len
-            );
-            return false;
-        }
-
-        let expected_edge_count =
-            (self.graph.edge_count() as isize) + self.delta.edges.edge_count;
-
-        if other.edge_count() as isize != expected_edge_count {
-            println!("wrong edge count:");
-            println!("  LHS: {}", self.graph.edge_count());
-            println!("  RHS: {}", other.edge_count());
-            println!("  edge delta:     {}", self.delta.edges.edge_count);
-            return false;
-        }
-
-        /*
-        for edge_delta in self.delta.edges.iter() {
-            if edge_delta.is_add() {
-                if !other.has_node(handle_delta.value().id()) {
-                    return false;
-                }
-            } else {
-                if other.has_node(handle_delta.value().id()) {
-                    return false;
-                }
-            } else {
-            }
-        }
-        */
-
-        let expected_path_count =
-            (self.graph.path_count() as isize) + self.delta.paths.path_count;
-
-        if other.path_count() as isize != expected_path_count {
-            println!("wrong path count");
-            return false;
-        }
-
-        // let expected_total_len =
-        //     (self.graph.total_length() as isize) + self.delta.nodes.total_len;
-
-        // if other.total_length() as isize != expected_total_len {
-        //     return false;
-        // }
-
-        println!("  ------------------------  ");
-
-        true
-    }
-}
 
 #[test]
 fn adding_nodes_prop() {

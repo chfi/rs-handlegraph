@@ -24,7 +24,6 @@ use crate::packedgraph::{
 };
 
 use super::traits::*;
-use super::DeltaEq;
 
 use fnv::{FnvHashMap, FnvHashSet};
 
@@ -404,4 +403,123 @@ pub struct PathStepsDelta {
     pub steps: AddDelDelta<StepOp>,
     pub head: StepPtr,
     pub tail: StepPtr,
+}
+
+/*
+   Delta-based invariant checking
+*/
+
+pub struct DeltaEq {
+    graph: PackedGraph,
+    delta: GraphOpDelta,
+}
+
+impl DeltaEq {
+    pub fn new(graph: &PackedGraph, delta: GraphOpDelta) -> Self {
+        let graph = graph.clone();
+
+        Self { graph, delta }
+    }
+
+    fn compare_nodes(&self, other: &PackedGraph) -> bool {
+        let expected_node_count =
+            (self.graph.node_count() as isize) + self.delta.nodes.node_count;
+
+        println!("  ------------------------  ");
+        println!("      eq_delta");
+
+        if other.node_count() as isize != expected_node_count {
+            println!(
+                "node count: {} != {}, delta {}",
+                self.graph.node_count(),
+                other.node_count(),
+                self.delta.nodes.node_count
+            );
+            return false;
+        }
+
+        for handle_delta in self.delta.nodes_iter() {
+            if handle_delta.is_add() {
+                if !other.has_node(handle_delta.value().id()) {
+                    return false;
+                }
+            } else {
+                if other.has_node(handle_delta.value().id()) {
+                    return false;
+                }
+            }
+        }
+
+        let expected_total_len =
+            (self.graph.total_length() as isize) + self.delta.nodes.total_len;
+
+        if other.total_length() as isize != expected_total_len {
+            println!(
+                "total len: {} != {}, delta {}",
+                self.graph.total_length(),
+                other.total_length(),
+                self.delta.nodes.total_len
+            );
+            return false;
+        }
+
+        true
+    }
+
+    fn compare_edges(&self, other: &PackedGraph) -> bool {
+        let expected_edge_count =
+            (self.graph.edge_count() as isize) + self.delta.edges.edge_count;
+
+        if other.edge_count() as isize != expected_edge_count {
+            println!("wrong edge count:");
+            println!("  LHS: {}", self.graph.edge_count());
+            println!("  RHS: {}", other.edge_count());
+            println!("  edge delta:     {}", self.delta.edges.edge_count);
+            return false;
+        }
+
+        /*
+        for edge_delta in self.delta.edges.iter() {
+            if edge_delta.is_add() {
+                if !other.has_node(handle_delta.value().id()) {
+                    return false;
+                }
+            } else {
+                if other.has_node(handle_delta.value().id()) {
+                    return false;
+                }
+            } else {
+            }
+        }
+        */
+
+        true
+    }
+
+    pub fn eq_delta(&self, other: &PackedGraph) -> bool {
+        let mut pass = true;
+
+        pass &= self.compare_nodes(other);
+
+        pass &= self.compare_edges(other);
+
+        let expected_path_count =
+            (self.graph.path_count() as isize) + self.delta.paths.path_count;
+
+        if other.path_count() as isize != expected_path_count {
+            println!("wrong path count");
+            return false;
+        }
+
+        // let expected_total_len =
+        //     (self.graph.total_length() as isize) + self.delta.nodes.total_len;
+
+        // if other.total_length() as isize != expected_total_len {
+        //     return false;
+        // }
+
+        println!("  ------------------------  ");
+
+        pass
+    }
 }
