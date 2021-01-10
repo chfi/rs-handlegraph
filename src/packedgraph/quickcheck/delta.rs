@@ -178,35 +178,33 @@ where
     pub fn compact(&mut self) {
         let vec = std::mem::take(&mut self.vec);
 
-        let mut seen_adds: FnvHashSet<T> = FnvHashSet::default();
-        let mut seen_dels: FnvHashSet<T> = FnvHashSet::default();
-        seen_adds.reserve(vec.len());
-        seen_dels.reserve(vec.len());
-
         let mut parity: FnvHashMap<T, i8> = FnvHashMap::default();
-
-        let mut canonical: Vec<AddDel<T>> = Vec::with_capacity(vec.len());
-
         for &ad in vec.iter() {
             let diff = if ad.is_add() { 1 } else { -1 };
             *parity.entry(ad.value()).or_default() += diff;
         }
 
+        let mut canonical: Vec<AddDel<T>> = Vec::with_capacity(vec.len());
+
+        let mut seen: FnvHashSet<T> = FnvHashSet::default();
+
         for ad in vec.into_iter().rev() {
             let k = ad.value();
 
-            if let Some(par) = parity.get(&k) {
-                use std::cmp::Ordering;
+            if !seen.contains(&k) {
+                seen.insert(k);
 
-                match par.cmp(&0) {
-                    std::cmp::Ordering::Less => {
-                        canonical.push(AddDel::Del(ad.count(), k));
-                    }
-                    std::cmp::Ordering::Equal => {
-                        // cancels out
-                    }
-                    std::cmp::Ordering::Greater => {
-                        canonical.push(AddDel::Add(ad.count(), k));
+                if let Some(par) = parity.get(&k) {
+                    match par.cmp(&0) {
+                        std::cmp::Ordering::Less => {
+                            canonical.push(AddDel::Del(ad.count(), k));
+                        }
+                        std::cmp::Ordering::Equal => {
+                            // cancels out
+                        }
+                        std::cmp::Ordering::Greater => {
+                            canonical.push(AddDel::Add(ad.count(), k));
+                        }
                     }
                 }
             }
