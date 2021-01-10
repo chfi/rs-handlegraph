@@ -256,7 +256,7 @@ impl MutableHandles for PackedGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,
-        offsets: Vec<usize>,
+        offsets: &[usize],
     ) -> Vec<Handle> {
         let mut result = vec![handle];
 
@@ -924,7 +924,7 @@ pub(crate) mod tests {
         let pre_divide_occurrences =
             (1..=9).map(|n| get_occurs(&graph, n)).collect::<Vec<_>>();
 
-        let new_hs = graph.divide_handle(hnd(2), vec![3, 7, 9]);
+        let new_hs = graph.divide_handle(hnd(2), &[3, 7, 9]);
 
         assert_eq!(graph.node_count(), 12);
 

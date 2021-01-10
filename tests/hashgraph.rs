@@ -415,7 +415,7 @@ fn graph_divide_handle() {
 
     assert_eq!(expected_handles, handles);
 
-    graph.divide_handle(H2, vec![3, 7, 9]);
+    graph.divide_handle(H2, &[3, 7, 9]);
 
     // The left-hand edges on the divided handle are the same
     assert!(graph.has_edge(H1, H2));

@@ -51,7 +51,7 @@ pub trait MutableHandles: AdditiveHandleGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,
-        offsets: Vec<usize>,
+        offsets: &[usize],
     ) -> Vec<Handle>;
 
     /// Divide the given handle at the provided offset, creating one
@@ -65,7 +65,7 @@ pub trait MutableHandles: AdditiveHandleGraph {
         handle: Handle,
         offset: usize,
     ) -> (Handle, Handle) {
-        let handles = self.divide_handle(handle, vec![offset]);
+        let handles = self.divide_handle(handle, &[offset]);
         (handles[0], handles[1])
     }
 

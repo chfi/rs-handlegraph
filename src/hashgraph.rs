@@ -221,13 +221,15 @@ impl MutableHandles for HashGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,
-        mut offsets: Vec<usize>,
+        mut offsets: &[usize],
     ) -> Vec<Handle> {
         let mut result = vec![handle];
         let node_len = self.node_len(handle);
         let sequence = self.sequence_vec(handle);
 
         let fwd_handle = handle.forward();
+
+        let mut offsets = offsets.to_vec();
 
         // Push the node length as a last offset to make constructing
         // the ranges nicer
