@@ -33,6 +33,8 @@ pub struct GraphOpDelta {
     pub nodes: NodesDelta,
     pub edges: EdgesDelta,
     pub paths: PathsDelta,
+    pub count: usize,
+    // pub count_offset: usize,
 }
 
 impl GraphOpDelta {
@@ -48,15 +50,21 @@ impl GraphOpDelta {
         self.paths.paths.iter()
     }
 
+    pub fn count(&self) -> usize {
+        self.count
+    }
+
     pub fn compose(mut self, mut rhs: Self) -> Self {
         let nodes = self.nodes.compose(std::mem::take(&mut rhs.nodes));
         let edges = self.edges.compose(std::mem::take(&mut rhs.edges));
         let paths = self.paths.compose(std::mem::take(&mut rhs.paths));
+        let count = rhs.count;
 
         Self {
             nodes,
             edges,
             paths,
+            count,
         }
     }
 
@@ -81,6 +89,7 @@ pub struct NodesDelta {
     pub node_count: isize,
     pub total_len: isize,
     pub handles: AddDelDelta<Handle>,
+    // pub handles: AddDelDelta_<Handle>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -117,9 +126,27 @@ impl<T: Sized + Copy> Default for AddDelDelta<T> {
 }
 
 impl<T: Sized + Copy> AddDelDelta<T> {
+    pub fn new(count: usize) -> Self {
+        Self {
+            vec: Vec::new(),
+            count,
+        }
+    }
+
+    pub fn new_<U: Sized + Copy>(count: usize) -> AddDelDelta<U> {
+        AddDelDelta {
+            vec: Vec::new(),
+            count,
+        }
+    }
+
     #[inline]
     pub fn iter(&self) -> std::slice::Iter<'_, AddDel<T>> {
         self.vec.iter()
+    }
+
+    pub fn add_(&mut self, count: usize, v: T) {
+        self.vec.push(AddDel::Add(count, v));
     }
 
     #[inline]
@@ -202,23 +229,13 @@ pub enum AddDel<T: Sized + Copy> {
 
 impl<T: Sized + Copy> AddDel<T> {
     #[inline]
-    pub fn add_init(v: T) -> Self {
-        AddDel::Add(0, v)
+    pub fn add(&self, c: usize, v: T) -> Self {
+        AddDel::Add(c, v)
     }
 
     #[inline]
-    pub fn del_init(v: T) -> Self {
-        AddDel::Del(0, v)
-    }
-
-    #[inline]
-    pub fn add(&self, v: T) -> Self {
-        AddDel::Add(self.count(), v)
-    }
-
-    #[inline]
-    pub fn del(&self, v: T) -> Self {
-        AddDel::Del(self.count(), v)
+    pub fn del(&self, c: usize, v: T) -> Self {
+        AddDel::Del(c, v)
     }
 
     #[inline]
@@ -280,15 +297,7 @@ impl<T: Sized + Copy> AddDel<T> {
 
 impl GraphDelta for GraphOpDelta {
     fn compose(self, mut rhs: Self) -> Self {
-        let nodes = self.nodes.compose(std::mem::take(&mut rhs.nodes));
-        let edges = self.edges.compose(std::mem::take(&mut rhs.edges));
-        let paths = self.paths.compose(std::mem::take(&mut rhs.paths));
-
-        Self {
-            nodes,
-            edges,
-            paths,
-        }
+        self.compose(rhs)
     }
 
     fn into_graph_delta(self) -> GraphOpDelta {

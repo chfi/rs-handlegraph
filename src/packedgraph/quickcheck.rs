@@ -36,18 +36,20 @@ mod ops;
 mod traits;
 
 pub use delta::{
-    AddDel, AddDelDelta, EdgesDelta, GraphOpDelta, LocalStep, NodeDegreeDelta,
-    NodesDelta, PathsDelta,
+    AddDel, AddDelDelta, EdgesDelta, GraphOpDelta, LocalStep, NodesDelta,
+    PathsDelta,
 };
 use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
 use traits::{DeriveDelta, GraphApply, GraphDelta};
 
 impl CreateOp {
+    /*
     pub fn derive_delta(&self, _graph: &PackedGraph) -> GraphOpDelta {
         let mut res = GraphOpDelta::default();
         match self {
             CreateOp::Handle { id, seq } => {
                 let mut handles: AddDelDelta<Handle> = Default::default();
+                // let mut handles: AddDelDelta_<Handle> = Default::default();
                 handles.add(Handle::pack(*id, false));
 
                 let nodes = NodesDelta {
@@ -88,6 +90,7 @@ impl CreateOp {
 
         res
     }
+    */
 
     pub fn apply(&self, graph: &mut PackedGraph) {
         match self {
@@ -109,6 +112,7 @@ impl CreateOp {
 }
 
 impl RemoveOp {
+    /*
     pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {
         let mut res = GraphOpDelta::default();
 
@@ -159,6 +163,7 @@ impl RemoveOp {
 
         res
     }
+    */
 
     pub fn apply(&self, graph: &mut PackedGraph) {
         match self {
@@ -176,6 +181,48 @@ impl RemoveOp {
             RemoveOp::Path { name } => {
                 let path_id = graph.get_path_id(name).unwrap();
                 graph.destroy_path(path_id);
+            }
+        }
+    }
+}
+
+impl MutHandleOp {
+    pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {
+        match self {
+            MutHandleOp::Divide { handle, offsets } => {
+                let mut delta = GraphOpDelta::default();
+
+                let mut next_id = u64::from(graph.max_node_id()) + 1;
+
+                let mut handles: AddDelDelta<Handle> = Default::default();
+                let mut edges: AddDelDelta<Edge> = Default::default();
+
+                let node_count = offsets.len() as isize;
+                let edge_count = offsets.len() as isize;
+
+                let mut prev_handle = handle;
+
+                for _ in offsets {
+                    let new_handle = Handle::pack(next_id, handle.is_reverse());
+                    handles.add(new_handle);
+                    next_id += 1;
+                }
+
+                delta.nodes.node_count = node_count;
+                delta.nodes.handles = handles;
+
+                delta.edges.edge_count = edge_count;
+                delta.edges.edges = edges;
+
+                delta
+            }
+        }
+    }
+
+    pub fn apply(&self, graph: &mut PackedGraph) {
+        match self {
+            MutHandleOp::Divide { handle, offsets } => {
+                graph.divide_handle(*handle, offsets.to_owned());
             }
         }
     }
@@ -210,7 +257,7 @@ impl DeltaEq {
             return false;
         }
 
-        for handle_delta in self.delta.handles.iter() {
+        for handle_delta in self.delta.nodes_iter() {
             if handle_delta.is_add() {
                 if !other.has_node(handle_delta.value().id()) {
                     return false;
@@ -282,13 +329,13 @@ impl DeltaEq {
     }
 }
 
-impl NodeDegreeDelta {
-    pub fn compose(mut self, mut rhs: Self) -> Self {
-        self.right_degree += rhs.right_degree;
-        self.left_degree += rhs.left_degree;
-        self
-    }
-}
+// impl NodeDegreeDelta {
+//     pub fn compose(mut self, mut rhs: Self) -> Self {
+//         self.right_degree += rhs.right_degree;
+//         self.left_degree += rhs.left_degree;
+//         self
+//     }
+// }
 
 #[test]
 fn adding_nodes_prop() {
@@ -309,7 +356,11 @@ fn adding_nodes_prop() {
         handle: Handle::pack(8u64, false),
     };
 
-    let delta_1 = op_1.derive_delta(&graph_1);
+    // let mut count
+    let count = 0usize;
+
+    let delta_1 = op_1.derive_delta(&graph_1, count);
+    let count = delta_1.count;
     let delta_eq_1 = DeltaEq::new(&graph_1, delta_1.clone());
     op_1.apply(&mut graph_1);
 
@@ -319,7 +370,8 @@ fn adding_nodes_prop() {
     println!("compare: {}", delta_eq_1.eq_delta(&graph_1));
     println!();
 
-    let delta_2 = op_2.derive_delta(&graph_1);
+    let delta_2 = op_2.derive_delta(&graph_1, count);
+    let count = delta_2.count;
     let delta_eq_2 = DeltaEq::new(&graph_1, delta_2.clone());
     op_2.apply(&mut graph_1);
 

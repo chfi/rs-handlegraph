@@ -31,7 +31,17 @@ pub trait GraphApply {
 }
 
 pub trait DeriveDelta {
-    fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta;
+    fn derive_compose(
+        &self,
+        graph: &PackedGraph,
+        lhs: GraphOpDelta,
+    ) -> GraphOpDelta;
+
+    fn derive_delta(&self, graph: &PackedGraph, count: usize) -> GraphOpDelta {
+        let mut delta = GraphOpDelta::default();
+        delta.count = count;
+        self.derive_compose(graph, delta)
+    }
 }
 
 pub trait GraphDelta: Sized + Clone {
