@@ -42,48 +42,6 @@ pub use delta::{
 use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
 use traits::{DeriveDelta, GraphApply, GraphDelta};
 
-impl CreateOp {
-    pub fn apply(&self, graph: &mut PackedGraph) {
-        match self {
-            CreateOp::Handle { id, seq } => {
-                println!("adding id: {:?}", id);
-                graph.create_handle(seq, *id);
-            }
-            CreateOp::Edge { edge } => {
-                graph.create_edge(*edge);
-            }
-            CreateOp::EdgesIter { edges } => {
-                graph.create_edges_iter(edges.iter().copied());
-            }
-            CreateOp::Path { name } => {
-                graph.create_path(name, false);
-            }
-        }
-    }
-}
-
-impl RemoveOp {
-    pub fn apply(&self, graph: &mut PackedGraph) {
-        match self {
-            RemoveOp::Handle { handle } => {
-                println!(" node count before: {}", graph.node_count());
-                println!(" total len before:  {}", graph.total_length());
-                println!("removing id: {:?}", handle.id());
-                graph.remove_handle(*handle);
-                println!(" node count after: {}", graph.node_count());
-                println!(" total len after:  {}", graph.total_length());
-            }
-            RemoveOp::Edge { edge } => {
-                graph.remove_edge(*edge);
-            }
-            RemoveOp::Path { name } => {
-                let path_id = graph.get_path_id(name).unwrap();
-                graph.destroy_path(path_id);
-            }
-        }
-    }
-}
-
 /*
 impl MutHandleOp {
     pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {

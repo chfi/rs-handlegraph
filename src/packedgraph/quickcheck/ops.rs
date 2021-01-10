@@ -75,6 +75,10 @@ pub enum GraphWideOp {
   Trait implementations
 */
 
+/*
+  CreateOp trait imps
+*/
+
 impl DeriveDelta for CreateOp {
     fn derive_compose(
         &self,
@@ -118,6 +122,30 @@ impl DeriveDelta for CreateOp {
         lhs
     }
 }
+
+impl GraphApply for CreateOp {
+    fn apply(&self, graph: &mut PackedGraph) {
+        match self {
+            CreateOp::Handle { id, seq } => {
+                println!("adding id: {:?}", id);
+                graph.create_handle(seq, *id);
+            }
+            CreateOp::Edge { edge } => {
+                graph.create_edge(*edge);
+            }
+            CreateOp::EdgesIter { edges } => {
+                graph.create_edges_iter(edges.iter().copied());
+            }
+            CreateOp::Path { name } => {
+                graph.create_path(name, false);
+            }
+        }
+    }
+}
+
+/*
+  RemoveOp trait imps
+*/
 
 impl DeriveDelta for RemoveOp {
     fn derive_compose(
@@ -172,3 +200,32 @@ impl DeriveDelta for RemoveOp {
         lhs
     }
 }
+
+impl GraphApply for RemoveOp {
+    fn apply(&self, graph: &mut PackedGraph) {
+        match self {
+            RemoveOp::Handle { handle } => {
+                graph.remove_handle(*handle);
+            }
+            RemoveOp::Edge { edge } => {
+                graph.remove_edge(*edge);
+            }
+            RemoveOp::Path { name } => {
+                let path_id = graph.get_path_id(name).unwrap();
+                graph.destroy_path(path_id);
+            }
+        }
+    }
+}
+
+/*
+  MutHandleOp trait imps
+*/
+
+/*
+  MutPathOp trait imps
+*/
+
+/*
+  GraphWideOp trait imps
+*/
