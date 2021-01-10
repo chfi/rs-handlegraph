@@ -140,13 +140,41 @@ impl<T: Sized + Copy> AddDelDelta<T> {
         }
     }
 
+    pub fn new_add(v: T, count: &mut usize) -> Self {
+        let res = AddDelDelta {
+            vec: vec![AddDel::Add(*count, v)],
+            count: *count + 1,
+        };
+        *count += 1;
+        res
+    }
+
+    pub fn new_del(v: T, count: &mut usize) -> Self {
+        let res = AddDelDelta {
+            vec: vec![AddDel::Del(*count, v)],
+            count: *count + 1,
+        };
+        *count += 1;
+        res
+    }
+
     #[inline]
     pub fn iter(&self) -> std::slice::Iter<'_, AddDel<T>> {
         self.vec.iter()
     }
 
-    pub fn add_(&mut self, count: usize, v: T) {
-        self.vec.push(AddDel::Add(count, v));
+    #[inline]
+    pub fn add_with(&mut self, v: T, count: &mut usize) {
+        self.vec.push(AddDel::Add(*count, v));
+        *count += 1;
+        self.count = *count;
+    }
+
+    #[inline]
+    pub fn del_with(&mut self, v: T, count: &mut usize) {
+        self.vec.push(AddDel::Del(*count, v));
+        *count += 1;
+        self.count = *count;
     }
 
     #[inline]

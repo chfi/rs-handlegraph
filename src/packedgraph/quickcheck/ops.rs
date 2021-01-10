@@ -85,42 +85,45 @@ impl DeriveDelta for CreateOp {
 
         match self {
             CreateOp::Handle { id, seq } => {
-                let mut handles: AddDelDelta<Handle> = AddDelDelta::new(*count);
-                handles.add(Handle::pack(*id, false));
-                *count += 1;
-
-                let nodes = NodesDelta {
+                lhs.nodes = NodesDelta {
                     node_count: 1,
                     total_len: seq.len() as isize,
-                    handles,
+                    handles: AddDelDelta::new_add(
+                        Handle::pack(*id, false),
+                        count,
+                    ),
                 };
-
-                lhs.nodes = nodes;
             }
             CreateOp::Edge { edge } => {
-                let mut edges: AddDelDelta<Edge> = AddDelDelta::new(*count);
-                edges.add(*edge);
-                *count += 1;
-
-                let edges = EdgesDelta {
+                lhs.edges = EdgesDelta {
                     edge_count: 1,
-                    edges,
+                    edges: AddDelDelta::new_add(*edge, count),
                 };
-                lhs.edges = edges;
             }
             CreateOp::EdgesIter { edges } => {
-                let mut edges_ad: AddDelDelta<Edge> = AddDelDelta::new(*count);
                 let edge_count = edges.len() as isize;
+                let edges = edges.iter().fold(
+                    AddDelDelta::new(*count),
+                    |mut acc, &edge| {
+                        acc.add_with(edge, count);
+                        acc
+                    },
+                );
+
+                lhs.edges = EdgesDelta { edges, edge_count };
+
+                /*
+                let mut edges_ad = AddDelDelta::new(*count);
 
                 for &edge in edges {
-                    edges_ad.add(edge);
-                    *count += 1;
+                    edges_ad.add_with(edge, count);
                 }
 
                 lhs.edges = EdgesDelta {
                     edges: edges_ad,
                     edge_count,
                 };
+                */
             }
             CreateOp::Path { name } => {
                 unimplemented!();
@@ -144,44 +147,42 @@ impl DeriveDelta for RemoveOp {
                 let handle = *handle;
                 let seq_len = graph.node_len(handle) as isize;
 
-                let mut handles: AddDelDelta<Handle> = AddDelDelta::new(*count);
-                handles.del(handle);
-                *count += 1;
-
                 lhs.nodes = NodesDelta {
                     node_count: -1,
                     total_len: -seq_len,
-                    handles,
+                    handles: AddDelDelta::new_del(handle, count),
                 };
 
-                let mut edges: AddDelDelta<Edge> = AddDelDelta::new(*count);
+                let mut edges = AddDelDelta::new(*count);
                 let mut edge_count = 0isize;
 
-                for left in graph.neighbors(handle, Direction::Left) {
-                    edges.add(Edge(left, handle));
-                    edges.add(Edge(handle.flip(), left.flip()));
-                    *count += 2;
-                    edge_count -= 2;
-                }
-                for right in graph.neighbors(handle, Direction::Right) {
-                    edges.add(Edge(handle, right));
-                    edges.add(Edge(right.flip(), handle.flip()));
-                    *count += 2;
-                    edge_count -= 2;
+                {
+                    // let mut add_edge = |edge: Edge| {
+                    //     edges.add_with(edge, count);
+                    //     edge_count -= 1;
+                    // };
+
+                    let mut add_edges = |a: Handle, b: Handle| {
+                        edges.add_with(Edge(a, b), count);
+                        edges.add_with(Edge(b.flip(), a.flip()), count);
+                        edge_count -= 2;
+                    };
+
+                    graph
+                        .neighbors(handle, Direction::Left)
+                        .for_each(|l| add_edges(l, handle));
+                    graph
+                        .neighbors(handle, Direction::Right)
+                        .for_each(|r| add_edges(handle, r));
                 }
 
                 lhs.edges = EdgesDelta { edges, edge_count };
             }
             RemoveOp::Edge { edge } => {
-                let mut edges: AddDelDelta<Edge> = AddDelDelta::new(*count);
-                edges.del(*edge);
-                *count += 1;
-
-                let edges = EdgesDelta {
+                lhs.edges = EdgesDelta {
                     edge_count: -1,
-                    edges,
+                    edges: AddDelDelta::new_del(*edge, count),
                 };
-                lhs.edges = edges;
             }
             RemoveOp::Path { name } => {
                 unimplemented!();
