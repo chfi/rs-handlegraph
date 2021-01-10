@@ -210,6 +210,18 @@ impl DeltaEq {
             return false;
         }
 
+        for handle_delta in self.delta.handles.iter() {
+            if handle_delta.is_add() {
+                if !other.has_node(handle_delta.value().id()) {
+                    return false;
+                }
+            } else {
+                if other.has_node(handle_delta.value().id()) {
+                    return false;
+                }
+            }
+        }
+
         let expected_total_len =
             (self.graph.total_length() as isize) + self.delta.nodes.total_len;
 
@@ -226,28 +238,6 @@ impl DeltaEq {
         let expected_edge_count =
             (self.graph.edge_count() as isize) + self.delta.edges.edge_count;
 
-        /*
-        let expected_edge_count = {
-            let mut expected = self.graph.edge_count() as isize;
-            expected += self.delta.edges.edge_count;
-
-            for &ad in self.delta.nodes_iter() {
-                if ad.is_del() {
-                    use Direction::{Left, Right};
-
-                    let handle = ad.value();
-
-                    let left = self.graph.degree(handle, Left) as isize;
-                    let right = self.graph.degree(handle, Right) as isize;
-
-                    expected -= 2 * (left + right);
-                }
-            }
-
-            expected
-        };
-        */
-
         if other.edge_count() as isize != expected_edge_count {
             println!("wrong edge count:");
             println!("  LHS: {}", self.graph.edge_count());
@@ -255,6 +245,21 @@ impl DeltaEq {
             println!("  edge delta:     {}", self.delta.edges.edge_count);
             return false;
         }
+
+        /*
+        for edge_delta in self.delta.edges.iter() {
+            if edge_delta.is_add() {
+                if !other.has_node(handle_delta.value().id()) {
+                    return false;
+                }
+            } else {
+                if other.has_node(handle_delta.value().id()) {
+                    return false;
+                }
+            } else {
+            }
+        }
+        */
 
         let expected_path_count =
             (self.graph.path_count() as isize) + self.delta.paths.path_count;
@@ -277,35 +282,6 @@ impl DeltaEq {
     }
 }
 
-/*
-impl NodesDelta {
-    pub fn compose(mut self, mut rhs: Self) -> Self {
-        let node_count = self.node_count + rhs.node_count;
-        let total_len = self.total_len + rhs.total_len;
-
-        let new_handles = std::mem::take(&mut self.new_handles);
-        let mut new_handles = new_handles
-            .into_iter()
-            .filter(|(h, _)| !rhs.removed_handles.contains(h))
-            .collect::<Vec<_>>();
-        new_handles.append(&mut rhs.new_handles);
-
-        let mut removed_handles: FnvHashSet<_> =
-            self.removed_handles.into_iter().collect();
-        removed_handles.extend(rhs.removed_handles.into_iter());
-
-        let removed_handles: Vec<_> = removed_handles.into_iter().collect();
-
-        Self {
-            node_count,
-            total_len,
-            new_handles,
-            removed_handles,
-        }
-    }
-}
-*/
-
 impl NodeDegreeDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {
         self.right_degree += rhs.right_degree;
@@ -313,64 +289,6 @@ impl NodeDegreeDelta {
         self
     }
 }
-
-/*
-impl EdgesDelta {
-    pub fn compose(mut self, mut rhs: Self) -> Self {
-        let edge_count = self.edge_count + rhs.edge_count;
-
-        let new_edges = std::mem::take(&mut self.new_edges);
-        let new_edges = new_edges
-            .into_iter()
-            .filter(|e| !rhs.removed_edges.contains(e))
-            .collect::<Vec<_>>();
-
-        let mut removed_edges = std::mem::take(&mut self.removed_edges);
-        removed_edges.append(&mut rhs.removed_edges);
-        removed_edges.sort();
-        removed_edges.dedup();
-
-        let mut edge_deltas = std::mem::take(&mut self.edge_deltas);
-        edge_deltas.append(&mut rhs.edge_deltas);
-        edge_deltas.sort();
-        edge_deltas.dedup();
-
-        Self {
-            edge_count,
-            new_edges,
-            removed_edges,
-            edge_deltas,
-        }
-    }
-}
-*/
-
-/*
-impl PathsDelta {
-    pub fn compose(mut self, mut rhs: Self) -> Self {
-        let path_count = self.path_count + rhs.path_count;
-        let total_steps = self.total_steps + rhs.total_steps;
-
-        let new_paths = std::mem::take(&mut self.new_paths);
-        let new_paths = new_paths
-            .into_iter()
-            .filter(|e| !rhs.removed_paths.contains(e))
-            .collect::<Vec<_>>();
-
-        let mut removed_paths = std::mem::take(&mut self.removed_paths);
-        removed_paths.append(&mut rhs.removed_paths);
-        removed_paths.sort();
-        removed_paths.dedup();
-
-        Self {
-            path_count,
-            total_steps,
-            new_paths,
-            removed_paths,
-        }
-    }
-}
-*/
 
 #[test]
 fn adding_nodes_prop() {
