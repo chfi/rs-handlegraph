@@ -28,7 +28,7 @@ use super::DeltaEq;
 
 use fnv::{FnvHashMap, FnvHashSet};
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct GraphOpDelta {
     pub nodes: NodesDelta,
     pub edges: EdgesDelta,
@@ -44,9 +44,9 @@ impl GraphOpDelta {
         self.edges.edges.iter()
     }
 
-    // pub fn paths_iter(&self) -> std::slice::Iter<'_, AddDel<PathId>> {
-    //     self.nodes.handles.iter()
-    // }
+    pub fn paths_iter(&self) -> std::slice::Iter<'_, AddDel<PathId>> {
+        self.paths.paths.iter()
+    }
 
     pub fn compose(mut self, mut rhs: Self) -> Self {
         let nodes = self.nodes.compose(std::mem::take(&mut rhs.nodes));
@@ -86,16 +86,15 @@ pub struct NodesDelta {
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EdgesDelta {
     pub edge_count: isize,
-    // pub degree_deltas: Vec<NodeDegreeDelta>,
     pub edges: AddDelDelta<Edge>,
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct PathsDelta {
     pub path_count: isize,
     pub total_steps: isize,
-    pub new_paths: Vec<(PathId, Vec<u8>)>,
-    pub removed_paths: Vec<(PathId, Vec<u8>)>,
+    pub paths: AddDelDelta<PathId>,
+    pub path_steps: FnvHashMap<PathId, PathStepsDelta>,
 }
 
 /*
@@ -330,16 +329,7 @@ impl GraphDelta for EdgesDelta {
         edges.append(&rhs.edges);
         edges.compact();
 
-        // let mut edge_deltas = std::mem::take(&mut self.edge_deltas);
-        // edge_deltas.append(&mut rhs.edge_deltas);
-        // edge_deltas.sort();
-        // edge_deltas.dedup();
-
-        Self {
-            edge_count,
-            edges,
-            // edge_deltas,
-        }
+        Self { edge_count, edges }
     }
 
     fn into_graph_delta(self) -> GraphOpDelta {
@@ -355,22 +345,26 @@ impl GraphDelta for PathsDelta {
         let path_count = self.path_count + rhs.path_count;
         let total_steps = self.total_steps + rhs.total_steps;
 
-        let new_paths = std::mem::take(&mut self.new_paths);
-        let new_paths = new_paths
-            .into_iter()
-            .filter(|e| !rhs.removed_paths.contains(e))
-            .collect::<Vec<_>>();
+        let mut paths = std::mem::take(&mut self.paths);
+        paths.append(&rhs.paths);
+        paths.compact();
 
-        let mut removed_paths = std::mem::take(&mut self.removed_paths);
-        removed_paths.append(&mut rhs.removed_paths);
-        removed_paths.sort();
-        removed_paths.dedup();
+        let mut path_steps = std::mem::take(&mut self.path_steps);
+
+        for (path_id, lhs_steps) in path_steps.iter_mut() {
+            if let Some(rhs_steps) = rhs.path_steps.get(path_id) {
+                lhs_steps.steps.append(&rhs_steps.steps);
+                lhs_steps.step_count += rhs_steps.step_count;
+                lhs_steps.head = rhs_steps.head;
+                lhs_steps.tail = rhs_steps.tail;
+            }
+        }
 
         Self {
             path_count,
             total_steps,
-            new_paths,
-            removed_paths,
+            paths,
+            path_steps,
         }
     }
 
@@ -382,28 +376,26 @@ impl GraphDelta for PathsDelta {
     }
 }
 
-/*
-These may be scrapped in the future
-*/
+pub struct LocalStep {
+    pub handle: Handle,
+    pub ptr: StepPtr,
+    pub prev: StepPtr,
+    pub next: StepPtr,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum StepOp {
+    InsertAfter { prev: StepPtr, handle: Handle },
+    RemoveAfter { prev: StepPtr },
+    InsertBefore { next: StepPtr, handle: Handle },
+    RemoveBefore { next: StepPtr },
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
-pub struct NodeDegreeDelta {
-    pub id: NodeId,
-    pub left_degree: isize,
-    pub right_degree: isize,
-}
-
-pub struct LocalStep {
-    pub prev: (StepPtr, Handle),
-    pub this: (StepPtr, Handle),
-    pub next: (StepPtr, Handle),
-}
-
-pub struct SinglePathDelta {
+pub struct PathStepsDelta {
+    pub path_id: PathId,
     pub step_count: isize,
-    pub seq_len: isize,
-    pub new_steps: Vec<LocalStep>,
-    pub removed_steps: Vec<StepPtr>,
-    pub new_head: StepPtr,
-    pub new_tail: StepPtr,
+    pub steps: AddDelDelta<StepOp>,
+    pub head: StepPtr,
+    pub tail: StepPtr,
 }

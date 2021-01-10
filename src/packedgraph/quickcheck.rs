@@ -37,7 +37,7 @@ mod traits;
 
 pub use delta::{
     AddDel, AddDelDelta, EdgesDelta, GraphOpDelta, LocalStep, NodeDegreeDelta,
-    NodesDelta, PathsDelta, SinglePathDelta,
+    NodesDelta, PathsDelta,
 };
 use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
 use traits::{DeriveDelta, GraphApply, GraphDelta};
@@ -345,37 +345,7 @@ impl EdgesDelta {
 }
 */
 
-impl SinglePathDelta {
-    pub fn compose(mut self, mut rhs: Self) -> Self {
-        let step_count = self.step_count + rhs.step_count;
-        let seq_len = self.seq_len + rhs.seq_len;
-
-        let new_steps = std::mem::take(&mut self.new_steps);
-        // TODO fix this
-        // let new_steps = new_steps
-        //     .into_iter()
-        //     .filter(|e| rhs.removed_steps.iter().find()
-        //     .collect::<Vec<_>>();
-
-        let mut removed_steps = std::mem::take(&mut self.removed_steps);
-        removed_steps.append(&mut rhs.removed_steps);
-        removed_steps.sort();
-        removed_steps.dedup();
-
-        let new_head = rhs.new_head;
-        let new_tail = rhs.new_tail;
-
-        Self {
-            step_count,
-            seq_len,
-            new_steps,
-            removed_steps,
-            new_head,
-            new_tail,
-        }
-    }
-}
-
+/*
 impl PathsDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {
         let path_count = self.path_count + rhs.path_count;
@@ -400,6 +370,7 @@ impl PathsDelta {
         }
     }
 }
+*/
 
 #[test]
 fn adding_nodes_prop() {
