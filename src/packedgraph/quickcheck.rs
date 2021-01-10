@@ -402,7 +402,7 @@ fn adding_nodes_prop() {
     // };
 
     let op_2 = RemoveOp::Handle {
-        handle: Handle::pack(10u64, false),
+        handle: Handle::pack(8u64, false),
     };
 
     let delta_1 = op_1.derive_delta(&graph_1);

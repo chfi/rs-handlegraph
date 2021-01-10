@@ -115,6 +115,50 @@ where
     pub fn compact(&mut self) {
         let vec = std::mem::take(&mut self.vec);
 
+        let mut seen_adds: FnvHashSet<T> = FnvHashSet::default();
+        let mut seen_dels: FnvHashSet<T> = FnvHashSet::default();
+        seen_adds.reserve(vec.len());
+        seen_dels.reserve(vec.len());
+
+        let mut parity: FnvHashMap<T, i8> = FnvHashMap::default();
+
+        let mut canonical: Vec<AddDel<T>> = Vec::with_capacity(vec.len());
+
+        for &ad in vec.iter() {
+            let k = ad.value();
+
+            if ad.is_add() {
+                *parity.entry(k).or_default() += 1;
+            } else {
+                *parity.entry(k).or_default() -= 1;
+            }
+        }
+
+        for ad in vec.into_iter().rev() {
+            let k = ad.value();
+
+            if let Some(par) = parity.get(&k) {
+                use std::cmp::Ordering;
+
+                match par.cmp(&0) {
+                    std::cmp::Ordering::Less => {
+                        canonical.push(AddDel::Del(ad.count(), k));
+                    }
+                    std::cmp::Ordering::Equal => {
+                        // cancels out
+                    }
+                    std::cmp::Ordering::Greater => {
+                        canonical.push(AddDel::Add(ad.count(), k));
+                    }
+                }
+            }
+        }
+        canonical.reverse();
+        canonical.shrink_to_fit();
+        self.vec = canonical;
+
+        /*
+
         // let mut seen: FnvHashSet<(bool, T)> = FnvHashSet::default();
         let mut seen: FnvHashSet<T> = FnvHashSet::default();
         seen.reserve(vec.len());
@@ -135,9 +179,8 @@ where
             })
             .collect();
 
-        canonical.reverse();
-        canonical.shrink_to_fit();
-        self.vec = canonical;
+
+            */
 
         // let mut value_ops: FnvHashMap<T, Vec<AddDel<()>>> =
         //     FnvHashMap::default();
