@@ -102,28 +102,13 @@ impl DeriveDelta for CreateOp {
             }
             CreateOp::EdgesIter { edges } => {
                 let edge_count = edges.len() as isize;
-                let edges = edges.iter().fold(
-                    AddDelDelta::new(*count),
-                    |mut acc, &edge| {
-                        acc.add_with(edge, count);
+                let edges =
+                    edges.iter().fold(AddDelDelta::new(), |mut acc, &edge| {
+                        acc.add(edge, count);
                         acc
-                    },
-                );
+                    });
 
                 lhs.edges = EdgesDelta { edges, edge_count };
-
-                /*
-                let mut edges_ad = AddDelDelta::new(*count);
-
-                for &edge in edges {
-                    edges_ad.add_with(edge, count);
-                }
-
-                lhs.edges = EdgesDelta {
-                    edges: edges_ad,
-                    edge_count,
-                };
-                */
             }
             CreateOp::Path { name } => {
                 unimplemented!();
@@ -153,18 +138,13 @@ impl DeriveDelta for RemoveOp {
                     handles: AddDelDelta::new_del(handle, count),
                 };
 
-                let mut edges = AddDelDelta::new(*count);
+                let mut edges = AddDelDelta::new();
                 let mut edge_count = 0isize;
 
                 {
-                    // let mut add_edge = |edge: Edge| {
-                    //     edges.add_with(edge, count);
-                    //     edge_count -= 1;
-                    // };
-
                     let mut add_edges = |a: Handle, b: Handle| {
-                        edges.add_with(Edge(a, b), count);
-                        edges.add_with(Edge(b.flip(), a.flip()), count);
+                        edges.add(Edge(a, b), count);
+                        edges.add(Edge(b.flip(), a.flip()), count);
                         edge_count -= 2;
                     };
 

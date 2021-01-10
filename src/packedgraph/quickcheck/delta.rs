@@ -34,7 +34,6 @@ pub struct GraphOpDelta {
     pub edges: EdgesDelta,
     pub paths: PathsDelta,
     pub count: usize,
-    // pub count_offset: usize,
 }
 
 impl GraphOpDelta {
@@ -89,7 +88,6 @@ pub struct NodesDelta {
     pub node_count: isize,
     pub total_len: isize,
     pub handles: AddDelDelta<Handle>,
-    // pub handles: AddDelDelta_<Handle>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -113,37 +111,22 @@ pub struct PathsDelta {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct AddDelDelta<T: Sized + Copy> {
     vec: Vec<AddDel<T>>,
-    count: usize,
 }
 
 impl<T: Sized + Copy> Default for AddDelDelta<T> {
     fn default() -> Self {
-        Self {
-            vec: Vec::new(),
-            count: 0,
-        }
+        Self { vec: Vec::new() }
     }
 }
 
 impl<T: Sized + Copy> AddDelDelta<T> {
-    pub fn new(count: usize) -> Self {
-        Self {
-            vec: Vec::new(),
-            count,
-        }
-    }
-
-    pub fn new_<U: Sized + Copy>(count: usize) -> AddDelDelta<U> {
-        AddDelDelta {
-            vec: Vec::new(),
-            count,
-        }
+    pub fn new() -> Self {
+        Self { vec: Vec::new() }
     }
 
     pub fn new_add(v: T, count: &mut usize) -> Self {
         let res = AddDelDelta {
             vec: vec![AddDel::Add(*count, v)],
-            count: *count + 1,
         };
         *count += 1;
         res
@@ -152,7 +135,6 @@ impl<T: Sized + Copy> AddDelDelta<T> {
     pub fn new_del(v: T, count: &mut usize) -> Self {
         let res = AddDelDelta {
             vec: vec![AddDel::Del(*count, v)],
-            count: *count + 1,
         };
         *count += 1;
         res
@@ -164,41 +146,28 @@ impl<T: Sized + Copy> AddDelDelta<T> {
     }
 
     #[inline]
-    pub fn add_with(&mut self, v: T, count: &mut usize) {
+    pub fn add(&mut self, v: T, count: &mut usize) {
         self.vec.push(AddDel::Add(*count, v));
         *count += 1;
-        self.count = *count;
     }
 
     #[inline]
-    pub fn del_with(&mut self, v: T, count: &mut usize) {
+    pub fn del(&mut self, v: T, count: &mut usize) {
         self.vec.push(AddDel::Del(*count, v));
         *count += 1;
-        self.count = *count;
-    }
-
-    #[inline]
-    pub fn add(&mut self, v: T) {
-        self.vec.push(AddDel::Add(self.count, v));
-        self.count += 1;
-    }
-
-    #[inline]
-    pub fn del(&mut self, v: T) {
-        self.vec.push(AddDel::Del(self.count, v));
-        self.count += 1;
     }
 
     #[inline]
     pub fn append(&mut self, other: &Self) {
-        let new_count = self.count + other.count;
-        let offset = self.count;
+        // TODO think about the offsetting and how/if it should occur
+
+        let offset = self.vec.last().map(|ad| ad.count()).unwrap_or(0);
+        // let new_count = self.count + other.count;
+        // let offset = self.count;
 
         self.vec.extend(
             other.vec.iter().copied().map(|ad| ad.offset_count(offset)),
         );
-
-        self.count = new_count;
     }
 }
 

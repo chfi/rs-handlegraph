@@ -186,6 +186,7 @@ impl RemoveOp {
     }
 }
 
+/*
 impl MutHandleOp {
     pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {
         match self {
@@ -227,6 +228,7 @@ impl MutHandleOp {
         }
     }
 }
+*/
 
 pub struct DeltaEq {
     graph: PackedGraph,
@@ -328,14 +330,6 @@ impl DeltaEq {
         true
     }
 }
-
-// impl NodeDegreeDelta {
-//     pub fn compose(mut self, mut rhs: Self) -> Self {
-//         self.right_degree += rhs.right_degree;
-//         self.left_degree += rhs.left_degree;
-//         self
-//     }
-// }
 
 #[test]
 fn adding_nodes_prop() {
