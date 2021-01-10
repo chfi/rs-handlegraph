@@ -55,15 +55,16 @@ impl CreateOp {
                     total_len: seq.len() as isize,
                     handles,
                 };
+
                 res.nodes = nodes;
             }
             CreateOp::Edge { edge } => {
+                let mut edges: AddDelDelta<Edge> = Default::default();
+                edges.add(*edge);
+
                 let edges = EdgesDelta {
                     edge_count: 1,
-                    new_edges: vec![*edge],
-                    removed_edges: Vec::new(),
-                    // TODO fix this
-                    edge_deltas: Vec::new(),
+                    edges,
                 };
                 res.edges = edges;
             }
@@ -107,6 +108,9 @@ impl RemoveOp {
                 let handle = *handle;
                 let seq_len = graph.node_len(handle) as isize;
 
+                let degree_delta = graph.degree(handle, Direction::Left)
+                    + graph.degree(handle, Direction::Right);
+
                 let mut handles: AddDelDelta<Handle> = Default::default();
                 handles.del(handle);
 
@@ -115,15 +119,16 @@ impl RemoveOp {
                     total_len: -seq_len,
                     handles,
                 };
+
                 res.nodes = nodes;
             }
             RemoveOp::Edge { edge } => {
+                let mut edges: AddDelDelta<Edge> = Default::default();
+                edges.del(*edge);
+
                 let edges = EdgesDelta {
                     edge_count: -1,
-                    new_edges: Vec::new(),
-                    removed_edges: vec![*edge],
-                    // TODO fix this
-                    edge_deltas: Vec::new(),
+                    edges,
                 };
                 res.edges = edges;
             }
@@ -138,8 +143,12 @@ impl RemoveOp {
     pub fn apply(&self, graph: &mut PackedGraph) {
         match self {
             RemoveOp::Handle { handle } => {
-                // println!("removing id: {:?}", handle.id());
+                println!(" node count before: {}", graph.node_count());
+                println!(" total len before:  {}", graph.total_length());
+                println!("removing id: {:?}", handle.id());
                 graph.remove_handle(*handle);
+                println!(" node count after: {}", graph.node_count());
+                println!(" total len after:  {}", graph.total_length());
             }
             RemoveOp::Edge { edge } => {
                 graph.remove_edge(*edge);
@@ -197,7 +206,16 @@ impl DeltaEq {
         let expected_node_count =
             (self.graph.node_count() as isize) + self.delta.nodes.node_count;
 
+        println!("  ------------------------  ");
+        println!("      eq_delta");
+
         if other.node_count() as isize != expected_node_count {
+            println!(
+                "node count: {} != {}, delta {}",
+                self.graph.node_count(),
+                other.node_count(),
+                self.delta.nodes.node_count
+            );
             return false;
         }
 
@@ -205,13 +223,40 @@ impl DeltaEq {
             (self.graph.total_length() as isize) + self.delta.nodes.total_len;
 
         if other.total_length() as isize != expected_total_len {
+            println!(
+                "total len: {} != {}, delta {}",
+                self.graph.total_length(),
+                other.total_length(),
+                self.delta.nodes.total_len
+            );
             return false;
         }
 
-        let expected_edge_count =
-            (self.graph.edge_count() as isize) + self.delta.edges.edge_count;
+        let expected_edge_count = {
+            let mut expected = self.graph.edge_count() as isize;
+            expected += self.delta.edges.edge_count;
+
+            for &ad in self.delta.nodes_iter() {
+                if ad.is_del() {
+                    use Direction::{Left, Right};
+
+                    let handle = ad.value();
+
+                    let left = self.graph.degree(handle, Left) as isize;
+                    let right = self.graph.degree(handle, Right) as isize;
+
+                    expected -= 2 * (left + right);
+                }
+            }
+
+            expected
+        };
 
         if other.edge_count() as isize != expected_edge_count {
+            println!("wrong edge count:");
+            println!("  LHS: {}", self.graph.edge_count());
+            println!("  RHS: {}", other.edge_count());
+            println!("  edge delta:     {}", self.delta.edges.edge_count);
             return false;
         }
 
@@ -219,6 +264,7 @@ impl DeltaEq {
             (self.graph.path_count() as isize) + self.delta.paths.path_count;
 
         if other.path_count() as isize != expected_path_count {
+            println!("wrong path count");
             return false;
         }
 
@@ -228,6 +274,8 @@ impl DeltaEq {
         // if other.total_length() as isize != expected_total_len {
         //     return false;
         // }
+
+        println!("  ------------------------  ");
 
         true
     }
@@ -301,6 +349,7 @@ impl LocalEdgeDelta {
     }
 }
 
+/*
 impl EdgesDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {
         let edge_count = self.edge_count + rhs.edge_count;
@@ -329,6 +378,7 @@ impl EdgesDelta {
         }
     }
 }
+*/
 
 impl SinglePathDelta {
     pub fn compose(mut self, mut rhs: Self) -> Self {

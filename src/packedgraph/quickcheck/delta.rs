@@ -35,23 +35,34 @@ pub struct GraphOpDelta {
     pub paths: PathsDelta,
 }
 
+impl GraphOpDelta {
+    pub fn nodes_iter(&self) -> std::slice::Iter<'_, AddDel<Handle>> {
+        self.nodes.handles.iter()
+    }
+
+    pub fn edges_iter(&self) -> std::slice::Iter<'_, AddDel<Edge>> {
+        self.edges.edges.iter()
+    }
+
+    // pub fn nodes_iter(&self) -> std::slice::Iter<'_, AddDel<Handle>> {
+    //     self.nodes.handles.iter()
+    // }
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodesDelta {
     pub node_count: isize,
     pub total_len: isize,
     pub handles: AddDelDelta<Handle>,
-    // pub new_handles: Vec<(Handle, Vec<u8>)>,
-    // pub removed_handles: Vec<Handle>,
-    // pub handles: Vec<AddDel<Handle>>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EdgesDelta {
     pub edge_count: isize,
-    pub new_edges: Vec<Edge>,
-    pub removed_edges: Vec<Edge>,
-    pub edge_deltas: Vec<LocalEdgeDelta>,
-    // pub edges: Vec<AddDel<Edge>>,
+    // pub new_edges: Vec<Edge>,
+    // pub removed_edges: Vec<Edge>,
+    // pub edge_deltas: Vec<LocalEdgeDelta>,
+    pub edges: AddDelDelta<Edge>,
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -82,6 +93,11 @@ impl<T: Sized + Copy> Default for AddDelDelta<T> {
 }
 
 impl<T: Sized + Copy> AddDelDelta<T> {
+    #[inline]
+    pub fn iter(&self) -> std::slice::Iter<'_, AddDel<T>> {
+        self.vec.iter()
+    }
+
     #[inline]
     pub fn add(&mut self, v: T) {
         self.vec.push(AddDel::Add(self.count, v));
@@ -156,81 +172,6 @@ where
         canonical.reverse();
         canonical.shrink_to_fit();
         self.vec = canonical;
-
-        /*
-
-        // let mut seen: FnvHashSet<(bool, T)> = FnvHashSet::default();
-        let mut seen: FnvHashSet<T> = FnvHashSet::default();
-        seen.reserve(vec.len());
-
-        // this contains the temporally last occurrence for each
-        // element
-        let mut canonical: Vec<AddDel<T>> = vec
-            .into_iter()
-            .rev()
-            .filter(|ad| {
-                let v = ad.value();
-                if seen.contains(&v) {
-                    false
-                } else {
-                    seen.insert(v);
-                    true
-                }
-            })
-            .collect();
-
-
-            */
-
-        // let mut value_ops: FnvHashMap<T, Vec<AddDel<()>>> =
-        //     FnvHashMap::default();
-        // value_ops.reserve(vec.len());
-
-        // for &ad in vec.iter() {
-        //     let t = ad.value();
-        //     value_ops.entry(t).or_default().push(ad.map(|_| ()));
-        // }
-
-        /*
-        let mut seen: FnvHashSet<(bool, T)> = FnvHashSet::default();
-        seen.reserve(vec.len());
-
-        let mut seen_adds: FnvHashSet<T> = FnvHashSet::default();
-        let mut seen_dels: FnvHashSet<T> = FnvHashSet::default();
-
-        let mut canonical_adds: Vec<AddDel<T>> = Vec::with_capacity(vec.len());
-        let mut canonical_dels: Vec<AddDel<T>> = Vec::with_capacity(vec.len());
-
-        for ad in vec.into_iter().rev() {
-            if ad.is_add() {
-                if !seen_adds.contains(&ad.value()) {
-                    seen_adds.insert(ad.value());
-                    canonical_adds.push(ad);
-                }
-            } else {
-                if !seen_dels.contains(&ad.value()) {
-                    seen_dels.insert(ad.value());
-                    canonical_dels.push(ad);
-                }
-            }
-        }
-
-        canonical_adds.reverse();
-        canonical_dels.reverse();
-        */
-
-        /*
-        let (mut adds, mut dels): (Vec<_>, Vec<_>) =
-            vec.into_iter().partition(AddDel::is_add);
-
-        let mut modified: FnvHashSet<_> = {
-            let adds_set: FnvHashSet<_> = adds.iter().collect();
-            let dels_set: FnvHashSet<_> = dels.iter().collect();
-
-            let intersection = adds_set.intersection(&dels_set);
-            intersection.cloned().collect()
-        };
-            */
     }
 }
 
@@ -373,27 +314,19 @@ impl GraphDelta for EdgesDelta {
     fn compose(mut self, mut rhs: Self) -> Self {
         let edge_count = self.edge_count + rhs.edge_count;
 
-        let new_edges = std::mem::take(&mut self.new_edges);
-        let new_edges = new_edges
-            .into_iter()
-            .filter(|e| !rhs.removed_edges.contains(e))
-            .collect::<Vec<_>>();
+        let mut edges = std::mem::take(&mut self.edges);
+        edges.append(&rhs.edges);
+        edges.compact();
 
-        let mut removed_edges = std::mem::take(&mut self.removed_edges);
-        removed_edges.append(&mut rhs.removed_edges);
-        removed_edges.sort();
-        removed_edges.dedup();
-
-        let mut edge_deltas = std::mem::take(&mut self.edge_deltas);
-        edge_deltas.append(&mut rhs.edge_deltas);
-        edge_deltas.sort();
-        edge_deltas.dedup();
+        // let mut edge_deltas = std::mem::take(&mut self.edge_deltas);
+        // edge_deltas.append(&mut rhs.edge_deltas);
+        // edge_deltas.sort();
+        // edge_deltas.dedup();
 
         Self {
             edge_count,
-            new_edges,
-            removed_edges,
-            edge_deltas,
+            edges,
+            // edge_deltas,
         }
     }
 
