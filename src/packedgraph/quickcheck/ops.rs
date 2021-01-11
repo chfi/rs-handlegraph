@@ -34,8 +34,8 @@ pub enum GraphOp {
     Create { op: CreateOp },
     Remove { op: RemoveOp },
     MutHandle { op: MutHandleOp },
-    MutPath { path: PathId, op: MutPathOp },
-    MutMultiPaths { ops: (PathId, MutPathOp) },
+    MutPath { op: MutPathOp },
+    // MutMultiPaths { ops: (PathId, MutPathOp) },
     GraphWide { op: GraphWideOp },
 }
 
@@ -103,7 +103,39 @@ pub enum GraphWideOp {
 */
 
 /*
-  CreateOp trait imps
+  GraphOp trait impls
+*/
+
+impl DeriveDelta for GraphOp {
+    fn derive_compose(
+        &self,
+        graph: &PackedGraph,
+        lhs: GraphOpDelta,
+    ) -> GraphOpDelta {
+        match self {
+            GraphOp::Create { op } => op.derive_compose(graph, lhs),
+            GraphOp::Remove { op } => op.derive_compose(graph, lhs),
+            GraphOp::MutHandle { op } => op.derive_compose(graph, lhs),
+            GraphOp::MutPath { op } => op.derive_compose(graph, lhs),
+            GraphOp::GraphWide { op } => op.derive_compose(graph, lhs),
+        }
+    }
+}
+
+impl GraphApply for GraphOp {
+    fn apply(&self, graph: &mut PackedGraph) {
+        match self {
+            GraphOp::Create { op } => op.apply(graph),
+            GraphOp::Remove { op } => op.apply(graph),
+            GraphOp::MutHandle { op } => op.apply(graph),
+            GraphOp::MutPath { op } => op.apply(graph),
+            GraphOp::GraphWide { op } => op.apply(graph),
+        };
+    }
+}
+
+/*
+  CreateOp trait impls
 */
 
 impl DeriveDelta for CreateOp {
@@ -174,7 +206,7 @@ impl GraphApply for CreateOp {
 }
 
 /*
-  RemoveOp trait imps
+  RemoveOp trait impls
 */
 
 impl DeriveDelta for RemoveOp {
@@ -252,7 +284,7 @@ impl GraphApply for RemoveOp {
 }
 
 /*
-  MutHandleOp trait imps
+  MutHandleOp trait impls
 */
 
 impl DeriveDelta for MutHandleOp {
@@ -329,7 +361,7 @@ impl GraphApply for MutHandleOp {
 }
 
 /*
-  MutPathOp trait imps
+  MutPathOp trait impls
 */
 
 impl DeriveDelta for MutPathOp {
@@ -462,7 +494,7 @@ impl GraphApply for MutPathOp {
 }
 
 /*
-  GraphWideOp trait imps
+  GraphWideOp trait impls
 */
 
 impl DeriveDelta for GraphWideOp {

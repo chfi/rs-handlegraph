@@ -52,31 +52,17 @@ impl GraphOpDelta {
         self.count
     }
 
-    pub fn compose(mut self, mut rhs: Self) -> Self {
-        let nodes = self.nodes.compose(std::mem::take(&mut rhs.nodes));
-        let edges = self.edges.compose(std::mem::take(&mut rhs.edges));
-        let paths = self.paths.compose(std::mem::take(&mut rhs.paths));
-        let count = rhs.count;
-
-        Self {
-            nodes,
-            edges,
-            paths,
-            count,
-        }
-    }
-
-    pub fn compose_nodes(mut self, mut nodes: NodesDelta) -> Self {
+    pub fn compose_nodes(mut self, nodes: NodesDelta) -> Self {
         self.nodes = self.nodes.compose(nodes);
         self
     }
 
-    pub fn compose_edges(mut self, mut edges: EdgesDelta) -> Self {
+    pub fn compose_edges(mut self, edges: EdgesDelta) -> Self {
         self.edges = self.edges.compose(edges);
         self
     }
 
-    pub fn compose_paths(mut self, mut paths: PathsDelta) -> Self {
+    pub fn compose_paths(mut self, paths: PathsDelta) -> Self {
         self.paths = self.paths.compose(paths);
         self
     }
@@ -290,8 +276,12 @@ impl<T: Sized + Copy> AddDel<T> {
 */
 
 impl GraphDelta for GraphOpDelta {
-    fn compose(self, mut rhs: Self) -> Self {
-        self.compose(rhs)
+    fn compose(mut self, mut rhs: Self) -> Self {
+        self.nodes = self.nodes.compose(std::mem::take(&mut rhs.nodes));
+        self.edges = self.edges.compose(std::mem::take(&mut rhs.edges));
+        self.paths = self.paths.compose(std::mem::take(&mut rhs.paths));
+        self.count = rhs.count;
+        self
     }
 
     fn into_graph_delta(self) -> GraphOpDelta {
@@ -300,7 +290,7 @@ impl GraphDelta for GraphOpDelta {
 }
 
 impl GraphDelta for NodesDelta {
-    fn compose(mut self, mut rhs: Self) -> Self {
+    fn compose(mut self, rhs: Self) -> Self {
         let node_count = self.node_count + rhs.node_count;
         let total_len = self.total_len + rhs.total_len;
 
@@ -325,7 +315,7 @@ impl GraphDelta for NodesDelta {
 }
 
 impl GraphDelta for EdgesDelta {
-    fn compose(mut self, mut rhs: Self) -> Self {
+    fn compose(mut self, rhs: Self) -> Self {
         let edge_count = self.edge_count + rhs.edge_count;
 
         let mut edges = std::mem::take(&mut self.edges);
@@ -378,26 +368,6 @@ impl GraphDelta for PathsDelta {
         }
     }
 }
-
-/*
-pub struct LocalStep {
-    pub handle: Handle,
-    pub ptr: StepPtr,
-    pub prev: StepPtr,
-    pub next: StepPtr,
-}
-
-// TODO only have `After` & `Before` variants; AddDelDelta implies Insert & Remove
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum StepOp {
-    StepAfter { prev: StepPtr, handle: Handle },
-    Flip { step: StepPtr },
-    // InsertAfter { prev: StepPtr, handle: Handle },
-    // RemoveAfter { prev: StepPtr },
-    // InsertBefore { next: StepPtr, handle: Handle },
-    // RemoveBefore { next: StepPtr },
-}
-*/
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathStepsDelta {
