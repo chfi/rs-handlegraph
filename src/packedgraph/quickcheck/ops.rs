@@ -13,6 +13,7 @@ use crate::{
 };
 
 use crate::packedgraph::{
+    defragment::Defragment,
     edges::{EdgeListIx, EdgeLists},
     index::{list, OneBasedIndex, RecordIndex},
     iter::EdgeListHandleIter,
@@ -470,12 +471,22 @@ impl DeriveDelta for GraphWideOp {
         graph: &PackedGraph,
         mut lhs: GraphOpDelta,
     ) -> GraphOpDelta {
-        unimplemented!();
+        match self {
+            GraphWideOp::Defragment => lhs,
+            GraphWideOp::ApplyOrdering { order } => lhs,
+        }
     }
 }
 
 impl GraphApply for GraphWideOp {
     fn apply(&self, graph: &mut PackedGraph) {
-        unimplemented!();
+        match self {
+            GraphWideOp::Defragment => {
+                graph.defragment();
+            }
+            GraphWideOp::ApplyOrdering { order } => {
+                graph.apply_ordering(order);
+            }
+        }
     }
 }

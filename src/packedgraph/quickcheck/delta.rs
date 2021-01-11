@@ -428,9 +428,6 @@ impl DeltaEq {
         let expected_node_count =
             (self.graph.node_count() as isize) + self.delta.nodes.node_count;
 
-        println!("  ------------------------  ");
-        println!("      eq_delta");
-
         if other.node_count() as isize != expected_node_count {
             println!(
                 "node count: {} != {}, delta {}",
@@ -441,6 +438,7 @@ impl DeltaEq {
             return false;
         }
 
+        /*
         for handle_delta in self.delta.nodes_iter() {
             if handle_delta.is_add() {
                 if !other.has_node(handle_delta.value().id()) {
@@ -452,6 +450,7 @@ impl DeltaEq {
                 }
             }
         }
+        */
 
         let expected_total_len =
             (self.graph.total_length() as isize) + self.delta.nodes.total_len;
@@ -499,27 +498,32 @@ impl DeltaEq {
         true
     }
 
+    fn compare_paths(&self, other: &PackedGraph) -> bool {
+        let expected_path_count =
+            (self.graph.path_count() as isize) + self.delta.paths.path_count;
+
+        if other.path_count() as isize != expected_path_count {
+            println!("wrong path count:");
+            println!("  LHS: {}", self.graph.path_count());
+            println!("  RHS: {}", other.path_count());
+            println!("  path delta:     {}", self.delta.paths.path_count);
+            return false;
+        }
+
+        true
+    }
+
     pub fn eq_delta(&self, other: &PackedGraph) -> bool {
         let mut pass = true;
+
+        println!("  ------------------------  ");
+        println!("      eq_delta");
 
         pass &= self.compare_nodes(other);
 
         pass &= self.compare_edges(other);
 
-        let expected_path_count =
-            (self.graph.path_count() as isize) + self.delta.paths.path_count;
-
-        if other.path_count() as isize != expected_path_count {
-            println!("wrong path count");
-            return false;
-        }
-
-        // let expected_total_len =
-        //     (self.graph.total_length() as isize) + self.delta.nodes.total_len;
-
-        // if other.total_length() as isize != expected_total_len {
-        //     return false;
-        // }
+        pass &= self.compare_paths(other);
 
         println!("  ------------------------  ");
 
