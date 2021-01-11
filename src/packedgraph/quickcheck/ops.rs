@@ -141,7 +141,10 @@ impl DeriveDelta for CreateOp {
                 lhs.edges = EdgesDelta { edges, edge_count };
             }
             CreateOp::Path { name } => {
-                unimplemented!();
+                let path_id = PathId(graph.path_count() as u64);
+
+                lhs.paths.path_count += 1;
+                lhs.paths.paths.add(path_id, count);
             }
         }
 
@@ -219,7 +222,10 @@ impl DeriveDelta for RemoveOp {
                 };
             }
             RemoveOp::Path { name } => {
-                unimplemented!();
+                let path_id = graph.get_path_id(name).unwrap();
+
+                lhs.paths.path_count -= 1;
+                lhs.paths.paths.del(path_id, count);
             }
         }
 
@@ -339,60 +345,83 @@ impl DeriveDelta for MutPathOp {
                 let path_steps: &mut PathStepsDelta =
                     lhs.paths.path_steps.get_mut(path).unwrap();
 
+                path_steps.step_count += 1;
+
+                lhs
+
+                // TODO for now we just track step count, not the
+                // specific path structure
+                /*
                 path_steps.steps.add(
-                    StepOp::InsertAfter {
+                    StepOp::StepAfter {
                         prev: *prev,
                         handle: *handle,
                     },
                     &mut lhs.count,
                 );
-                path_steps.step_count += 1;
+
 
                 if graph.path_last_step(*path) == Some(*prev) {
                     // TODO get the new step index and update the tail
                     // path_steps.tail =
                 }
-
-                lhs
+                */
             }
             MutPathOp::RemoveAfter { path, prev } => {
-                // let path_steps: &mut PathStepsDelta =
-                //     lhs.paths.path_steps.get_mut(path).unwrap();
-                unimplemented!();
+                let path_steps: &mut PathStepsDelta =
+                    lhs.paths.path_steps.get_mut(path).unwrap();
+
+                path_steps.step_count -= 1;
+
+                lhs
             }
             MutPathOp::InsertBefore { path, next, handle } => {
                 let path_steps: &mut PathStepsDelta =
                     lhs.paths.path_steps.get_mut(path).unwrap();
 
-                path_steps.steps.add(
+                path_steps.step_count += 1;
+
+                lhs
+                /*
+                let prev = graph.path_steps.steps.add(
                     StepOp::InsertBefore {
                         next: *next,
                         handle: *handle,
                     },
                     &mut lhs.count,
                 );
-                path_steps.step_count += 1;
 
                 if graph.path_first_step(*path) == Some(*next) {
                     // TODO get the new step index and update the head
                     // path_steps.head =
                 }
+                */
+            }
+            MutPathOp::RemoveBefore { path, next } => {
+                let path_steps: &mut PathStepsDelta =
+                    lhs.paths.path_steps.get_mut(path).unwrap();
+
+                path_steps.step_count -= 1;
 
                 lhs
             }
-            MutPathOp::RemoveBefore { path, next } => {
-                unimplemented!();
-            }
-            MutPathOp::FlipStep { path, step } => {
-                unimplemented!();
-            }
+            MutPathOp::FlipStep { path, step } => lhs,
             MutPathOp::RewriteSegment {
                 path,
                 from,
                 to,
                 new,
             } => {
-                unimplemented!();
+                let path_steps: &mut PathStepsDelta =
+                    lhs.paths.path_steps.get_mut(path).unwrap();
+
+                let added = new.len() as isize;
+                // TODO calculate steps in range [from, to)
+                let removed = 0;
+
+                path_steps.step_count -= 1;
+
+                lhs
             }
         }
     }

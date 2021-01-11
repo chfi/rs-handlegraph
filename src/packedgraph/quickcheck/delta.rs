@@ -356,10 +356,10 @@ impl GraphDelta for PathsDelta {
 
         for (path_id, lhs_steps) in path_steps.iter_mut() {
             if let Some(rhs_steps) = rhs.path_steps.get(path_id) {
-                lhs_steps.steps.append(&rhs_steps.steps);
                 lhs_steps.step_count += rhs_steps.step_count;
-                lhs_steps.head = rhs_steps.head;
-                lhs_steps.tail = rhs_steps.tail;
+                // lhs_steps.steps.append(&rhs_steps.steps);
+                // lhs_steps.head = rhs_steps.head;
+                // lhs_steps.tail = rhs_steps.tail;
             }
         }
 
@@ -379,6 +379,7 @@ impl GraphDelta for PathsDelta {
     }
 }
 
+/*
 pub struct LocalStep {
     pub handle: Handle,
     pub ptr: StepPtr,
@@ -389,19 +390,22 @@ pub struct LocalStep {
 // TODO only have `After` & `Before` variants; AddDelDelta implies Insert & Remove
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StepOp {
-    InsertAfter { prev: StepPtr, handle: Handle },
-    RemoveAfter { prev: StepPtr },
-    InsertBefore { next: StepPtr, handle: Handle },
-    RemoveBefore { next: StepPtr },
+    StepAfter { prev: StepPtr, handle: Handle },
+    Flip { step: StepPtr },
+    // InsertAfter { prev: StepPtr, handle: Handle },
+    // RemoveAfter { prev: StepPtr },
+    // InsertBefore { next: StepPtr, handle: Handle },
+    // RemoveBefore { next: StepPtr },
 }
+*/
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct PathStepsDelta {
     pub path_id: PathId,
     pub step_count: isize,
-    pub steps: AddDelDelta<StepOp>,
-    pub head: StepPtr,
-    pub tail: StepPtr,
+    // pub steps: AddDelDelta<StepOp>,
+    // pub head: StepPtr,
+    // pub tail: StepPtr,
 }
 
 /*

@@ -36,55 +36,11 @@ mod ops;
 mod traits;
 
 pub use delta::{
-    AddDel, AddDelDelta, DeltaEq, EdgesDelta, GraphOpDelta, LocalStep,
-    NodesDelta, PathsDelta,
+    AddDel, AddDelDelta, DeltaEq, EdgesDelta, GraphOpDelta, NodesDelta,
+    PathsDelta,
 };
 use ops::{CreateOp, GraphOp, GraphWideOp, MutHandleOp, MutPathOp, RemoveOp};
 use traits::{DeriveDelta, GraphApply, GraphDelta};
-
-/*
-impl MutHandleOp {
-    pub fn derive_delta(&self, graph: &PackedGraph) -> GraphOpDelta {
-        match self {
-            MutHandleOp::Divide { handle, offsets } => {
-                let mut delta = GraphOpDelta::default();
-
-                let mut next_id = u64::from(graph.max_node_id()) + 1;
-
-                let mut handles: AddDelDelta<Handle> = Default::default();
-                let mut edges: AddDelDelta<Edge> = Default::default();
-
-                let node_count = offsets.len() as isize;
-                let edge_count = offsets.len() as isize;
-
-                let mut prev_handle = handle;
-
-                for _ in offsets {
-                    let new_handle = Handle::pack(next_id, handle.is_reverse());
-                    handles.add(new_handle);
-                    next_id += 1;
-                }
-
-                delta.nodes.node_count = node_count;
-                delta.nodes.handles = handles;
-
-                delta.edges.edge_count = edge_count;
-                delta.edges.edges = edges;
-
-                delta
-            }
-        }
-    }
-
-    pub fn apply(&self, graph: &mut PackedGraph) {
-        match self {
-            MutHandleOp::Divide { handle, offsets } => {
-                graph.divide_handle(*handle, offsets.to_owned());
-            }
-        }
-    }
-}
-*/
 
 #[test]
 fn adding_nodes_prop() {
