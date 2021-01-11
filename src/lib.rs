@@ -59,5 +59,5 @@ pub mod disjoint;
 pub mod packed;
 pub mod util;
 
-pub mod algorithm;
+pub mod algorithms;
 pub mod consensus;
