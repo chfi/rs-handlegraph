@@ -26,6 +26,8 @@ use crate::packedgraph::{
 use super::delta::*;
 use super::traits::*;
 
+use fnv::{FnvHashMap, FnvHashSet};
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum GraphOp {
     Create { op: CreateOp },
@@ -59,10 +61,34 @@ pub enum MutHandleOp {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum MutPathOp {
-    AppendStep { handle: Handle },
-    PrependStep { handle: Handle },
-    FlipStep { handle: Handle },
-    RewriteSegment { handle: Handle },
+    InsertAfter {
+        path: PathId,
+        prev: StepPtr,
+        handle: Handle,
+    },
+    RemoveAfter {
+        path: PathId,
+        prev: StepPtr,
+    },
+    InsertBefore {
+        path: PathId,
+        next: StepPtr,
+        handle: Handle,
+    },
+    RemoveBefore {
+        path: PathId,
+        next: StepPtr,
+    },
+    FlipStep {
+        path: PathId,
+        step: StepPtr,
+    },
+    RewriteSegment {
+        path: PathId,
+        from: StepPtr,
+        to: StepPtr,
+        new: Vec<Handle>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
@@ -254,9 +280,11 @@ impl DeriveDelta for MutHandleOp {
                 let mut node_count = 0isize;
                 let mut edge_count = 0isize;
 
-                let mut prev_h = handle;
+                let mut prev_h = *handle;
 
-                for i in 0..offsets.len() {
+                let count = &mut lhs.count;
+
+                for _ in 0..offsets.len() {
                     let curr_h = Handle::pack(next_id, false);
 
                     handles.add(curr_h, count);
@@ -303,13 +331,103 @@ impl DeriveDelta for MutPathOp {
         graph: &PackedGraph,
         mut lhs: GraphOpDelta,
     ) -> GraphOpDelta {
-        unimplemented!();
+        match self {
+            MutPathOp::InsertAfter { path, prev, handle } => {
+                // let path_steps: &mut FnvHashMap<PathId, PathStepsDelta> =
+                //     &mut lhs.paths.path_steps;
+
+                let path_steps: &mut PathStepsDelta =
+                    lhs.paths.path_steps.get_mut(path).unwrap();
+
+                path_steps.steps.add(
+                    StepOp::InsertAfter {
+                        prev: *prev,
+                        handle: *handle,
+                    },
+                    &mut lhs.count,
+                );
+                path_steps.step_count += 1;
+
+                if graph.path_last_step(*path) == Some(*prev) {
+                    // TODO get the new step index and update the tail
+                    // path_steps.tail =
+                }
+
+                lhs
+            }
+            MutPathOp::RemoveAfter { path, prev } => {
+                // let path_steps: &mut PathStepsDelta =
+                //     lhs.paths.path_steps.get_mut(path).unwrap();
+                unimplemented!();
+            }
+            MutPathOp::InsertBefore { path, next, handle } => {
+                let path_steps: &mut PathStepsDelta =
+                    lhs.paths.path_steps.get_mut(path).unwrap();
+
+                path_steps.steps.add(
+                    StepOp::InsertBefore {
+                        next: *next,
+                        handle: *handle,
+                    },
+                    &mut lhs.count,
+                );
+                path_steps.step_count += 1;
+
+                if graph.path_first_step(*path) == Some(*next) {
+                    // TODO get the new step index and update the head
+                    // path_steps.head =
+                }
+
+                lhs
+            }
+            MutPathOp::RemoveBefore { path, next } => {
+                unimplemented!();
+            }
+            MutPathOp::FlipStep { path, step } => {
+                unimplemented!();
+            }
+            MutPathOp::RewriteSegment {
+                path,
+                from,
+                to,
+                new,
+            } => {
+                unimplemented!();
+            }
+        }
     }
 }
 
 impl GraphApply for MutPathOp {
     fn apply(&self, graph: &mut PackedGraph) {
-        unimplemented!();
+        match self {
+            MutPathOp::InsertAfter { path, prev, handle } => {
+                graph.path_insert_step_after(*path, *prev, *handle);
+            }
+            MutPathOp::RemoveAfter { path, prev } => {
+                let step = graph.path_next_step(*path, *prev).unwrap();
+                graph.path_remove_step(*path, step);
+            }
+            MutPathOp::InsertBefore { path, next, handle } => {
+                let step = graph.path_prev_step(*path, *next).unwrap();
+                graph.path_insert_step_after(*path, step, *handle);
+            }
+            MutPathOp::RemoveBefore { path, next } => {
+                let step = graph.path_prev_step(*path, *next).unwrap();
+                graph.path_remove_step(*path, step);
+            }
+            MutPathOp::FlipStep { path, step } => {
+                graph.path_flip_step(*path, *step);
+            }
+            MutPathOp::RewriteSegment {
+                path,
+                from,
+                to,
+                new,
+            } => {
+                graph.path_rewrite_segment(*path, *from, *to, new);
+            }
+        }
     }
 }
 

@@ -386,6 +386,7 @@ pub struct LocalStep {
     pub next: StepPtr,
 }
 
+// TODO only have `After` & `Before` variants; AddDelDelta implies Insert & Remove
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum StepOp {
     InsertAfter { prev: StepPtr, handle: Handle },
