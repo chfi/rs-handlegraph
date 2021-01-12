@@ -82,6 +82,41 @@ fn print_graph_ops(ops: &[GraphOp]) {
     }
 }
 
+/// Takes a sequence of [`GraphOp`]s and batches sequences of
+/// `CreateOp::Edge` into equivalent `CreateOp::EdgeIter` ops.
+// fn batch_edge_ops(ops: &[GraphOp], mut batch_freq: f64) -> Vec<GraphOp> {
+fn batch_edge_ops(ops: &[GraphOp]) -> Vec<GraphOp> {
+    let mut batch_ops = Vec::with_capacity(ops.len());
+
+    let mut latest_batch: Vec<Edge> = Vec::new();
+
+    for op in ops {
+        if let GraphOp::Create { op } = op {
+            if let CreateOp::Edge { edge } = op {
+                latest_batch.push(*edge);
+            } else {
+                batch_ops.push(GraphOp::Create { op: op.clone() });
+            }
+        } else {
+            if !latest_batch.is_empty() {
+                let edges = std::mem::take(&mut latest_batch);
+                let batched = CreateOp::EdgesIter { edges };
+                batch_ops.push(GraphOp::Create { op: batched });
+            }
+            batch_ops.push(op.clone());
+        }
+    }
+
+    if !latest_batch.is_empty() {
+        let edges = std::mem::take(&mut latest_batch);
+        let batched = CreateOp::EdgesIter { edges };
+        batch_ops.push(GraphOp::Create { op: batched });
+    }
+
+    batch_ops.shrink_to_fit();
+    batch_ops
+}
+
 fn gen_edge_ops(edges: &[Edge], mut del_r: f64, shuffle: bool) -> Vec<GraphOp> {
     // `del_r` signifies to what extent edges will be removed and re-added;
     // 0.0 -> just add all edges

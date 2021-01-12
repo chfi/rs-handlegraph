@@ -201,7 +201,18 @@ impl GraphApply for CreateOp {
                 }
             }
             CreateOp::EdgesIter { edges } => {
-                graph.create_edges_iter(edges.iter().copied());
+                let edges: Vec<Edge> = edges
+                    .iter()
+                    .map(|&edge| {
+                        let Edge(from, to) = edge;
+                        if from.is_reverse() && to.is_reverse() {
+                            Edge(to.forward(), from.forward())
+                        } else {
+                            Edge(from, to)
+                        }
+                    })
+                    .collect();
+                graph.create_edges_iter(edges.into_iter());
             }
             CreateOp::Path { name } => {
                 graph.create_path(name, false);
