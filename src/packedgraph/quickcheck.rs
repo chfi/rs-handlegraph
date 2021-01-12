@@ -59,7 +59,22 @@ fn print_graph_ops(ops: &[GraphOp]) {
                         u64::from(to.id())
                     );
                 }
-                CreateOp::EdgesIter { edges } => {}
+                CreateOp::EdgesIter { edges } => {
+                    print!("{:<3} - Edges Iter  - ", ix);
+                    for (ix, edge) in edges.iter().enumerate() {
+                        if ix != 0 {
+                            print!(", ");
+                        }
+
+                        let Edge(from, to) = *edge;
+                        print!(
+                            "({}, {})",
+                            u64::from(from.id()),
+                            u64::from(to.id())
+                        );
+                    }
+                    println!();
+                }
                 CreateOp::Path { name } => {}
             },
             GraphOp::Remove { op } => match op {
@@ -283,30 +298,52 @@ fn adding_edges_ops() {
     let edge_ops_one = gen_edge_ops(&edges, 1.0, false);
     let edge_ops_shuffle = gen_edge_ops(&edges, 0.5, true);
 
+    let batched_zero = batch_edge_ops(&edge_ops_zero);
+    let batched_mid = batch_edge_ops(&edge_ops_mid);
+    let batched_one = batch_edge_ops(&edge_ops_one);
+    let batched_shuffle = batch_edge_ops(&edge_ops_shuffle);
+
     println!("-----------------------------------");
     println!("  Edge Ops - del_r 0.0 - no shuffle");
     print_graph_ops(&edge_ops_zero);
+    println!("    ---------------------------");
+    println!("  Batched ");
+    print_graph_ops(&batched_zero);
     println!("-----------------------------------");
 
     println!("-----------------------------------");
     println!("  Edge Ops - del_r 0.5 - no shuffle");
     print_graph_ops(&edge_ops_mid);
+    println!("    ---------------------------");
+    println!("  Batched ");
+    print_graph_ops(&batched_mid);
     println!("-----------------------------------");
 
     println!("-----------------------------------");
     println!("  Edge Ops - del_r 1.0 - no shuffle");
     print_graph_ops(&edge_ops_one);
+    println!("    ---------------------------");
+    println!("  Batched ");
+    print_graph_ops(&batched_one);
     println!("-----------------------------------");
 
     println!("-----------------------------------");
     println!("  Edge Ops - del_r 0.5 - shuffled");
     print_graph_ops(&edge_ops_shuffle);
+    println!("    ---------------------------");
+    println!("  Batched ");
+    print_graph_ops(&batched_shuffle);
     println!("-----------------------------------");
 
     let mut graph_zero = graph.clone();
     let mut graph_mid = graph.clone();
     let mut graph_one = graph.clone();
     let mut graph_shuffle = graph.clone();
+
+    let mut graph_zero_batched = graph.clone();
+    let mut graph_mid_batched = graph.clone();
+    let mut graph_one_batched = graph.clone();
+    let mut graph_shuffle_batched = graph.clone();
 
     for op in edge_ops_zero {
         op.apply(&mut graph_zero);
@@ -324,11 +361,44 @@ fn adding_edges_ops() {
         op.apply(&mut graph_shuffle);
     }
 
+    for op in batched_zero {
+        op.apply(&mut graph_zero_batched);
+    }
+
+    for op in batched_mid {
+        op.apply(&mut graph_mid_batched);
+    }
+
+    for op in batched_one {
+        op.apply(&mut graph_one_batched);
+    }
+
+    for op in batched_shuffle {
+        op.apply(&mut graph_shuffle_batched);
+    }
+
     println!("expected edge count:      {}", orig_graph.edge_count());
     println!("graph_zero    edge count: {}", graph_zero.edge_count());
     println!("graph_mid     edge count: {}", graph_mid.edge_count());
     println!("graph_one     edge count: {}", graph_one.edge_count());
     println!("graph_shuffle edge count: {}", graph_shuffle.edge_count());
+
+    println!(
+        "graph_zero_batched    edge count: {}",
+        graph_zero_batched.edge_count()
+    );
+    println!(
+        "graph_mid_batched     edge count: {}",
+        graph_mid_batched.edge_count()
+    );
+    println!(
+        "graph_one_batched     edge count: {}",
+        graph_one_batched.edge_count()
+    );
+    println!(
+        "graph_shuffle_batched edge count: {}",
+        graph_shuffle_batched.edge_count()
+    );
 
     let mut expected = orig_graph.edges().collect::<Vec<_>>();
     expected.sort();
@@ -338,11 +408,28 @@ fn adding_edges_ops() {
     let mut edges_one = graph_one.edges().collect::<Vec<_>>();
     let mut edges_shuffle = graph_shuffle.edges().collect::<Vec<_>>();
 
+    let mut edges_zero_batched = graph_zero_batched.edges().collect::<Vec<_>>();
+    let mut edges_mid_batched = graph_mid_batched.edges().collect::<Vec<_>>();
+    let mut edges_one_batched = graph_one_batched.edges().collect::<Vec<_>>();
+    let mut edges_shuffle_batched =
+        graph_shuffle_batched.edges().collect::<Vec<_>>();
+
     edges_zero.sort();
     edges_mid.sort();
     edges_one.sort();
     edges_shuffle.sort();
 
+    edges_zero_batched.sort();
+    edges_mid_batched.sort();
+    edges_one_batched.sort();
+    edges_shuffle_batched.sort();
+
+    assert_eq!(edges_zero, edges_zero_batched);
+    assert_eq!(edges_mid, edges_mid_batched);
+    assert_eq!(edges_one, edges_one_batched);
+    assert_eq!(edges_shuffle, edges_shuffle_batched);
+
+    /*
     let mut edges = edges;
     edges.sort();
 
@@ -351,4 +438,5 @@ fn adding_edges_ops() {
     assert_eq!(expected, edges_mid);
     assert_eq!(expected, edges_one);
     assert_eq!(expected, edges_shuffle);
+    */
 }
