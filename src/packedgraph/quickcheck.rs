@@ -44,6 +44,44 @@ use traits::{DeriveDelta, GraphApply, GraphDelta};
 
 use rand::prelude::*;
 
+fn print_graph_ops(ops: &[GraphOp]) {
+    println!(" - {} ops", ops.len());
+    for (ix, op) in ops.iter().enumerate() {
+        match op {
+            GraphOp::Create { op } => match op {
+                CreateOp::Handle { id, seq } => {}
+                CreateOp::Edge { edge } => {
+                    let Edge(from, to) = *edge;
+                    println!(
+                        "{:<3} - Create Edge - {:3} {:3}",
+                        ix,
+                        u64::from(from.id()),
+                        u64::from(to.id())
+                    );
+                }
+                CreateOp::EdgesIter { edges } => {}
+                CreateOp::Path { name } => {}
+            },
+            GraphOp::Remove { op } => match op {
+                RemoveOp::Handle { handle } => {}
+                RemoveOp::Edge { edge } => {
+                    let Edge(from, to) = *edge;
+                    println!(
+                        "{:<3} - Remove Edge - {:3} {:3}",
+                        ix,
+                        u64::from(from.id()),
+                        u64::from(to.id())
+                    );
+                }
+                RemoveOp::Path { name } => {}
+            },
+            GraphOp::MutHandle { op } => {}
+            GraphOp::MutPath { op } => {}
+            GraphOp::GraphWide { op } => {}
+        }
+    }
+}
+
 fn gen_edge_ops(edges: &[Edge], mut del_r: f64, shuffle: bool) -> Vec<GraphOp> {
     // `del_r` signifies to what extent edges will be removed and re-added;
     // 0.0 -> just add all edges
@@ -178,4 +216,133 @@ fn adding_nodes_prop() {
     println!("compare to new:  {}", comp_eq.eq_delta(&graph_1));
     println!("compare to orig: {}", comp_eq.eq_delta(&graph_2));
     println!();
+}
+
+#[test]
+fn adding_edges_ops() {
+    let orig_graph = crate::packedgraph::tests::test_graph_no_paths();
+
+    let nodes: Vec<(NodeId, Vec<u8>)> = orig_graph
+        .handles()
+        .map(|h| {
+            let id = h.id();
+            let seq = orig_graph.sequence_vec(h);
+            (id, seq)
+        })
+        .collect::<Vec<_>>();
+
+    // let edges: Vec<Edge> = orig_graph.edges().map(|edge| {}).collect();
+
+    let edges = orig_graph.edges().collect::<Vec<_>>();
+
+    let mut graph = PackedGraph::new();
+
+    for (id, seq) in nodes {
+        graph.create_handle(&seq, id);
+    }
+
+    println!("edge count {}", edges.len());
+
+    let edge_ops_zero = gen_edge_ops(&edges, 0.0, false);
+    let edge_ops_mid = gen_edge_ops(&edges, 0.5, false);
+    let edge_ops_one = gen_edge_ops(&edges, 1.0, false);
+    let edge_ops_shuffle = gen_edge_ops(&edges, 0.5, true);
+
+    println!("-----------------------------------");
+    println!("  Edge Ops - del_r 0.0 - no shuffle");
+    print_graph_ops(&edge_ops_zero);
+    println!("-----------------------------------");
+
+    println!("-----------------------------------");
+    println!("  Edge Ops - del_r 0.5 - no shuffle");
+    print_graph_ops(&edge_ops_mid);
+    println!("-----------------------------------");
+
+    println!("-----------------------------------");
+    println!("  Edge Ops - del_r 1.0 - no shuffle");
+    print_graph_ops(&edge_ops_one);
+    println!("-----------------------------------");
+
+    println!("-----------------------------------");
+    println!("  Edge Ops - del_r 0.5 - shuffled");
+    print_graph_ops(&edge_ops_shuffle);
+    println!("-----------------------------------");
+
+    let mut graph_zero = graph.clone();
+    let mut graph_mid = graph.clone();
+    let mut graph_one = graph.clone();
+    let mut graph_shuffle = graph.clone();
+
+    for op in edge_ops_zero {
+        op.apply(&mut graph_zero);
+    }
+
+    for op in edge_ops_mid {
+        op.apply(&mut graph_mid);
+    }
+
+    for op in edge_ops_one {
+        op.apply(&mut graph_one);
+    }
+
+    for op in edge_ops_shuffle {
+        op.apply(&mut graph_shuffle);
+    }
+
+    println!("expected edge count:      {}", orig_graph.edge_count());
+    println!("graph_zero    edge count: {}", graph_zero.edge_count());
+    println!("graph_mid     edge count: {}", graph_mid.edge_count());
+    println!("graph_one     edge count: {}", graph_one.edge_count());
+    println!("graph_shuffle edge count: {}", graph_shuffle.edge_count());
+
+    let mut expected = orig_graph.edges().collect::<Vec<_>>();
+    expected.sort();
+
+    let mut edges_zero = graph_zero.edges().collect::<Vec<_>>();
+    let mut edges_mid = graph_mid.edges().collect::<Vec<_>>();
+    let mut edges_one = graph_one.edges().collect::<Vec<_>>();
+    let mut edges_shuffle = graph_shuffle.edges().collect::<Vec<_>>();
+
+    edges_zero.sort();
+    edges_mid.sort();
+    edges_one.sort();
+    edges_shuffle.sort();
+
+    let mut edges = edges;
+    edges.sort();
+
+    println!("org_L, org_R - new_L, new_R");
+    for (a, b) in edges.into_iter().zip(edges_zero.into_iter()) {
+        let Edge(a_f, a_t) = a;
+        let Edge(b_f, b_t) = b;
+        // println!(
+        //     "{:>5}, {:<5} - {:>5}, {:<5}",
+        //     a_f.id().0,
+        //     a_t.id().0,
+        //     b_f.id().0,
+        //     b_t.id().0
+        // );
+        println!("{:>5}, {:<5} - {:>5}, {:<5}", a_f.0, a_t.0, b_f.0, b_t.0);
+    }
+
+    /*
+    println!("----------------------------------------");
+    println!("{:#?}", edges);
+    println!("----------------------------------------");
+
+    println!("----------------------------------------");
+    println!("{:#?}", edges_zero);
+    println!("----------------------------------------");
+
+    assert_eq!(edges, expected);
+    assert_eq!(edges_zero, expected);
+    assert_eq!(edges_mid, expected);
+    assert_eq!(edges_one, expected);
+    assert_eq!(edges_shuffle, expected);
+    */
+
+    // let mut graph_zero = graph.clone();
+    // let mut graph_mid = graph.clone();
+    // let mut graph_one = graph.clone();
+    // let mut graph_shuffle = graph.clone();
 }

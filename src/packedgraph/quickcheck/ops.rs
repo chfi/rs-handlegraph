@@ -194,6 +194,10 @@ impl GraphApply for CreateOp {
             }
             CreateOp::Edge { edge } => {
                 graph.create_edge(*edge);
+
+                // let Edge(from, to) = *edge;
+                // let edge_ = Edge(from.forward(), to.forward());
+                // graph.create_edge(edge_);
             }
             CreateOp::EdgesIter { edges } => {
                 graph.create_edges_iter(edges.iter().copied());
