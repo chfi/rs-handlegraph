@@ -27,6 +27,8 @@ use super::{
     PackedGraph,
 };
 
+use crate::hashgraph::HashGraph;
+
 use quickcheck::{Arbitrary, Gen, QuickCheck};
 
 use fnv::{FnvHashMap, FnvHashSet};
@@ -269,6 +271,109 @@ fn adding_nodes_prop() {
 }
 
 #[test]
+fn graph_edges_ops() {
+    let packed = crate::util::test::test_packedgraph();
+    let hash = crate::util::test::test_hashgraph();
+
+    let mut p_edges = packed.edges().collect::<Vec<_>>();
+    let mut h_edges = hash.edges().collect::<Vec<_>>();
+
+    p_edges.sort();
+    h_edges.sort();
+
+    println!(
+        "{:2} | {:3} {:3} | {:3} {:3}",
+        "Ix", "H_l", "H_r", "I_l", "I_r"
+    );
+    for (ix, &p_edge) in p_edges.iter().enumerate() {
+        let Edge(p_f, p_t) = p_edge;
+        // let Edge(h_f, h_t) = h_edge;
+
+        println!(
+            "{:2} | {:3} {:3} | {:3} {:3}",
+            ix,
+            p_f.0,
+            p_t.0,
+            p_f.id().0,
+            p_t.id().0,
+        );
+    }
+
+    let nodes: Vec<(NodeId, Vec<u8>)> = packed
+        .handles()
+        .map(|h| {
+            let id = h.id();
+            let seq = packed.sequence_vec(h);
+            (id, seq)
+        })
+        .collect::<Vec<_>>();
+
+    // let edges: Vec<Edge> = orig_graph.edges().map(|edge| {}).collect();
+
+    let mut hash_2 = HashGraph::default();
+    let mut packed_2 = PackedGraph::default();
+
+    for (id, seq) in nodes {
+        hash_2.create_handle(&seq, id);
+        packed_2.create_handle(&seq, id);
+    }
+
+    for &edge in h_edges.iter() {
+        hash_2.create_edge(edge);
+    }
+
+    for &edge in p_edges.iter() {
+        packed_2.create_edge(edge);
+    }
+
+    let mut h2_edges = hash_2.edges().collect::<Vec<_>>();
+    h2_edges.sort();
+
+    let mut p2_edges = packed_2.edges().collect::<Vec<_>>();
+    p2_edges.sort();
+
+    assert_eq!(h_edges, h2_edges);
+    assert_eq!(p_edges, p2_edges);
+
+    // println!("{:2} | {:6}  {:6}", "Ix", "Packed", "Hash");
+    // for (ix, (&p_edge, &h_edge)) in
+    //     p_edges.iter().zip(h_edges.iter()).enumerate()
+    // {
+    //     let Edge(p_f, p_t) = p_edge;
+    //     let Edge(h_f, h_t) = h_edge;
+
+    //     println!(
+    //         "{:2} |  {:>2}-{:<2}  {:>2}-{:<2}",
+    //         ix, p_f.0, p_t.0, h_f.0, h_t.0
+    //     );
+    // }
+
+    /*
+    assert_eq!(p_edges, h_edges);
+
+    let mut p_handles = packed.handles().collect::<Vec<_>>();
+    let mut h_handles = hash.handles().collect::<Vec<_>>();
+
+    p_handles.sort();
+    h_handles.sort();
+
+    assert_eq!(p_handles, h_handles);
+    */
+
+    // println!("-------------------");
+    // println!(" PackedGraph edges ");
+    // println!("  count: {}", p_edges.len());
+    // println!("{:#?}", p_edges);
+    // println!();
+
+    // println!("-------------------");
+    // println!("   HashGraph edges ");
+    // println!("  count: {}", h_edges.len());
+    // println!("{:#?}", h_edges);
+    // println!();
+}
+
+#[test]
 fn adding_edges_ops() {
     let orig_graph = crate::packedgraph::tests::test_graph_no_paths();
 
@@ -399,6 +504,21 @@ fn adding_edges_ops() {
         "graph_shuffle_batched edge count: {}",
         graph_shuffle_batched.edge_count()
     );
+
+    let mut expected = orig_graph.edges().collect::<Vec<_>>();
+    expected.sort();
+
+    for (ix, exp_edge) in expected.into_iter().enumerate() {
+        let Edge(l, r) = exp_edge;
+        println!(
+            "{:2} - {} {} - {}",
+            ix,
+            l.id().0,
+            r.id().0,
+            graph_zero.has_edge(l, r)
+        );
+        // assert!(graph_zero.has_edge(l, r));
+    }
 
     let mut expected = orig_graph.edges().collect::<Vec<_>>();
     expected.sort();
