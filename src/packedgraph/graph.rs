@@ -162,7 +162,7 @@ impl PackedGraph {
             );
             edge_vec_ix += 1;
 
-            data_buf.push(left.pack());
+            data_buf.push(left.flip().pack());
             data_buf.push(right_edge_list.pack());
             self.nodes.set_edge_list(
                 right_gix,
