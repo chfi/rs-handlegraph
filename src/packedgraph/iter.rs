@@ -5,11 +5,18 @@ use super::{index::list, EdgeLists};
 /// Iterator for stepping through an edge list, returning Handles.
 pub struct EdgeListHandleIter<'a> {
     edge_list_iter: list::Iter<'a, EdgeLists>,
+    flip: bool,
 }
 
 impl<'a> EdgeListHandleIter<'a> {
-    pub(super) fn new(edge_list_iter: list::Iter<'a, EdgeLists>) -> Self {
-        Self { edge_list_iter }
+    pub(super) fn new(
+        edge_list_iter: list::Iter<'a, EdgeLists>,
+        flip: bool,
+    ) -> Self {
+        Self {
+            edge_list_iter,
+            flip,
+        }
     }
 }
 
@@ -19,6 +26,10 @@ impl<'a> Iterator for EdgeListHandleIter<'a> {
     #[inline]
     fn next(&mut self) -> Option<Handle> {
         let (_, (handle, _)) = self.edge_list_iter.next()?;
-        Some(handle)
+        if self.flip {
+            Some(handle.flip())
+        } else {
+            Some(handle)
+        }
     }
 }

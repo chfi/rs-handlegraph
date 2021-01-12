@@ -138,7 +138,7 @@ impl<'a> IntoNeighbors for &'a PackedGraph {
 
         let iter = self.edges.iter(edge_list_ix);
 
-        EdgeListHandleIter::new(iter)
+        EdgeListHandleIter::new(iter, dir == Dir::Left)
     }
 }
 
@@ -227,7 +227,8 @@ impl AdditiveHandleGraph for PackedGraph {
             self.nodes.get_edge_list(right_gix, right_edge_dir);
 
         // create the record for the edge from the right handle to the left
-        let right_to_left = self.edges.append_record(left, right_edge_list);
+        let right_to_left =
+            self.edges.append_record(left.flip(), right_edge_list);
 
         // set the `next` pointer of the new record to the old head of
         // the right handle
