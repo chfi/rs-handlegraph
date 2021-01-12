@@ -311,38 +311,9 @@ fn adding_edges_ops() {
     let mut edges = edges;
     edges.sort();
 
-    println!("org_L, org_R - new_L, new_R");
-    for (a, b) in edges.into_iter().zip(edges_zero.into_iter()) {
-        let Edge(a_f, a_t) = a;
-        let Edge(b_f, b_t) = b;
-        // println!(
-        //     "{:>5}, {:<5} - {:>5}, {:<5}",
-        //     a_f.id().0,
-        //     a_t.id().0,
-        //     b_f.id().0,
-        //     b_t.id().0
-        // );
-        println!("{:>5}, {:<5} - {:>5}, {:<5}", a_f.0, a_t.0, b_f.0, b_t.0);
-    }
-
-    /*
-    println!("----------------------------------------");
-    println!("{:#?}", edges);
-    println!("----------------------------------------");
-
-    println!("----------------------------------------");
-    println!("{:#?}", edges_zero);
-    println!("----------------------------------------");
-
-    assert_eq!(edges, expected);
-    assert_eq!(edges_zero, expected);
-    assert_eq!(edges_mid, expected);
-    assert_eq!(edges_one, expected);
-    assert_eq!(edges_shuffle, expected);
-    */
-
-    // let mut graph_zero = graph.clone();
-    // let mut graph_mid = graph.clone();
-    // let mut graph_one = graph.clone();
-    // let mut graph_shuffle = graph.clone();
+    assert_eq!(expected, edges);
+    assert_eq!(expected, edges_zero);
+    assert_eq!(expected, edges_mid);
+    assert_eq!(expected, edges_one);
+    assert_eq!(expected, edges_shuffle);
 }

@@ -193,11 +193,12 @@ impl GraphApply for CreateOp {
                 graph.create_handle(seq, *id);
             }
             CreateOp::Edge { edge } => {
-                graph.create_edge(*edge);
-
-                // let Edge(from, to) = *edge;
-                // let edge_ = Edge(from.forward(), to.forward());
-                // graph.create_edge(edge_);
+                let Edge(from, to) = *edge;
+                if from.is_reverse() && to.is_reverse() {
+                    graph.create_edge(Edge(to.forward(), from.forward()));
+                } else {
+                    graph.create_edge(Edge(from, to));
+                }
             }
             CreateOp::EdgesIter { edges } => {
                 graph.create_edges_iter(edges.iter().copied());
