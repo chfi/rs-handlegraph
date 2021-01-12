@@ -271,6 +271,74 @@ fn adding_nodes_prop() {
 }
 
 #[test]
+fn create_edges_iter_eq() {
+    let orig_graph = crate::packedgraph::tests::test_graph_no_paths();
+
+    let nodes: Vec<(NodeId, Vec<u8>)> = orig_graph
+        .handles()
+        .map(|h| {
+            let id = h.id();
+            let seq = orig_graph.sequence_vec(h);
+            (id, seq)
+        })
+        .collect::<Vec<_>>();
+
+    let edges = orig_graph.edges().collect::<Vec<_>>();
+
+    let mut graph_simple = PackedGraph::new();
+    let mut graph_batch = PackedGraph::new();
+
+    for (id, seq) in nodes {
+        graph_simple.create_handle(&seq, id);
+        graph_batch.create_handle(&seq, id);
+    }
+
+    let del_r = 0.0;
+    let shuffle = false;
+
+    let ops_simple = gen_edge_ops(&edges, del_r, shuffle);
+    let ops_batch = batch_edge_ops(&ops_simple);
+
+    println!("---------------------");
+    println!("  --- simple ops --- ");
+    print_graph_ops(&ops_simple);
+    println!();
+    println!("  ---  batch ops --- ");
+    print_graph_ops(&ops_batch);
+    println!("---------------------");
+
+    for op in ops_simple {
+        op.apply(&mut graph_simple);
+    }
+
+    for op in ops_batch {
+        op.apply(&mut graph_batch);
+    }
+
+    let mut simple_edges = graph_simple.edges().collect::<Vec<_>>();
+    let mut batch_edges = graph_batch.edges().collect::<Vec<_>>();
+
+    simple_edges.sort();
+    batch_edges.sort();
+
+    assert_eq!(simple_edges, batch_edges);
+
+    println!("   --- simple ---");
+    println!("  node count: {}", graph_simple.node_count());
+    println!("  edge count: {}", graph_simple.edge_count());
+    println!("  edge records:");
+    crate::packedgraph::tests::print_edge_records(&graph_simple);
+    println!();
+
+    println!("   --- batch  ---");
+    println!("  node count: {}", graph_batch.node_count());
+    println!("  edge count: {}", graph_batch.edge_count());
+    println!("  edge records:");
+    crate::packedgraph::tests::print_edge_records(&graph_batch);
+    println!();
+}
+
+#[test]
 fn graph_edges_ops() {
     let packed = crate::util::test::test_packedgraph();
     let hash = crate::util::test::test_hashgraph();
