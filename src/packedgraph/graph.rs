@@ -217,7 +217,7 @@ impl PackedGraph {
         let new_right_head = self
             .edges
             .iter_mut(right_edge_list)
-            .remove_record_with(|_, (handle, _)| handle == left)?;
+            .remove_record_with(|_, (handle, _)| handle.flip() == left)?;
 
         // update `left`'s edge list header
         self.nodes
