@@ -494,13 +494,10 @@ pub fn create_consensus_graph(
     }
 
     for (from, to) in perfect_edges {
-        consensus_graph.create_edge(Edge(from, to));
-
-        // edges.insert(Edge(from, to));
+        edges.insert(Edge(from, to));
     }
 
-    // For some reason this breaks link_steps; something wrong with the way num_entries is updated
-    // consensus_graph.create_edges_iter(edges.into_iter());
+    consensus_graph.create_edges_iter(edges.into_iter());
 
     {
         let mut link_steps = |path_id: PathId,
