@@ -848,6 +848,46 @@ pub(crate) mod tests {
             .collect::<Vec<_>>();
 
         assert_eq!(path_0_steps, path_1_steps);
+
+        println!("path_0_steps: {:#?}", path_0_steps);
+        println!("path_1_steps: {:#?}", path_1_steps);
+
+        let p0_first = graph.path_first_step(path_0);
+        let p0_last = graph.path_last_step(path_0);
+        let p1_first = graph.path_first_step(path_1);
+        let p1_last = graph.path_last_step(path_1);
+
+        println!(
+            "path 0 - head: {:?}\t tail: {:?}",
+            graph.path_first_step(path_0),
+            graph.path_last_step(path_0)
+        );
+        println!(
+            "path 1 - head: {:?}\t tail: {:?}",
+            graph.path_first_step(path_1),
+            graph.path_last_step(path_1)
+        );
+
+        println!("path 0 len: {:?}", graph.path_len(path_0));
+        println!("path 1 len: {:?}", graph.path_len(path_1));
+
+        println!(
+            "path 0 first: {:?}",
+            graph.path_handle_at_step(path_0, p0_first.unwrap())
+        );
+        println!(
+            "path 0 last:  {:?}",
+            graph.path_handle_at_step(path_0, p0_last.unwrap())
+        );
+
+        println!(
+            "path 1 first: {:?}",
+            graph.path_handle_at_step(path_1, p1_first.unwrap())
+        );
+        println!(
+            "path 1 last:  {:?}",
+            graph.path_handle_at_step(path_1, p1_last.unwrap())
+        );
     }
 
     #[test]
