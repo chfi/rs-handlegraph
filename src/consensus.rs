@@ -656,7 +656,7 @@ pub fn create_consensus_graph(
     let empty_handles = consensus_graph
         .handles()
         .filter(|&handle| {
-            consensus_graph.steps_on_handle(handle).unwrap().count() != 0
+            consensus_graph.steps_on_handle(handle).unwrap().count() == 0
         })
         .collect::<Vec<_>>();
 
@@ -914,7 +914,7 @@ pub fn create_consensus_graph(
     let empty_handles = consensus_graph
         .handles()
         .filter(|&handle| {
-            consensus_graph.steps_on_handle(handle).unwrap().count() != 0
+            consensus_graph.steps_on_handle(handle).unwrap().count() == 0
         })
         .collect::<Vec<_>>();
 
