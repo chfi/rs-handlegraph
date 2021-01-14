@@ -456,9 +456,15 @@ impl TransformNodeIds for PackedGraph {
             .collect();
 
         PackedGraph::transform_node_ids(self, |node| {
-            let ix = rank.get(&node).unwrap();
-            let handle = order[*ix];
-            handle.id()
+            if let Some(ix) = rank.get(&node) {
+                let handle = order[*ix];
+                handle.id()
+            } else {
+                panic!(
+                    "error when transforming node {:?}; didn't exist in graph",
+                    node
+                );
+            }
         });
     }
 }
@@ -872,20 +878,20 @@ pub(crate) mod tests {
         println!("path 1 len: {:?}", graph.path_len(path_1));
 
         println!(
-            "path 0 first: {:?}",
+            "path 0 first: {:#?}",
             graph.path_handle_at_step(path_0, p0_first.unwrap())
         );
         println!(
-            "path 0 last:  {:?}",
+            "path 0 last:  {:#?}",
             graph.path_handle_at_step(path_0, p0_last.unwrap())
         );
 
         println!(
-            "path 1 first: {:?}",
+            "path 1 first: {:#?}",
             graph.path_handle_at_step(path_1, p1_first.unwrap())
         );
         println!(
-            "path 1 last:  {:?}",
+            "path 1 last:  {:#?}",
             graph.path_handle_at_step(path_1, p1_last.unwrap())
         );
     }

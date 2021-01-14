@@ -211,13 +211,21 @@ impl PackedGraph {
         let new_left_head = self
             .edges
             .iter_mut(left_edge_list)
-            .remove_record_with(|_, (handle, _)| handle == right)?;
+            .remove_all_records_with(|_, (handle, _)| {
+                handle.id() == right.id()
+            })?;
+        // .remove_record_with(|_, (handle, _)| handle.id() == right.id())?;
+        // .remove_record_with(|_, (handle, _)| handle == right)?;
 
         // remove the edge from `right`'s edge list
         let new_right_head = self
             .edges
             .iter_mut(right_edge_list)
-            .remove_record_with(|_, (handle, _)| handle.flip() == left)?;
+            .remove_all_records_with(|_, (handle, _)| {
+                handle.id() == left.id()
+            })?;
+        // .remove_record_with(|_, (handle, _)| handle.id() == left.id())?;
+        // .remove_record_with(|_, (handle, _)| handle.flip() == left)?;
 
         // update `left`'s edge list header
         self.nodes
@@ -268,12 +276,14 @@ impl PackedGraph {
             self.neighbors(handle, Direction::Right).collect::<Vec<_>>();
 
         for other in lefts {
-            let edge = Edge(other, handle);
+            let edge = Edge::edge_handle(other, handle);
+            // let edge = Edge(other, handle);
             self.remove_edge_impl(edge);
         }
 
         for other in rights {
-            let edge = Edge(handle, other);
+            let edge = Edge::edge_handle(handle, other);
+            // let edge = Edge(handle, other);
             self.remove_edge_impl(edge);
         }
 

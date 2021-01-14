@@ -1033,28 +1033,63 @@ fn compute_best_link(
 
     let from_cons_path = most_frequent_link.from_cons_path;
     let to_cons_path = most_frequent_link.to_cons_path;
+    println!(
+        "from_cons_path: {:?} - steps: {:?}",
+        from_cons_path,
+        graph.path_len(from_cons_path)
+    );
+    println!(
+        "to_cons_path:   {:?} - steps: {:?}",
+        to_cons_path,
+        graph.path_len(to_cons_path)
+    );
 
     let from_first = graph.path_first_step(from_cons_path).unwrap();
     let from_last = graph.path_last_step(from_cons_path).unwrap();
     let to_first = graph.path_first_step(to_cons_path).unwrap();
     let to_last = graph.path_last_step(to_cons_path).unwrap();
 
-    let from_end_fwd: Handle = graph
-        .path_handle_at_step(from_cons_path, from_last)
-        .unwrap();
-    let from_end_rev = from_end_fwd.flip();
+    println!("from_first: {:?}", from_first);
+    println!("from_last: {:?}", from_last);
+    println!("to_first: {:?}", to_first);
+    println!("to_last: {:?}", to_last);
 
-    let to_begin_fwd: Handle =
-        graph.path_handle_at_step(to_cons_path, to_first).unwrap();
-    let to_begin_rev = to_begin_fwd.flip();
+    let from_steps = graph
+        .get_path_ref(from_cons_path)
+        .unwrap()
+        .steps()
+        .collect::<Vec<_>>();
+
+    let to_steps = graph
+        .get_path_ref(to_cons_path)
+        .unwrap()
+        .steps()
+        .collect::<Vec<_>>();
+
+    println!("from_steps len: {}", from_steps.len());
+    println!("from_steps first: {:?}", from_steps.first());
+    println!("from_steps last:  {:?}", from_steps.last());
+
+    println!("to_steps len: {}", to_steps.len());
+    println!("to_steps first: {:?}", to_steps.first());
+    println!("to_steps last:  {:?}", to_steps.last());
+
+    let to_end_fwd = graph.path_handle_at_step(to_cons_path, to_last).unwrap();
+    let to_end_rev = to_end_fwd.flip();
 
     let from_begin_fwd = graph
         .path_handle_at_step(from_cons_path, from_first)
         .unwrap();
     let from_begin_rev = from_begin_fwd.flip();
 
-    let to_end_fwd = graph.path_handle_at_step(to_cons_path, to_last).unwrap();
-    let to_end_rev = to_end_fwd.flip();
+    let to_begin_fwd: Handle =
+        graph.path_handle_at_step(to_cons_path, to_first).unwrap();
+    let to_begin_rev = to_begin_fwd.flip();
+
+    let from_end_fwd: Handle = graph
+        .path_handle_at_step(from_cons_path, from_last)
+        .unwrap();
+    let from_end_rev = from_end_fwd.flip();
 
     let mut has_perfect_edge = false;
     let mut has_perfect_link = false;
