@@ -34,6 +34,11 @@ pub fn simple_components(
     let disj_set = DisjointSets::new(bphf_data.len() + 1);
 
     graph.handles_par().for_each(|handle| {
+        assert!(
+            graph.has_node(handle.id()),
+            "handles_par() produced a node that doesn't exist: {}",
+            handle.id().0
+        );
         let h_i = bphf.hash(&handle.0);
         let h_j = bphf.hash(&handle.flip().0);
         disj_set.unite(h_i, h_j);

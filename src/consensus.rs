@@ -391,6 +391,11 @@ pub fn create_consensus_graph(
 
     println!("adding consensus paths");
     // add consensus paths to consensus graph
+
+    let mut cons_paths_total_steps = 0;
+    let mut cons_paths_nodes: FnvHashSet<NodeId> = FnvHashSet::default();
+    let mut added_handles = 0;
+
     for &path_id in consensus_paths.iter() {
         let path_name = smoothed.get_path_name_vec(path_id).unwrap();
 
@@ -401,15 +406,27 @@ pub fn create_consensus_graph(
 
         let path_ref = smoothed.get_path_ref(path_id).unwrap();
 
+        let path_len = smoothed.path_len(path_id).unwrap();
+        cons_paths_total_steps += path_len;
+
         for step in path_ref.steps() {
             let handle = step.handle();
 
             if !consensus_graph.has_node(handle.id()) {
                 let seq = smoothed.sequence_vec(handle);
                 consensus_graph.create_handle(&seq, handle.id());
+                cons_paths_nodes.insert(handle.id());
+                added_handles += 1;
             }
         }
     }
+
+    println!(
+        "sum of consensus path step counts {}",
+        cons_paths_total_steps
+    );
+    println!("number of unique path steps {}", cons_paths_nodes.len());
+    println!("number of added handles     {}", added_handles);
 
     consensus_graph.with_all_paths_mut_ctx_chn_new(
         |cons_path_id, sender, cons_path_ref| {
@@ -564,13 +581,13 @@ pub fn create_consensus_graph(
 
             if s_buf != c_buf {
                 err_count += 1;
-                println!(
+                // println!(
 
-                "error: node {} has different sequences in the graphs\n  smoothed:  {}\n  consensus: {}",
-                step.handle().id(),
-                s_buf.as_bstr(),
-                c_buf.as_bstr(),
-                    );
+                // "error: node {} has different sequences in the graphs\n  smoothed:  {}\n  consensus: {}",
+                // step.handle().id(),
+                // s_buf.as_bstr(),
+                // c_buf.as_bstr(),
+                //     );
             }
 
             /*
@@ -624,19 +641,32 @@ pub fn create_consensus_graph(
     let consensus_graph_path_ids =
         consensus_graph.path_ids().collect::<Vec<_>>();
 
+    let mut edges: Vec<Edge> = Vec::new();
+
     for path_id in consensus_graph_path_ids {
-        let path_ref = smoothed.get_path_ref(path_id).unwrap();
+        edges.clear();
+
+        let path_ref = consensus_graph.get_path_ref(path_id).unwrap();
+
+        for step in path_ref.steps() {
+            if !consensus_graph.has_node(step.handle().id()) {
+                println!(
+                    "consensus graph is missing node with handle {}",
+                    step.handle().0
+                );
+            }
+        }
 
         let mut steps = path_ref.steps();
         let first = steps.next().unwrap();
 
-        let edges_iter = steps.scan(first, |prev, curr| {
+        edges.extend(steps.scan(first, |prev, curr| {
             let edge = Edge(prev.handle(), curr.handle());
             *prev = curr;
             Some(edge)
-        });
+        }));
 
-        consensus_graph.create_edges_iter(edges_iter);
+        consensus_graph.create_edges_iter(edges.iter().copied());
     }
 
     crate::algorithms::unchop::unchop(&mut consensus_graph);

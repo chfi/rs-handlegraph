@@ -119,6 +119,12 @@ impl<'a> IntoNeighbors for &'a PackedGraph {
     #[inline]
     fn neighbors(self, handle: Handle, dir: Direction) -> Self::Neighbors {
         use Direction as Dir;
+        if !self.has_node(handle.id()) {
+            panic!(
+                "tried to get neighbors of node {} which doesn't exist",
+                handle.id().0
+            );
+        }
         let g_ix = self.nodes.handle_record(handle).unwrap();
 
         let edge_list_ix = match (dir, handle.is_reverse()) {
