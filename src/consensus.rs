@@ -428,17 +428,29 @@ pub fn create_consensus_graph(
     println!("number of unique path steps {}", cons_paths_nodes.len());
     println!("number of added handles     {}", added_handles);
 
-    consensus_graph.with_all_paths_mut_ctx_chn_new(
-        |cons_path_id, sender, cons_path_ref| {
+    consensus_graph.with_all_paths_mut_ctx_chn(
+        |cons_path_id, cons_path_ref| {
             let path_id = *path_map.get(&cons_path_id).unwrap();
             let path_ref = smoothed.get_path_ref(path_id).unwrap();
 
-            cons_path_ref.append_handles_iter_chn(
-                sender,
-                path_ref.steps().map(|step| step.handle()),
-            );
+            path_ref
+                .steps()
+                .map(|step| cons_path_ref.append_step(step.handle()))
+                .collect()
         },
     );
+
+    // consensus_graph.with_all_paths_mut_ctx_chn_new(
+    //     |cons_path_id, sender, cons_path_ref| {
+    //         let path_id = *path_map.get(&cons_path_id).unwrap();
+    //         let path_ref = smoothed.get_path_ref(path_id).unwrap();
+
+    //         cons_path_ref.append_handles_iter_chn(
+    //             sender,
+    //             path_ref.steps().map(|step| step.handle()),
+    //         );
+    //     },
+    // );
 
     println!("adding link paths not in consensus paths");
     // add link paths not in the consensus paths
@@ -660,14 +672,30 @@ pub fn create_consensus_graph(
         let mut steps = path_ref.steps();
         let first = steps.next().unwrap();
 
-        edges.extend(steps.scan(first, |prev, curr| {
-            let edge = Edge(prev.handle(), curr.handle());
-            *prev = curr;
-            Some(edge)
-        }));
+        edges.extend(
+            steps
+                .scan(first, |prev, curr| {
+                    let edge = Edge(prev.handle(), curr.handle());
+                    *prev = curr;
+                    Some(edge)
+                })
+                .filter(|edge| {
+                    let Edge(l, r) = *edge;
+                    !consensus_graph.has_edge(l, r)
+                }),
+        );
 
-        consensus_graph.create_edges_iter(edges.iter().copied());
+        for &edge in edges.iter() {
+            consensus_graph.create_edge(edge);
+        }
+
+        // consensus_graph.create_edges_iter(edges.iter().copied());
     }
+
+    println!("node_count()      = {}", consensus_graph.node_count());
+    println!("handles().count() = {}", consensus_graph.handles().count());
+    println!("min node id: {}", consensus_graph.min_node_id().0);
+    println!("max node id: {}", consensus_graph.max_node_id().0);
 
     crate::algorithms::unchop::unchop(&mut consensus_graph);
 

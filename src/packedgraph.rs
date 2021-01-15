@@ -204,6 +204,10 @@ impl AdditiveHandleGraph for PackedGraph {
 
     #[inline]
     fn create_edge(&mut self, Edge(left, right): Edge) {
+        if self.has_edge(left, right) {
+            return;
+        }
+
         let left_gix = self.nodes.handle_record(left).unwrap();
         let right_gix = self.nodes.handle_record(right).unwrap();
 
