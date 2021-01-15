@@ -184,13 +184,15 @@ impl NodeIdIndexMap {
 
     pub(super) fn iter(&self) -> IndexMapIter<'_> {
         IndexMapIter {
-            iter: self.deque.iter(),
+            iter: self.deque.iter().enumerate(),
+            min_id: self.min_id,
         }
     }
 }
 
 pub struct IndexMapIter<'a> {
-    iter: packed::deque::Iter<'a>,
+    iter: std::iter::Enumerate<packed::deque::Iter<'a>>,
+    min_id: u64,
 }
 
 impl<'a> Iterator for IndexMapIter<'a> {
@@ -198,8 +200,9 @@ impl<'a> Iterator for IndexMapIter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<NodeId> {
-        let next_non_zero = self.iter.find(|&x| x != 0)?;
-        Some(NodeId::from(next_non_zero))
+        let next_non_zero = self.iter.find(|(_, x)| *x != 0)?;
+        let id = (next_non_zero.0 as u64) + self.min_id;
+        Some(NodeId::from(id))
     }
 }
 
