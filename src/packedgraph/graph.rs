@@ -132,8 +132,16 @@ impl PackedGraph {
         let mut edge_vec_ix = 1 + (self.edges.record_vec.len() / 2);
 
         while let Some(Edge(left, right)) = iter.next() {
-            let left_gix = self.nodes.handle_record(left).unwrap();
-            let right_gix = self.nodes.handle_record(right).unwrap();
+            // let left_gix = self.nodes.handle_record(left).unwrap();
+            // let right_gix = self.nodes.handle_record(right).unwrap();
+            let left_gix =
+                self.nodes.handle_record(left).unwrap_or_else(|| {
+                    panic!("handle {} does not have a record", left.0)
+                });
+            let right_gix =
+                self.nodes.handle_record(right).unwrap_or_else(|| {
+                    panic!("handle {} does not have a record", right.0)
+                });
 
             let left_edge_dir = if left.is_reverse() {
                 Direction::Left

@@ -528,6 +528,7 @@ pub fn create_consensus_graph(
     // validation
 
     println!("validating");
+    let mut err_count = 0;
     for path_id in smoothed.path_ids().filter(|p| consensus_paths.contains(&p))
     {
         let path_name = smoothed.get_path_name_vec(path_id).unwrap();
@@ -550,6 +551,8 @@ pub fn create_consensus_graph(
 
             s_buf.extend(smoothed.sequence(step.handle()));
             c_buf.extend(consensus_graph.sequence(step.handle()));
+
+            /*
             assert!(
                 s_buf == c_buf,
                 "error: node {} has different sequences in the graphs\n  smoothed:  {}\n  consensus: {}",
@@ -557,8 +560,66 @@ pub fn create_consensus_graph(
                 s_buf.as_bstr(),
                 c_buf.as_bstr(),
             );
+            */
+
+            if s_buf != c_buf {
+                err_count += 1;
+                println!(
+
+                "error: node {} has different sequences in the graphs\n  smoothed:  {}\n  consensus: {}",
+                step.handle().id(),
+                s_buf.as_bstr(),
+                c_buf.as_bstr(),
+                    );
+            }
+
+            /*
+            let s_seq = smoothed.sequence(step.handle());
+            let c_seq = consensus_graph.sequence(step.handle());
+            assert!(
+                s_seq.eq(c_seq),
+                "error: node {} has different sequences in the graphs",
+                step.handle().id()
+            );
+            */
         }
+
+        /*
+        let c_path_id =
+            consensus_graph.get_path_id(&path_name).unwrap_or_else(|| {
+                panic!(
+                    "error: consensus path {} not present in consensus graph",
+                    path_name.as_bstr()
+                )
+            });
+
+        let s_path_ref = smoothed.get_path_ref(path_id).unwrap();
+
+        let mut s_buf = Vec::new();
+        let mut c_buf = Vec::new();
+
+
+        let c_path_ref = consensus_graph.get_path_ref(c_path_id).unwrap();
+
+        for (s_step, c_step) in s_path_ref.steps().zip(c_path_ref.steps()) {
+            s_buf.clear();
+            c_buf.clear();
+
+            s_buf.extend(smoothed.sequence(s_step.handle()));
+            c_buf.extend(consensus_graph.sequence(c_step.handle()));
+
+            assert!(
+                s_buf == c_buf,
+                "error: node {} has different sequences in the graphs\n  smoothed:  {}\n  consensus: {}",
+                s_step.handle().id(),
+                s_buf.as_bstr(),
+                c_buf.as_bstr(),
+            );
+        }
+        */
     }
+
+    println!("there were {} validation errors", err_count);
 
     let consensus_graph_path_ids =
         consensus_graph.path_ids().collect::<Vec<_>>();
