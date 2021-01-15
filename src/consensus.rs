@@ -984,7 +984,7 @@ fn mark_seen_nodes(
 ) {
     let mut step = begin;
 
-    println!("marking seen nodes");
+    // println!("marking seen nodes");
     loop {
         let handle = graph.path_handle_at_step(path, step).unwrap();
         let id = handle.id();
@@ -1033,26 +1033,11 @@ fn compute_best_link(
 
     let from_cons_path = most_frequent_link.from_cons_path;
     let to_cons_path = most_frequent_link.to_cons_path;
-    println!(
-        "from_cons_path: {:?} - steps: {:?}",
-        from_cons_path,
-        graph.path_len(from_cons_path)
-    );
-    println!(
-        "to_cons_path:   {:?} - steps: {:?}",
-        to_cons_path,
-        graph.path_len(to_cons_path)
-    );
 
     let from_first = graph.path_first_step(from_cons_path).unwrap();
     let from_last = graph.path_last_step(from_cons_path).unwrap();
     let to_first = graph.path_first_step(to_cons_path).unwrap();
     let to_last = graph.path_last_step(to_cons_path).unwrap();
-
-    println!("from_first: {:?}", from_first);
-    println!("from_last: {:?}", from_last);
-    println!("to_first: {:?}", to_first);
-    println!("to_last: {:?}", to_last);
 
     let from_steps = graph
         .get_path_ref(from_cons_path)
@@ -1065,14 +1050,6 @@ fn compute_best_link(
         .unwrap()
         .steps()
         .collect::<Vec<_>>();
-
-    println!("from_steps len: {}", from_steps.len());
-    println!("from_steps first: {:?}", from_steps.first());
-    println!("from_steps last:  {:?}", from_steps.last());
-
-    println!("to_steps len: {}", to_steps.len());
-    println!("to_steps first: {:?}", to_steps.first());
-    println!("to_steps last:  {:?}", to_steps.last());
 
     let to_end_fwd = graph.path_handle_at_step(to_cons_path, to_last).unwrap();
     let to_end_rev = to_end_fwd.flip();
@@ -1102,13 +1079,13 @@ fn compute_best_link(
         perfect_edges.push((to_end_fwd, from_begin_fwd));
         has_perfect_edge = true;
     } else {
-        println!("iterating unique_links - {}", unique_links.len());
+        // println!("iterating unique_links - {}", unique_links.len());
         for link in unique_links.iter() {
             let mut step = link.begin;
 
             let mut count = 0;
             loop {
-                println!("   {}", count);
+                // println!("   {}", count);
                 count += 1;
 
                 let next = graph.path_next_step(link.path, step).unwrap();
