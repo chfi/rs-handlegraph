@@ -541,13 +541,21 @@ pub fn create_consensus_graph(
 
         let path_ref = smoothed.get_path_ref(path_id).unwrap();
 
+        let mut s_buf = Vec::new();
+        let mut c_buf = Vec::new();
+
         for step in path_ref.steps() {
-            let s_seq = smoothed.sequence(step.handle());
-            let c_seq = consensus_graph.sequence(step.handle());
+            s_buf.clear();
+            c_buf.clear();
+
+            s_buf.extend(smoothed.sequence(step.handle()));
+            c_buf.extend(consensus_graph.sequence(step.handle()));
             assert!(
-                s_seq.eq(c_seq),
-                "error: node {} has different sequences in the graphs",
-                step.handle().id()
+                s_buf == c_buf,
+                "error: node {} has different sequences in the graphs\n  smoothed:  {}\n  consensus: {}",
+                step.handle().id(),
+                s_buf.as_bstr(),
+                c_buf.as_bstr(),
             );
         }
     }
