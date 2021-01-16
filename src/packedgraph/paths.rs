@@ -565,8 +565,9 @@ impl GraphPaths for super::PackedGraph {
         index: Self::StepIx,
     ) -> Option<Handle> {
         let path = self.paths.path_ref(id)?;
-        let (_, step) = path.steps().find(|&(ix, _)| ix == index)?;
-        Some(step.handle)
+        let ix = index.to_zero_based()?;
+        let handle: Handle = path.path.steps.get_unpack(ix);
+        Some(handle)
     }
 
     #[inline]
