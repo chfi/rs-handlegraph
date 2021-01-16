@@ -305,7 +305,8 @@ fn create_edges_iter_eq() {
         graph_batch.create_handle(&seq, id);
     }
 
-    let del_r = 0.3;
+    // let del_r = 0.3;
+    let del_r = 0.0;
     let shuffle = false;
 
     let ops_simple = gen_edge_ops(&edges, del_r, shuffle);

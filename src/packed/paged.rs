@@ -346,9 +346,9 @@ impl<T: PagedCodec> PagedIntVec<T> {
 
         let mut new_page =
             PackedIntVec::with_width_and_capacity(width, self.page_size);
-        new_page.resize(self.page_size);
 
         new_page.append_iter(width, buf.iter().copied());
+        new_page.resize(self.page_size);
 
         self.anchors.append(anchor);
         self.pages.push(new_page);
