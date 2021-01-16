@@ -589,6 +589,9 @@ impl GraphPaths for super::PackedGraph {
     ) -> Option<Self::StepIx> {
         let path = self.paths.path_ref(id)?;
         let (_, step) = path.step_at(ix)?;
+        if step.next.is_null() {
+            return None;
+        }
         Some(step.next)
     }
 
@@ -600,6 +603,9 @@ impl GraphPaths for super::PackedGraph {
     ) -> Option<Self::StepIx> {
         let path = self.paths.path_ref(id)?;
         let (_, step) = path.step_at(ix)?;
+        if step.prev.is_null() {
+            return None;
+        }
         Some(step.prev)
     }
 }
