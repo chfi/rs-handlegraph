@@ -363,8 +363,8 @@ impl MutableHandles for PackedGraph {
         for edge_list in right_neighbors {
             self.edges.update_edge_record(
                 edge_list,
-                |_, (h, _)| h == handle,
-                |(_, n)| (last_handle, n),
+                |_, (h, _)| h.flip() == handle,
+                |(_, n)| (last_handle.flip(), n),
             );
         }
 
