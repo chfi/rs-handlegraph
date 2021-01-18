@@ -524,7 +524,14 @@ impl<'a> PackedPathMut<'a> {
     ) -> StepPtr {
         let step_update = self.append_handle(handle);
         let step = step_update.step();
-        sender.send((self.path_id, step_update));
+        sender
+            .send((self.path_id, step_update))
+            .unwrap_or_else(|_| {
+                panic!(
+                "Error sending update for path {}, step {} in append_handle_chn",
+                self.path_id.0, step.pack()
+            );
+            });
         step
     }
 
@@ -559,13 +566,20 @@ impl<'a> PackedPathMut<'a> {
             links_buf.push(StepPtr::from_one_based(cur_ptr - 1).pack());
             links_buf.push(StepPtr::from_one_based(cur_ptr + 1).pack());
 
+            let path_id = self.path_id;
+
             sender.send((
                 self.path_id,
                 StepUpdate::Insert {
                     handle,
                     step: StepPtr::from_one_based(cur_ptr),
                 },
-            ));
+            )).unwrap_or_else(|_| {
+                panic!(
+                "Error sending update for path {}, step {} in append_handle_chn",
+                path_id.0, cur_ptr
+            );
+            });
 
             if steps_buf.len() >= steps_page_size {
                 steps_mut.steps.append_pages(&mut page_buf, &steps_buf);
@@ -610,7 +624,12 @@ impl<'a> PackedPathMut<'a> {
     ) -> StepPtr {
         let step_update = self.prepend_handle(handle);
         let step = step_update.step();
-        sender.send((self.path_id, step_update));
+        sender.send((self.path_id, step_update)).unwrap_or_else(|_| {
+                panic!(
+                "Error sending update for path {}, step {} in append_handle_chn",
+                self.path_id.0, step.pack()
+            );
+            });
         step
     }
 
@@ -629,7 +648,12 @@ impl<'a> PackedPathMut<'a> {
         }?;
 
         let step = step_update.step();
-        sender.send((self.path_id, step_update));
+        sender.send((self.path_id, step_update)).unwrap_or_else(|_| {
+                panic!(
+                "Error sending update for path {}, step {} in append_handle_chn",
+                self.path_id.0, step.pack()
+            );
+            });
         Some(step)
     }
 
@@ -641,7 +665,12 @@ impl<'a> PackedPathMut<'a> {
     ) -> bool {
         if let Some(step_update) = self.remove_step_at_index(step) {
             let step = step_update.step();
-            sender.send((self.path_id, step_update));
+            sender.send((self.path_id, step_update)).unwrap_or_else(|_| {
+                panic!(
+                "Error sending update for path {}, step {} in append_handle_chn",
+                self.path_id.0, step.pack()
+            );
+            });
             true
         } else {
             false
@@ -675,16 +704,23 @@ impl<'a> PackedPathMut<'a> {
         // step updates
         {
             let steps = self.path.steps_mut();
-            let to_remove = steps.iter(from, to).collect::<Vec<_>>();
+            let mut to_remove = steps.iter(from, to).collect::<Vec<_>>();
+            to_remove.pop();
 
             for (ptr, step) in to_remove.into_iter() {
+                let path_id = self.path_id;
                 sender.send((
                     self.path_id,
                     StepUpdate::Remove {
                         step: ptr,
                         handle: step.handle,
                     },
-                ));
+                )).unwrap_or_else(|_| {
+                panic!(
+                "Error sending update for path {}, step {} in append_handle_chn",
+                path_id.0, ptr.pack()
+            );
+            });
 
                 let step_ix = ptr.to_record_ix(1, 0)?;
                 let link_ix = ptr.to_record_ix(2, 0)?;
@@ -699,6 +735,7 @@ impl<'a> PackedPathMut<'a> {
         let mut handles = new_segment.iter();
         let first_handle = *handles.next()?;
 
+        // first added step, i.e. first handle in the provided slice
         let start = {
             let update = if from_step.prev.is_null() {
                 self.prepend_step(first_handle)
@@ -706,7 +743,7 @@ impl<'a> PackedPathMut<'a> {
                 self.insert_step_after(from_step.prev, first_handle)?
             };
             let step = update.step();
-            sender.send((self.path_id, update));
+            sender.send((self.path_id, update)).unwrap();
             step
         };
 
@@ -714,18 +751,25 @@ impl<'a> PackedPathMut<'a> {
         for &handle in handles {
             let update = self.insert_step_after(last, handle)?;
             last = update.step();
-            sender.send((self.path_id, update));
+            sender.send((self.path_id, update)).unwrap();
         }
 
+        // last added step, i.e. last handle in the provided slice
         let end = last;
 
         let steps = self.path.steps_mut();
 
+        // update the next-link of the step before the rewritten segment
         if let Some(ix) = from_step.prev.to_record_ix(2, 1) {
             steps.links.set_pack(ix, start);
         }
-        if let Some(ix) = to_step.next.to_record_ix(2, 0) {
+        // update the prev-link of the step after the rewritten segment
+        if let Some(ix) = to_step.prev.to_record_ix(2, 0) {
             steps.links.set_pack(ix, end);
+        }
+        // update the next-link of the last step in the new segment
+        if let Some(ix) = end.to_record_ix(2, 1) {
+            steps.links.set_pack(ix, to);
         }
 
         Some((start, end))
@@ -746,7 +790,12 @@ impl<'a> PackedPathMut<'a> {
             .steps
             .set_pack(step_rec_ix, handle.flip());
 
-        sender.send((self.path_id, StepUpdate::Remove { handle, step }));
+        sender.send((self.path_id, StepUpdate::Remove { handle, step })).unwrap_or_else(|_| {
+                panic!(
+                "Error sending update for path {}, step {} in append_handle_chn",
+                self.path_id.0, step.pack()
+            );
+            });
 
         sender.send((
             self.path_id,
@@ -754,7 +803,12 @@ impl<'a> PackedPathMut<'a> {
                 handle: handle.flip(),
                 step,
             },
-        ));
+        )).unwrap_or_else(|_| {
+                panic!(
+                "Error sending update for path {}, step {} in append_handle_chn",
+                self.path_id.0, step.pack()
+            );
+            });
 
         Some(())
     }
@@ -1105,12 +1159,15 @@ where
 
         let steps = self.path.steps_mut();
 
+        // update the next-link of the step before the rewritten segment
         if let Some(ix) = from_step.prev.to_record_ix(2, 1) {
             steps.links.set_pack(ix, start);
         }
+        // update the prev-link of the step after the rewritten segment
         if let Some(ix) = to_step.prev.to_record_ix(2, 0) {
             steps.links.set_pack(ix, end);
         }
+        // update the next-link of the last step in the new segment
         if let Some(ix) = end.to_record_ix(2, 1) {
             steps.links.set_pack(ix, to);
         }
