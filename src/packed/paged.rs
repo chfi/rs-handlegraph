@@ -306,7 +306,13 @@ impl<T: PagedCodec> PagedIntVec<T> {
 
         let last_page = self.pages.last_mut()?;
 
+        // the pages must all have page_size entries on the
+        // PackedIntVec, so to use append_iter to fill the remainder
+        // of the last page, we have to set its element count
+        // accordingly
+        last_page.resize(self.num_entries % self.page_size);
         last_page.append_iter(width, buf.iter().copied());
+        last_page.resize(self.page_size);
 
         self.num_entries += page.len();
 
