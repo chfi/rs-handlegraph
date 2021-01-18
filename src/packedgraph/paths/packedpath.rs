@@ -1059,7 +1059,8 @@ where
         // step updates
         {
             let steps = self.path.steps_mut();
-            let to_remove = steps.iter(from, to).collect::<Vec<_>>();
+            let mut to_remove = steps.iter(from, to).collect::<Vec<_>>();
+            to_remove.pop();
 
             for (ptr, step) in to_remove.into_iter() {
                 res.push(StepUpdate::Remove {
@@ -1080,6 +1081,7 @@ where
         let mut handles = new_segment.iter();
         let first_handle = *handles.next()?;
 
+        // first added step, i.e. first handle in the provided slice
         let start = {
             let update = if from_step.prev.is_null() {
                 self.prepend_step(first_handle)
@@ -1098,6 +1100,7 @@ where
             res.push(update);
         }
 
+        // last added step, i.e. last handle in the provided slice
         let end = last;
 
         let steps = self.path.steps_mut();
@@ -1105,11 +1108,11 @@ where
         if let Some(ix) = from_step.prev.to_record_ix(2, 1) {
             steps.links.set_pack(ix, start);
         }
-        if let Some(ix) = to_step.next.to_record_ix(2, 0) {
+        if let Some(ix) = to_step.prev.to_record_ix(2, 0) {
             steps.links.set_pack(ix, end);
         }
         if let Some(ix) = end.to_record_ix(2, 1) {
-            steps.links.set_pack(ix, to_step.next);
+            steps.links.set_pack(ix, to);
         }
 
         Some((start, end, res))
