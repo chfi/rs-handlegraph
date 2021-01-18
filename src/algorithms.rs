@@ -130,8 +130,22 @@ pub fn perfect_neighbors(
     let mut expected_next = 0usize;
 
     for (path_id, step_ptr) in graph.steps_on_handle(left).unwrap() {
-        let step_is_rev =
-            graph.path_handle_at_step(path_id, step_ptr).unwrap() != left;
+        let step =
+            graph
+                .path_handle_at_step(path_id, step_ptr)
+                .unwrap_or_else(|| {
+                    let first = graph.path_first_step(path_id).unwrap();
+                    let last = graph.path_last_step(path_id).unwrap();
+                    panic!(
+                        "path {}, first {} last {}, missing step {}",
+                        path_id.0,
+                        first.to_vector_value(),
+                        last.to_vector_value(),
+                        step_ptr.to_vector_value()
+                    );
+                });
+
+        let step_is_rev = step != left;
 
         let next_step = if step_is_rev {
             graph.path_prev_step(path_id, step_ptr)
@@ -142,8 +156,15 @@ pub fn perfect_neighbors(
         match next_step {
             None => return false,
             Some(next_step) => {
-                let mut next_handle =
-                    graph.path_handle_at_step(path_id, next_step).unwrap();
+                let mut next_handle = graph
+                    .path_handle_at_step(path_id, next_step)
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "error getting step: path {}, ptr {}",
+                            path_id.0,
+                            next_step.to_vector_value()
+                        );
+                    });
                 if step_is_rev {
                     next_handle = next_handle.flip();
                 }
