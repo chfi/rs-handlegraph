@@ -154,8 +154,7 @@ impl EdgeLists {
     #[inline]
     pub(crate) fn len(&self) -> usize {
         let num_records = (self.record_vec.len() / EdgeVecIx::RECORD_WIDTH) / 2;
-        // num_records - self.removed_records.len()
-        num_records - self.removed_count
+        num_records - (self.removed_count / 2)
     }
 
     #[inline]
