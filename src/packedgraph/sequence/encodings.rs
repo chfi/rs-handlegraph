@@ -434,10 +434,13 @@ impl EncodedSequence {
         reverse: bool,
     ) -> DecodeIter<'_> {
         assert!(offset + len <= self.len);
+
+        let left = offset;
+        let right = offset + len - 1;
         DecodeIter {
             encoded: &self.vec,
-            left: offset,
-            right: offset + len - 1,
+            left,
+            right,
             reverse,
             done: false,
             encoding: self.encoding,
@@ -595,7 +598,7 @@ impl<'a> Iterator for DecodeIter<'a> {
 
                 let item = decoded[index % 2];
 
-                if self.left > self.right {
+                if self.left > self.right || self.right == 0 {
                     self.done = true;
                 }
 
@@ -606,8 +609,13 @@ impl<'a> Iterator for DecodeIter<'a> {
                     self.left += 1;
                     self.left - 1
                 } else {
-                    self.right -= 1;
-                    self.right - 1
+                    if self.right > 0 {
+                        self.right -= 1;
+                        self.right + 1
+                    } else {
+                        self.done = true;
+                        0
+                    }
                 };
 
                 if self.left > self.right {
