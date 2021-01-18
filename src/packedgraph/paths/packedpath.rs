@@ -60,10 +60,10 @@ pub struct PackedStep {
 
 #[derive(Debug, Clone)]
 pub struct StepList {
-    pub(super) steps: RobustPagedIntVec,
-    pub(super) links: RobustPagedIntVec,
-    pub(super) removed_steps: usize,
-    pub(super) path_deleted: bool,
+    pub(crate) steps: RobustPagedIntVec,
+    pub(crate) links: RobustPagedIntVec,
+    pub(crate) removed_steps: usize,
+    pub(crate) path_deleted: bool,
 }
 
 /// A representation of a step that's added to a path, that must be

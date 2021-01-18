@@ -5,6 +5,7 @@ use crate::{
     pathhandlegraph::*,
 };
 
+use crate::packedgraph::index::OneBasedIndex;
 use crate::packedgraph::paths::StepPtr;
 use crate::packedgraph::*;
 

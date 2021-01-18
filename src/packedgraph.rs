@@ -526,6 +526,86 @@ pub(crate) mod tests {
     }
 
     #[allow(dead_code)]
+    pub(crate) fn print_path_data(graph: &PackedGraph, id: PathId) {
+        use crate::packed::PackedCollection;
+        use paths::AsStepsRef;
+
+        let path_ref = graph.paths.path_ref(id).unwrap();
+        let head = path_ref.head;
+        let tail = path_ref.tail;
+
+        println!(
+            "Path {:2} - Head {} - Tail {}",
+            id.0,
+            head.pack(),
+            tail.pack()
+        );
+
+        println!("{:^14}----------", "Iter");
+        // print the steps on the path
+        let mut ptrs: Vec<u64> = Vec::new();
+        let mut handles: Vec<u64> = Vec::new();
+        let mut prevs: Vec<u64> = Vec::new();
+        let mut nexts: Vec<u64> = Vec::new();
+
+        for (ptr, step) in path_ref.path.iter(head, tail) {
+            ptrs.push(ptr.pack());
+            handles.push(step.handle.pack());
+            prevs.push(step.prev.pack());
+            nexts.push(step.next.pack());
+        }
+
+        let print_slice = |data: &[u64]| {
+            for (ix, v) in data.iter().enumerate() {
+                if ix != 0 {
+                    print!(", ");
+                }
+                print!("{:2}", v);
+            }
+            println!();
+        };
+
+        print!(" Index  - ");
+        print_slice(&ptrs);
+        print!(" Handle - ");
+        print_slice(&handles);
+        print!(" Prev   - ");
+        print_slice(&prevs);
+        print!(" Next   - ");
+        print_slice(&nexts);
+
+        println!();
+        println!("{:^14}----------", "Vectors");
+
+        // print the storage vectors
+        ptrs.clear();
+        handles.clear();
+        prevs.clear();
+        nexts.clear();
+
+        for ix in 0..path_ref.path.steps_ref().len() {
+            ptrs.push((ix + 1) as u64);
+
+            handles.push(path_ref.path.steps.get(ix));
+            let l_ix = ix * 2;
+            prevs.push(path_ref.path.links.get(l_ix));
+            nexts.push(path_ref.path.links.get(l_ix + 1));
+        }
+
+        print!(" Index  - ");
+        print_slice(&ptrs);
+        print!(" Handle - ");
+        print_slice(&handles);
+        print!(" Prev   - ");
+        print_slice(&prevs);
+        print!(" Next   - ");
+        print_slice(&nexts);
+
+        println!();
+        println!("-----------------------------");
+    }
+
+    #[allow(dead_code)]
     pub(crate) fn print_node_records(graph: &PackedGraph, ids: &[u64]) {
         println!("{:4}  {:6}  {:5}  {:5}", "Node", "Record", "Left", "Right");
         for &id in ids.iter() {
@@ -1210,6 +1290,47 @@ pub(crate) mod tests {
             .for_each(|(name, expected)| {
                 assert_eq!(graph.get_path_id(name), expected);
             });
+    }
+
+    #[test]
+    fn path_rewrite_segment() {
+        use bstr::B;
+
+        let mut graph = test_graph_with_paths();
+
+        let path_names = vec![B("path1"), B("path2"), B("path3"), B("path4")];
+        let path_ids = path_names
+            .iter()
+            .filter_map(|&n| graph.get_path_id(n))
+            .collect::<Vec<_>>();
+
+        for &id in path_ids.iter() {
+            // println!("Path {}", id.0);
+            // print_path_debug(&graph, id.0);
+            // println!();
+            print_path_data(&graph, id);
+        }
+
+        /*
+        println!("Path - [Head, Tail] - Steps (node ID)");
+        for &id in path_ids.iter() {
+            let (head, tail) = {
+                let p_r = graph.get_path_ref(id).unwrap();
+                (p_r.head, p_r.tail)
+            };
+            let head_tail = format!("[{}, {}]", head.pack(), tail.pack());
+            let steps = path_steps(&graph, id);
+            print!("{:4} - {:12} - ", id.0, head_tail);
+            // print!("{:4} - [{:>4}, {:<4}] - ", id.0, head.pack(), tail.pack());
+            for (x, s) in steps.into_iter().enumerate() {
+                if x != 0 {
+                    print!(", ");
+                }
+                print!("{}", s);
+            }
+            println!();
+        }
+        */
     }
 
     #[test]
