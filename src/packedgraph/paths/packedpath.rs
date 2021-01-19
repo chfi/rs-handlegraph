@@ -1201,7 +1201,10 @@ where
         let links_len = self.path.steps_ref().links.len();
         self.path.steps_mut().links.set(links_len - 1, 0);
 
-        self.tail = StepPtr::from_zero_based(self.path.steps_ref().steps.len());
+        let new_tail =
+            StepPtr::from_one_based(self.path.steps_ref().steps.len());
+
+        self.tail = new_tail;
 
         step_updates
     }

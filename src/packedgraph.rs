@@ -963,13 +963,13 @@ pub(crate) mod tests {
 
         assert_eq!(path_0_steps, path_1_steps);
 
-        println!("path_0_steps: {:#?}", path_0_steps);
-        println!("path_1_steps: {:#?}", path_1_steps);
-
         let p0_first = graph.path_first_step(path_0);
         let p0_last = graph.path_last_step(path_0);
         let p1_first = graph.path_first_step(path_1);
         let p1_last = graph.path_last_step(path_1);
+
+        print_path_data(&graph, path_0);
+        print_path_data(&graph, path_1);
 
         println!(
             "path 0 - head: {:?}\t tail: {:?}",
