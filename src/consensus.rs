@@ -131,14 +131,6 @@ pub fn create_consensus_graph(
         .filter_map(|path_name| smoothed.get_path_id(path_name))
         .collect();
 
-    let consensus_path_ptrs: FnvHashMap<PathId, &[u8]> = consensus_path_names
-        .iter()
-        .filter_map(|path_name| {
-            let path_id = smoothed.get_path_id(path_name)?;
-            Some((path_id, path_name.as_slice()))
-        })
-        .collect();
-
     let is_consensus: FnvHashMap<PathId, bool> = smoothed
         .path_ids()
         .map(|path_id| (path_id, consensus_paths.contains(&path_id)))
@@ -148,9 +140,6 @@ pub fn create_consensus_graph(
 
     let mut handle_consensus_path_ids: FnvHashMap<NodeId, Vec<PathId>> =
         FnvHashMap::default();
-
-    // let mut handle_consensus_path_ids: Vec<PathId> =
-    //     vec![PathId(0); smoothed.node_count()];
 
     println!("preparing handle_is_consensus etc.");
     for &path_id in consensus_paths.iter() {
@@ -402,56 +391,13 @@ pub fn create_consensus_graph(
 
         let path_ref = smoothed.get_path_ref(path_id).unwrap();
 
-        let path_len = smoothed.path_len(path_id).unwrap();
-
         for step in path_ref.steps() {
             let handle = step.handle();
 
-            let mut cons_handle = if !consensus_graph.has_node(handle.id()) {
-                let seq = smoothed.sequence_vec(handle.forward());
-                consensus_graph.create_handle(&seq, handle.id())
-            } else {
-                handle.forward()
-            };
-
-            if handle.is_reverse() {
-                consensus_graph
-                    .path_append_step(new_path_id, cons_handle.flip());
-            } else {
-                consensus_graph.path_append_step(new_path_id, cons_handle);
-            }
-
-            /*
-            let handle = step.handle();
-
             if !consensus_graph.has_node(handle.id()) {
-                // let mut cons_handle = if !consensus_graph.has_node(handle.id())
-                // {
-                //     let seq = smoothed.sequence_vec(handle);
-                //     consensus_graph.create_handle(&seq, handle.id())
-                // } else {
-                //     handle.forward()
-                // };
-
-                // if handle.is_reverse() {
-                //     cons_handle = cons_handle.flip();
-                // }
-
-                // consensus_graph.path_append_step(new_path_id, cons_handle);
-
-                // let seq = smoothed.sequence_vec(handle.forward());
-                // let seq = smoothed.sequence_vec(handle);
-                // consensus_graph.create_handle(&seq, handle.id());
-                // cons_paths_nodes.insert(handle.id());
-                // added_handles += 1;
-
-                if !consensus_graph.has_node(handle.id()) {
-                    // let seq = smoothed.sequence_vec(handle.forward());
-                    let seq = smoothed.sequence_vec(handle);
-                    consensus_graph.create_handle(&seq, handle.id());
-                }
+                let seq = smoothed.sequence_vec(handle.forward());
+                consensus_graph.create_handle(&seq, handle.id());
             }
-            */
         }
     }
 
@@ -462,7 +408,6 @@ pub fn create_consensus_graph(
     // println!("number of unique path steps {}", cons_paths_nodes.len());
     // println!("number of added handles     {}", added_handles);
 
-    /*
     consensus_graph.with_all_paths_mut_ctx_chn(
         |cons_path_id, cons_path_ref| {
             let path_id = *path_map.get(&cons_path_id).unwrap();
@@ -470,29 +415,10 @@ pub fn create_consensus_graph(
 
             path_ref
                 .steps()
-                .map(|step| {
-                    // if step.handle().is_reverse() {
-                    // cons_path_ref.append_step(step.handle().flip())
-                    // } else {
-                    cons_path_ref.append_step(step.handle())
-                    // }
-                })
+                .map(|step| cons_path_ref.append_step(step.handle()))
                 .collect()
         },
     );
-    */
-
-    // consensus_graph.with_all_paths_mut_ctx_chn_new(
-    //     |cons_path_id, sender, cons_path_ref| {
-    //         let path_id = *path_map.get(&cons_path_id).unwrap();
-    //         let path_ref = smoothed.get_path_ref(path_id).unwrap();
-
-    //         cons_path_ref.append_handles_iter_chn(
-    //             sender,
-    //             path_ref.steps().map(|step| step.handle()),
-    //         );
-    //     },
-    // );
 
     println!("adding link paths not in consensus paths");
     // add link paths not in the consensus paths
@@ -523,25 +449,12 @@ pub fn create_consensus_graph(
                 let handle =
                     smoothed.path_handle_at_step(link.path, step).unwrap();
 
-                let mut cons_handle = if !consensus_graph.has_node(handle.id())
-                {
+                if !consensus_graph.has_node(handle.id()) {
                     let seq = smoothed.sequence_vec(handle.forward());
-                    consensus_graph.create_handle(&seq, handle.id())
-                } else {
-                    handle.forward()
-                };
-
-                // if handle.is_reverse() {
-                //     cons_handle = cons_handle.flip();
-                // }
-
-                if handle.is_reverse() {
-                    consensus_graph
-                        .path_append_step(path_cons_graph, cons_handle.flip());
-                } else {
-                    consensus_graph
-                        .path_append_step(path_cons_graph, cons_handle);
+                    consensus_graph.create_handle(&seq, handle.id());
                 }
+
+                consensus_graph.path_append_step(path_cons_graph, handle);
 
                 if step == link.end {
                     break;
@@ -761,17 +674,40 @@ pub fn create_consensus_graph(
     let mut link_path_names_to_keep: Vec<String> = Vec::new();
 
     println!("updated_links.len(): {}", updated_links.len());
-    for (name, handles) in updated_links {
-        let path = consensus_graph.create_path(name.as_bytes(), false).unwrap();
-        link_path_names_to_keep.push(name);
 
-        for handle in handles {
-            consensus_graph.path_append_step(path, handle);
-        }
+    {
+        let (link_path_ids, link_path_steps): (
+            FnvHashMap<PathId, usize>,
+            Vec<Vec<Handle>>,
+        ) = updated_links
+            .into_iter()
+            .enumerate()
+            .map(|(ix, (name, handles))| {
+                let path = consensus_graph
+                    .create_path(name.as_bytes(), false)
+                    .unwrap();
+                link_path_names_to_keep.push(name);
+
+                ((path, ix), handles)
+            })
+            .unzip();
+
+        consensus_graph.with_all_paths_mut_ctx_chn(
+            |cons_path_id, cons_path_ref| {
+                if let Some(ix) = link_path_ids.get(&cons_path_id) {
+                    let handles = &link_path_steps[*ix];
+                    handles
+                        .iter()
+                        .map(|&h| cons_path_ref.append_step(h))
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            },
+        );
     }
 
     // remove coverage = 0 nodes
-
     println!("empty handles");
     println!("node count: {}", consensus_graph.handles().count());
     let empty_handles = consensus_graph
@@ -962,13 +898,36 @@ pub fn create_consensus_graph(
 
     let mut link_path_names_to_keep: Vec<Vec<u8>> = Vec::new();
 
-    for (path_name, handles) in to_create {
-        let path = consensus_graph.create_path(&path_name, false).unwrap();
-        link_path_names_to_keep.push(path_name);
+    {
+        let (link_path_ids, link_path_steps): (
+            FnvHashMap<PathId, usize>,
+            Vec<Vec<Handle>>,
+        ) = to_create
+            .into_iter()
+            .enumerate()
+            .map(|(ix, (name, handles))| {
+                let path = consensus_graph
+                    .create_path(name.as_bytes(), false)
+                    .unwrap();
+                link_path_names_to_keep.push(name);
 
-        for handle in handles {
-            consensus_graph.path_append_step(path, handle);
-        }
+                ((path, ix), handles)
+            })
+            .unzip();
+
+        consensus_graph.with_all_paths_mut_ctx_chn(
+            |cons_path_id, cons_path_ref| {
+                if let Some(ix) = link_path_ids.get(&cons_path_id) {
+                    let handles = &link_path_steps[*ix];
+                    handles
+                        .iter()
+                        .map(|&h| cons_path_ref.append_step(h))
+                        .collect()
+                } else {
+                    Vec::new()
+                }
+            },
+        );
     }
 
     for &link in link_paths.iter() {
@@ -996,7 +955,6 @@ pub fn create_consensus_graph(
         };
 
         let mut link_tips: Vec<Handle> = Vec::new();
-        let mut paths_to_remove: Vec<PathId> = Vec::new();
 
         for &path in link_paths.iter() {
             let h_first = consensus_graph
@@ -1149,10 +1107,7 @@ fn compute_best_link(
         *c += 1;
     }
 
-    let hash_lengths: FnvHashMap<u64, usize> =
-        links.iter().map(|link| (link.hash, link.length)).collect();
-
-    let (&best_hash, &best_count) =
+    let (&best_hash, _best_count) =
         hash_counts.iter().max_by_key(|(_, c)| *c).unwrap();
 
     let most_frequent_link: &LinkPath = unique_links
@@ -1169,25 +1124,13 @@ fn compute_best_link(
     let to_first = graph.path_first_step(to_cons_path).unwrap();
     let to_last = graph.path_last_step(to_cons_path).unwrap();
 
-    let from_steps = graph
-        .get_path_ref(from_cons_path)
-        .unwrap()
-        .steps()
-        .collect::<Vec<_>>();
-
-    let to_steps = graph
-        .get_path_ref(to_cons_path)
-        .unwrap()
-        .steps()
-        .collect::<Vec<_>>();
-
     let to_end_fwd = graph.path_handle_at_step(to_cons_path, to_last).unwrap();
-    let to_end_rev = to_end_fwd.flip();
+    let _to_end_rev = to_end_fwd.flip();
 
     let from_begin_fwd = graph
         .path_handle_at_step(from_cons_path, from_first)
         .unwrap();
-    let from_begin_rev = from_begin_fwd.flip();
+    let _from_begin_rev = from_begin_fwd.flip();
 
     let to_begin_fwd: Handle =
         graph.path_handle_at_step(to_cons_path, to_first).unwrap();
@@ -1209,15 +1152,10 @@ fn compute_best_link(
         perfect_edges.push((to_end_fwd, from_begin_fwd));
         has_perfect_edge = true;
     } else {
-        // println!("iterating unique_links - {}", unique_links.len());
         for link in unique_links.iter() {
             let mut step = link.begin;
 
-            let mut count = 0;
             loop {
-                // println!("   {}", count);
-                count += 1;
-
                 let next = graph.path_next_step(link.path, step).unwrap();
 
                 let b: Handle =
@@ -1248,13 +1186,7 @@ fn compute_best_link(
         }
     }
 
-    // let perfect_link = perfect_link.unwrap();
-
     let mut seen_nodes: FnvHashSet<NodeId> = FnvHashSet::default();
-
-    // TODO the original implementation requires multiple mutable
-    // references to elements in unique_links, it looks like; need
-    // to fix that
 
     let mut link_rank = 0u64;
 
@@ -1371,7 +1303,7 @@ fn novelify(
     for &link in group {
         links_to_remove.push(link.path);
 
-        let begin = consensus.path_first_step(link.path).unwrap();
+        let _begin = consensus.path_first_step(link.path).unwrap();
         let end = consensus.path_last_step(link.path).unwrap();
 
         let mut in_novel = false;
