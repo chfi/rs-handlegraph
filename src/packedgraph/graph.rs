@@ -443,6 +443,12 @@ impl PackedGraph {
 
             let mut new_occur_ix = occurrences.path_ids.len() + 1;
 
+            println!(
+                "   --------- path {:2} received updates: {}",
+                path_id.0,
+                updates.len()
+            );
+
             for step_update in updates {
                 match step_update {
                     StepUpdate::Insert { handle, step } => {
@@ -473,6 +479,13 @@ impl PackedGraph {
                 }
             }
 
+            // println!("appending for path {}", path_id.0);
+            // println!(
+            //     "path_ids: {}\toffsets: {}\tnexts: {}",
+            //     path_id_buf.len(),
+            //     offset_buf.len(),
+            //     next_ptr_buf.len()
+            // );
             occurrences.path_ids.append_pages(&mut buf, &path_id_buf);
 
             occurrences
