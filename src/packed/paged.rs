@@ -366,6 +366,10 @@ impl<T: PagedCodec> PagedIntVec<T> {
 
     #[inline]
     pub fn append_pages(&mut self, buf: &mut Vec<u64>, mut data: &[u64]) {
+        if data.is_empty() {
+            return;
+        }
+
         if !self.pages_full() {
             data = self.fill_last_page(buf, data).unwrap();
         }

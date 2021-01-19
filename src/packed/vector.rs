@@ -166,6 +166,10 @@ impl PackedIntVec {
 
     #[inline]
     pub fn append_slice(&mut self, items: &[u64]) {
+        if items.is_empty() {
+            return;
+        }
+
         if let Some(width) = items.iter().copied().map(width_for).max() {
             let offset = self.num_entries;
             let indices = offset..(offset + items.len());
