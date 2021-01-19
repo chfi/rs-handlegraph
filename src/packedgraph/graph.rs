@@ -219,21 +219,13 @@ impl PackedGraph {
         let new_left_head = self
             .edges
             .iter_mut(left_edge_list)
-            .remove_all_records_with(|_, (handle, _)| {
-                handle.id() == right.id()
-            })?;
-        // .remove_record_with(|_, (handle, _)| handle.id() == right.id())?;
-        // .remove_record_with(|_, (handle, _)| handle == right)?;
+            .remove_record_with(|_, (handle, _)| handle.id() == right.id())?;
 
         // remove the edge from `right`'s edge list
         let new_right_head = self
             .edges
             .iter_mut(right_edge_list)
-            .remove_all_records_with(|_, (handle, _)| {
-                handle.id() == left.id()
-            })?;
-        // .remove_record_with(|_, (handle, _)| handle.id() == left.id())?;
-        // .remove_record_with(|_, (handle, _)| handle.flip() == left)?;
+            .remove_record_with(|_, (handle, _)| handle.id() == left.id())?;
 
         // update `left`'s edge list header
         self.nodes
