@@ -4,8 +4,8 @@ use super::traits::*;
 
 #[derive(Debug, Clone)]
 // pub struct PagedIntVec<Codec = XorCodec> {
-// pub struct PagedIntVec<Codec = DiffCodec> {
-pub struct PagedIntVec<Codec = IdentityCodec> {
+pub struct PagedIntVec<Codec = DiffCodec> {
+    // pub struct PagedIntVec<Codec = IdentityCodec> {
     pub page_size: usize,
     pub num_entries: usize,
     pub anchors: PackedIntVec,
@@ -291,8 +291,10 @@ impl<T: PagedCodec> PagedIntVec<T> {
         let mut anchor = self.anchors.get(self.pages.len() - 1);
 
         if anchor == 0 {
-            self.anchors.set(self.pages.len() - 1, page[0]);
-            anchor = page[0];
+            anchor =
+                page.iter().copied().filter(|&x| x != 0).min().unwrap_or(0);
+
+            self.anchors.set(self.pages.len() - 1, anchor);
         }
 
         buf.clear();
