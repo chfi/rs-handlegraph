@@ -924,6 +924,295 @@ where
             },
         ])
     }
+
+    fn rewrite_segment_old(
+        &mut self,
+        from: StepPtr,
+        to: StepPtr,
+        new_segment: &[Handle],
+    ) -> Option<(StepPtr, StepPtr, Vec<StepUpdate>)> {
+        if new_segment.is_empty() {
+            return None;
+        }
+
+        // if the `to` `StepPtr` is null, we'll rewrite all steps
+        // after `from`
+        let rewrite_rest = to.is_null();
+
+        // make sure the `from` step actually exists in this path, and
+        // if `to` is not null, that it also is in the path, after `from`
+        let (from_step, to_step) = {
+            let steps = self.path.steps_ref();
+            let from_step = steps.get_step(from)?;
+            let to_step = steps.get_step(to)?;
+            if from_step.handle.pack() == 0 || to_step.handle.pack() == 0 {
+                return None;
+            }
+            (from_step, to_step)
+        };
+
+        let mut res = Vec::new();
+
+        // clear the steps to be removed, and push their corresponding
+        // step updates
+        {
+            let steps = self.path.steps_mut();
+            let mut to_remove = steps.iter(from, to).collect::<Vec<_>>();
+            to_remove.pop();
+
+            for (ptr, step) in to_remove.into_iter() {
+                res.push(StepUpdate::Remove {
+                    step: ptr,
+                    handle: step.handle,
+                });
+
+                let step_ix = ptr.to_record_ix(1, 0)?;
+                let link_ix = ptr.to_record_ix(2, 0)?;
+
+                steps.steps.set(step_ix, 0);
+                steps.links.set(link_ix, 0);
+                steps.links.set(link_ix + 1, 0);
+                steps.removed_steps += 1;
+            }
+        }
+
+        let mut handles = new_segment.iter();
+        let first_handle = *handles.next()?;
+
+        // first added step, i.e. first handle in the provided slice
+        let start = {
+            let update = if from_step.prev.is_null() {
+                self.prepend_step(first_handle)
+            } else {
+                self.insert_step_after(from_step.prev, first_handle)?
+            };
+            let step = update.step();
+            res.push(update);
+            step
+        };
+
+        let mut last = start;
+        for &handle in handles {
+            let update = self.insert_step_after(last, handle)?;
+            last = update.step();
+            res.push(update);
+        }
+
+        // last added step, i.e. last handle in the provided slice
+        let end = last;
+
+        let steps = self.path.steps_mut();
+
+        // update the next-link of the step before the rewritten segment
+        if let Some(ix) = from_step.prev.to_record_ix(2, 1) {
+            steps.links.set_pack(ix, start);
+        }
+        // update the prev-link of the step after the rewritten segment
+        if let Some(ix) = to_step.prev.to_record_ix(2, 0) {
+            steps.links.set_pack(ix, end);
+        }
+        // update the next-link of the last step in the new segment
+        if let Some(ix) = end.to_record_ix(2, 1) {
+            steps.links.set_pack(ix, to);
+        }
+
+        Some((start, end, res))
+    }
+
+    fn rewrite_segment_impl(
+        &mut self,
+        from: StepPtr,
+        to: StepPtr,
+        new_segment: &[Handle],
+    ) -> Option<(StepPtr, StepPtr, Vec<StepUpdate>)> {
+        // actually, we do want to be able to remove a range of steps
+        // using this function
+        // if new_segment.is_empty() {
+        //     return None;
+        // }
+
+        // if the `to` `StepPtr` is null, we'll rewrite all steps
+        // after `from`
+        let rewrite_rest = to.is_null();
+
+        let new_empty = new_segment.is_empty();
+
+        // if the head and/or tail are included in the overwritten segment
+        let inc_head = self.head == from;
+        let inc_tail = to.is_null();
+
+        // the `from` step must exist in the path
+        let from_step: PackedStep = self.path.steps_ref().get_record(from)?;
+        let before_from = from_step.prev;
+
+        // let to_step = steps.get_record(to);
+
+        // get the steps to be removed, while checking that `from`
+        // exists in the path, and that `to`, if it's not null, comes
+        // after `from`
+        let to_remove = {
+            let steps = self.path.steps_mut();
+
+            // if steps.get_record(from).is_none() {
+            //     return None;
+            // }
+
+            let mut to_remove = steps.iter(from, to).collect::<Vec<_>>();
+
+            if !rewrite_rest {
+                // the provided range is end-exclusive, so we pop the
+                // last entry
+                if Some(to) != to_remove.pop().map(|(ptr, _)| ptr) {
+                    // if we're not rewriting to the end of the path, the
+                    // last entry of `to_remove` should be the provided
+                    // end of the range -- if not, `to` either doesn't
+                    // exist in the path, or it's before `from`, and we
+                    // signal an error with `None`
+                    return None;
+                }
+                to_remove.pop();
+            }
+
+            to_remove
+        };
+
+        let mod_prev =
+            |steps: &mut StepList, step: StepPtr, new_prev: StepPtr| {
+                if let Some(ix) = step.to_record_ix(2, 0) {
+                    steps.links.set_pack(ix, new_prev);
+                }
+            };
+
+        let mod_next =
+            |steps: &mut StepList, step: StepPtr, new_next: StepPtr| {
+                if let Some(ix) = step.to_record_ix(2, 1) {
+                    steps.links.set_pack(ix, new_next);
+                }
+            };
+
+        let link_pair =
+            |steps: &mut StepList, left: StepPtr, right: StepPtr| {
+                if let Some(ix) = left.to_record_ix(2, 1) {
+                    steps.links.set_pack(ix, right);
+                }
+                if let Some(ix) = right.to_record_ix(2, 0) {
+                    steps.links.set_pack(ix, left);
+                }
+            };
+
+        // clear the steps to be removed, push their removal updates,
+        // and store the new range to be returned
+
+        let mut updates: Vec<StepUpdate> =
+            Vec::with_capacity(new_segment.len());
+
+        {
+            let steps = self.path.steps_mut();
+            for (ptr, step) in to_remove {
+                updates.push(StepUpdate::Remove {
+                    step: ptr,
+                    handle: step.handle,
+                });
+
+                let step_ix = ptr.to_record_ix(1, 0)?;
+                let link_ix = ptr.to_record_ix(2, 0)?;
+
+                steps.steps.set(step_ix, 0);
+                steps.links.set(link_ix, 0);
+                steps.links.set(link_ix + 1, 0);
+                steps.removed_steps += 1;
+            }
+        }
+
+        if new_segment.is_empty() {
+            let steps = self.path.steps_mut();
+
+            match (inc_head, inc_tail) {
+                // if neither head nor tail are affected, we need to
+                // link the steps on either side of the removed range
+                (false, false) => {
+                    link_pair(steps, before_from, to);
+                }
+                // if only the tail is affected, we need to set the
+                // `next` pointer on the new tail to null
+                (false, true) => {
+                    self.tail = before_from;
+                    mod_next(steps, self.tail, StepPtr::null());
+                }
+                // if only the head is affected, we need to set the
+                // `prev` pointer on the new head to null
+                (true, false) => {
+                    self.head = to;
+                    mod_prev(steps, self.head, StepPtr::null());
+                }
+                // if both are affected, we just need to update the
+                // head and tail
+                (true, true) => {
+                    self.head = StepPtr::null();
+                    self.tail = StepPtr::null();
+                }
+            }
+
+            updates.shrink_to_fit();
+            return Some((StepPtr::null(), StepPtr::null(), updates));
+        }
+
+        let mut handles = new_segment.iter();
+        let first_handle = *handles.next()?;
+
+        // easier to append the rest of the steps if we add a bit of
+        // logic to set the first step correctly
+
+        // pointers to the first and last new steps, to be returned
+        let (start, mut end) = {
+            let first_update = if inc_head {
+                self.prepend_step(first_handle)
+            } else {
+                self.insert_step_after(before_from, first_handle)?
+            };
+            let step = first_update.step();
+            updates.push(first_update);
+            (step, step)
+        };
+
+        for &handle in handles {
+            let update = self.insert_step_after(end, handle)?;
+            end = update.step();
+            updates.push(update);
+        }
+
+        let steps = self.path.steps_mut();
+
+        match (inc_head, inc_tail) {
+            // if neither head nor tail are affected, we need to
+            // link the steps on either side of the new segment
+            (false, false) => {
+                link_pair(steps, before_from, start);
+                link_pair(steps, end, to);
+            }
+            // if only the tail is affected, we need to set the
+            // `next` pointer on the new tail to null
+            (false, true) => {
+                self.tail = end;
+                mod_next(steps, self.tail, StepPtr::null());
+            }
+            // if only the head is affected, we need to set the
+            // `prev` pointer on the new head to null
+            (true, false) => {
+                self.head = start;
+                mod_prev(steps, self.head, StepPtr::null());
+            }
+            // if both are affected, we just need to update the
+            // head and tail
+            (true, true) => {
+                self.head = start;
+                self.tail = end;
+            }
+        }
+
+        updates.shrink_to_fit();
+        Some((start, end, updates))
+    }
 }
 
 impl PathStep for (StepPtr, PackedStep) {
@@ -1092,87 +1381,7 @@ where
         to: Self::StepIx,
         new_segment: &[Handle],
     ) -> Option<(Self::StepIx, Self::StepIx, Vec<StepUpdate>)> {
-        if new_segment.is_empty() {
-            return None;
-        }
-
-        // make sure both steps actually exist in this path
-        let (from_step, to_step) = {
-            let steps = self.path.steps_ref();
-            let from_step = steps.get_step(from)?;
-            let to_step = steps.get_step(to)?;
-            if from_step.handle.pack() == 0 || to_step.handle.pack() == 0 {
-                return None;
-            }
-            (from_step, to_step)
-        };
-
-        let mut res = Vec::new();
-
-        // clear the steps to be removed, and push their corresponding
-        // step updates
-        {
-            let steps = self.path.steps_mut();
-            let mut to_remove = steps.iter(from, to).collect::<Vec<_>>();
-            to_remove.pop();
-
-            for (ptr, step) in to_remove.into_iter() {
-                res.push(StepUpdate::Remove {
-                    step: ptr,
-                    handle: step.handle,
-                });
-
-                let step_ix = ptr.to_record_ix(1, 0)?;
-                let link_ix = ptr.to_record_ix(2, 0)?;
-
-                steps.steps.set(step_ix, 0);
-                steps.links.set(link_ix, 0);
-                steps.links.set(link_ix + 1, 0);
-                steps.removed_steps += 1;
-            }
-        }
-
-        let mut handles = new_segment.iter();
-        let first_handle = *handles.next()?;
-
-        // first added step, i.e. first handle in the provided slice
-        let start = {
-            let update = if from_step.prev.is_null() {
-                self.prepend_step(first_handle)
-            } else {
-                self.insert_step_after(from_step.prev, first_handle)?
-            };
-            let step = update.step();
-            res.push(update);
-            step
-        };
-
-        let mut last = start;
-        for &handle in handles {
-            let update = self.insert_step_after(last, handle)?;
-            last = update.step();
-            res.push(update);
-        }
-
-        // last added step, i.e. last handle in the provided slice
-        let end = last;
-
-        let steps = self.path.steps_mut();
-
-        // update the next-link of the step before the rewritten segment
-        if let Some(ix) = from_step.prev.to_record_ix(2, 1) {
-            steps.links.set_pack(ix, start);
-        }
-        // update the prev-link of the step after the rewritten segment
-        if let Some(ix) = to_step.prev.to_record_ix(2, 0) {
-            steps.links.set_pack(ix, end);
-        }
-        // update the next-link of the last step in the new segment
-        if let Some(ix) = end.to_record_ix(2, 1) {
-            steps.links.set_pack(ix, to);
-        }
-
-        Some((start, end, res))
+        self.rewrite_segment_old(from, to, new_segment)
     }
 
     fn set_circularity(&mut self, circular: bool) {
