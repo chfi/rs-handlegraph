@@ -1311,7 +1311,7 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn path_rewrite_segment_handles() {
+    fn path_rewrite_segment() {
         use bstr::B;
 
         let mut graph = test_graph_with_paths();
@@ -1328,7 +1328,7 @@ pub(crate) mod tests {
             .iter()
             .filter_map(|&n| graph.get_path_id(n))
             .collect::<Vec<_>>();
-        //
+
         /* Paths before
           steps path_1: 1  2  3  4
           nodes path_1: 1+ 8+ 4+ 6+
@@ -1351,7 +1351,6 @@ pub(crate) mod tests {
         };
 
         print_paths(&graph, &path_ids);
-
         println!("  ---  Deleting  segments  ---");
 
         let step_ptr =
@@ -1433,7 +1432,6 @@ pub(crate) mod tests {
         );
         assert_eq!(path_steps_hnd(&graph, path_ids[3]), vec![6, 12, 4, 8]);
 
-        // print_paths(&graph, &path_ids);
         print_path_data(&graph, path_ids[1]);
 
         println!("-------------");
