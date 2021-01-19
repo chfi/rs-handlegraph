@@ -267,7 +267,14 @@ impl<'a> Iterator for OccurrencesIter<'a> {
     type Item = (PathId, StepPtr);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (_occ_ix, occ_rec) = self.list_iter.next()?;
+        let (occ_ix, occ_rec) = self.list_iter.next()?;
+        // println!(
+        //     "occ_ix {}\tpath {}\toffset {}\tnext {}",
+        //     occ_ix.pack(),
+        //     occ_rec.path_id.0,
+        //     occ_rec.offset.pack(),
+        //     occ_rec.next.pack()
+        // );
         let path_id = occ_rec.path_id;
         let step_ix = occ_rec.offset;
         Some((path_id, step_ix))
