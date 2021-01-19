@@ -5,6 +5,7 @@ use crate::{
     pathhandlegraph::*,
 };
 
+use crate::packedgraph::index::OneBasedIndex;
 use crate::packedgraph::paths::StepPtr;
 use crate::packedgraph::*;
 
@@ -121,7 +122,9 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
 
     for (path_id, from, to, rev) in to_rewrite {
         let new_seg = if rev { new_handle.flip() } else { new_handle };
-        let to = graph.path_next_step(path_id, to).unwrap();
+        let to = graph
+            .path_next_step(path_id, to)
+            .unwrap_or_else(|| StepPtr::null());
         graph.path_rewrite_segment(path_id, from, to, &[new_seg]);
     }
 
