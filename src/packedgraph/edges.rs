@@ -315,8 +315,7 @@ impl Defragment for EdgeLists {
     ///
     /// Returns None if there are no removed records.
     fn defragment(&mut self) -> Option<Self::Updates> {
-        let total_records = self.len() + self.removed_records.len();
-
+        let total_records = self.record_vec.len() / EdgeVecIx::RECORD_WIDTH;
         let id_map = defragment::build_id_map_1_based(
             &mut self.removed_records,
             total_records,
