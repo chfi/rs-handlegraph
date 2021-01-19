@@ -255,11 +255,15 @@ impl PackedListMut for NodeOccurrences {
 
 pub struct OccurrencesIter<'a> {
     list_iter: list::Iter<'a, NodeOccurrences>,
+    count: usize,
 }
 
 impl<'a> OccurrencesIter<'a> {
     pub(crate) fn new(list_iter: list::Iter<'a, NodeOccurrences>) -> Self {
-        Self { list_iter }
+        Self {
+            list_iter,
+            count: 0,
+        }
     }
 }
 
@@ -268,13 +272,16 @@ impl<'a> Iterator for OccurrencesIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let (occ_ix, occ_rec) = self.list_iter.next()?;
-        // println!(
-        //     "occ_ix {}\tpath {}\toffset {}\tnext {}",
-        //     occ_ix.pack(),
-        //     occ_rec.path_id.0,
-        //     occ_rec.offset.pack(),
-        //     occ_rec.next.pack()
-        // );
+        if self.count < 15 {
+            println!(
+                "occ_ix {}\tpath {}\toffset {}\tnext {}",
+                occ_ix.pack(),
+                occ_rec.path_id.0,
+                occ_rec.offset.pack(),
+                occ_rec.next.pack()
+            );
+        }
+        self.count += 1;
         let path_id = occ_rec.path_id;
         let step_ix = occ_rec.offset;
         Some((path_id, step_ix))

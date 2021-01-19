@@ -405,7 +405,7 @@ pub fn create_consensus_graph(
                 let seq = smoothed.sequence_vec(handle.forward());
                 consensus_graph.create_handle(&seq, handle.id());
             }
-            consensus_graph.path_append_step(new_path_id, handle);
+            // consensus_graph.path_append_step(new_path_id, handle);
         }
     }
 
@@ -422,7 +422,6 @@ pub fn create_consensus_graph(
     // println!("number of unique path steps {}", cons_paths_nodes.len());
     // println!("number of added handles     {}", added_handles);
 
-    /*
     consensus_graph.with_all_paths_mut_ctx_chn(
         |cons_path_id, cons_path_ref| {
             let path_id = *path_map.get(&cons_path_id).unwrap();
@@ -444,17 +443,21 @@ pub fn create_consensus_graph(
             updates
         },
     );
-    */
 
     println!("adding link paths not in consensus paths");
     // add link paths not in the consensus paths
     let mut link_path_names: Vec<String> = Vec::new();
 
+    let mut count = 0;
+
     println!("empty handles before adding from consensus_links");
     let empty_handles = consensus_graph
         .handles()
         .filter(|&handle| {
-            // println!("handle {}", handle.0);
+            // if count < 15 {
+            println!("                              handle {}:", handle.0);
+            // }
+            // count += 1;
             consensus_graph.steps_on_handle(handle).unwrap().count() == 0
         })
         .collect::<Vec<_>>();

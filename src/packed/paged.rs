@@ -4,8 +4,8 @@ use super::traits::*;
 
 #[derive(Debug, Clone)]
 // pub struct PagedIntVec<Codec = XorCodec> {
-pub struct PagedIntVec<Codec = DiffCodec> {
-    // pub struct PagedIntVec<Codec = IdentityCodec> {
+// pub struct PagedIntVec<Codec = DiffCodec> {
+pub struct PagedIntVec<Codec = IdentityCodec> {
     pub page_size: usize,
     pub num_entries: usize,
     pub anchors: PackedIntVec,

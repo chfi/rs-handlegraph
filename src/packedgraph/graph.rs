@@ -442,12 +442,13 @@ impl PackedGraph {
             to_remove.clear();
 
             let mut new_occur_ix = occurrences.path_ids.len() + 1;
+            let first_occur_ix = new_occur_ix;
 
-            println!(
-                "   --------- path {:2} received updates: {}",
-                path_id.0,
-                updates.len()
-            );
+            // println!(
+            //     "   --------- path {:2} received updates: {}",
+            //     path_id.0,
+            //     updates.len()
+            // );
 
             for step_update in updates {
                 match step_update {
@@ -480,17 +481,40 @@ impl PackedGraph {
             }
 
             // println!("appending for path {}", path_id.0);
-            // println!(
-            //     "path_ids: {}\toffsets: {}\tnexts: {}",
-            //     path_id_buf.len(),
-            //     offset_buf.len(),
-            //     next_ptr_buf.len()
-            // );
+            println!(
+                "~~ for path {} - path_ids: {}\toffsets: {}\tnexts: {}",
+                path_id.0,
+                path_id_buf.len(),
+                offset_buf.len(),
+                next_ptr_buf.len()
+            );
+            println!(" ~~~~~~~~~~~ removing {}", to_remove.len());
+
+            println!("  pointer from {} to {}", first_occur_ix, new_occur_ix);
+
+            let path_ids_pre = occurrences.path_ids.len();
+            let offsets_pre = occurrences.node_occur_offsets.len();
+
             occurrences.path_ids.append_pages(&mut buf, &path_id_buf);
+            let path_ids_post = occurrences.path_ids.len();
+
+            println!(
+                "\t~~ path_ids before: {}\t after {}\tdiff {}",
+                path_ids_pre,
+                path_ids_post,
+                path_ids_post - path_ids_pre
+            );
 
             occurrences
                 .node_occur_offsets
                 .append_pages(&mut buf, &offset_buf);
+            let offsets_post = occurrences.node_occur_offsets.len();
+            println!(
+                "\t~~ offsets before:  {}\t after {}\tdiff {}",
+                offsets_pre,
+                offsets_post,
+                offsets_post - offsets_pre
+            );
 
             occurrences
                 .node_occur_next
