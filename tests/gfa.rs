@@ -18,6 +18,7 @@ use std::fs::File;
 use std::io::Read;
 
 use anyhow::Result;
+use bstr::ByteSlice;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NodeRow {
@@ -133,13 +134,13 @@ impl TestRecords {
             let node_id = fields.next().and_then(|f| f.parse::<u64>().ok())?;
             let seq = fields.next()?.bytes().collect::<Vec<_>>();
 
-            let left_edges = fields.next()?;
+            let left_edges = fields.next().unwrap_or_default();
             let left_edges = left_edges
                 .split(",")
                 .filter_map(|h| h.parse::<u64>().ok())
                 .collect::<Vec<_>>();
 
-            let right_edges = fields.next()?;
+            let right_edges = fields.next().unwrap_or_default();
             let right_edges = right_edges
                 .split(",")
                 .filter_map(|h| h.parse::<u64>().ok())
@@ -362,7 +363,55 @@ fn test_gfa_simple_construction(gfa_path: &str, record_path: &str) {
         TestRecords::deserialize(&expected_contents).unwrap();
 
     println!("comparing");
-    assert_eq!(test_records, expected_test_records);
+    println!(
+        "node row count:  {} vs {}",
+        test_records.node_row_count, expected_test_records.node_row_count
+    );
+    println!(
+        "path row count:  {} vs {}",
+        test_records.path_row_count, expected_test_records.path_row_count
+    );
+    println!(
+        "occur row count: {} vs {}",
+        test_records.occur_row_count, expected_test_records.occur_row_count
+    );
+
+    assert_eq!(
+        test_records.node_row_count,
+        expected_test_records.node_row_count
+    );
+    assert_eq!(
+        test_records.path_row_count,
+        expected_test_records.path_row_count
+    );
+    assert_eq!(
+        test_records.occur_row_count,
+        expected_test_records.occur_row_count
+    );
+
+    for (test, expected) in test_records
+        .node_rows
+        .iter()
+        .zip(expected_test_records.node_rows.iter())
+    {
+        assert_eq!(test, expected);
+    }
+
+    for (test, expected) in test_records
+        .path_rows
+        .iter()
+        .zip(expected_test_records.path_rows.iter())
+    {
+        assert_eq!(test, expected);
+    }
+
+    for (test, expected) in test_records
+        .occur_rows
+        .iter()
+        .zip(expected_test_records.occur_rows.iter())
+    {
+        assert_eq!(test, expected);
+    }
 }
 
 fn test_gfa_fast_construction(gfa_path: &str, record_path: &str) {
@@ -427,7 +476,42 @@ fn test_gfa_fast_construction(gfa_path: &str, record_path: &str) {
         TestRecords::deserialize(&expected_contents).unwrap();
 
     println!("comparing");
-    assert_eq!(test_records, expected_test_records);
+    assert_eq!(
+        test_records.node_row_count,
+        expected_test_records.node_row_count
+    );
+    assert_eq!(
+        test_records.path_row_count,
+        expected_test_records.path_row_count
+    );
+    assert_eq!(
+        test_records.occur_row_count,
+        expected_test_records.occur_row_count
+    );
+
+    for (test, expected) in test_records
+        .node_rows
+        .iter()
+        .zip(expected_test_records.node_rows.iter())
+    {
+        assert_eq!(test, expected);
+    }
+
+    for (test, expected) in test_records
+        .path_rows
+        .iter()
+        .zip(expected_test_records.path_rows.iter())
+    {
+        assert_eq!(test, expected);
+    }
+
+    for (test, expected) in test_records
+        .occur_rows
+        .iter()
+        .zip(expected_test_records.occur_rows.iter())
+    {
+        assert_eq!(test, expected);
+    }
 }
 
 #[test]
