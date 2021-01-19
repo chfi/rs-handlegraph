@@ -516,6 +516,17 @@ pub(crate) mod tests {
             .collect::<Vec<_>>()
     }
 
+    fn path_steps_hnd(graph: &PackedGraph, id: PathId) -> Vec<u64> {
+        let path_ref = graph.paths.path_ref(id).unwrap();
+
+        path_ref
+            .steps()
+            .map(|(_step_ix, step)| step.handle.0)
+            .collect::<Vec<_>>()
+    }
+
+    // fn printpath_detail(graph: &PackedGraph,
+
     #[allow(dead_code)]
     pub(crate) fn print_path_debug(graph: &PackedGraph, id: u64) {
         let path_ref = graph.paths.path_ref(PathId(id)).unwrap();
@@ -528,15 +539,20 @@ pub(crate) mod tests {
     #[allow(dead_code)]
     pub(crate) fn print_path_data(graph: &PackedGraph, id: PathId) {
         use crate::packed::PackedCollection;
+        use bstr::{ByteSlice, ByteVec};
         use paths::AsStepsRef;
 
         let path_ref = graph.paths.path_ref(id).unwrap();
         let head = path_ref.head;
         let tail = path_ref.tail;
 
+        let name = graph.get_path_name_vec(id).unwrap();
+
+        println!();
+        println!("-----------------------------");
         println!(
-            "Path {:2} - Head {} - Tail {}",
-            id.0,
+            "Path \"{}\" - Head {} - Tail {}",
+            name.as_bstr(),
             head.pack(),
             tail.pack()
         );
@@ -583,7 +599,9 @@ pub(crate) mod tests {
         prevs.clear();
         nexts.clear();
 
-        for ix in 0..path_ref.path.steps_ref().len() {
+        let step_record_len = path_ref.path.steps.len();
+
+        for ix in 0..step_record_len {
             ptrs.push((ix + 1) as u64);
 
             handles.push(path_ref.path.steps.get(ix));
@@ -1293,44 +1311,147 @@ pub(crate) mod tests {
     }
 
     #[test]
-    fn path_rewrite_segment() {
+    fn path_rewrite_segment_handles() {
         use bstr::B;
 
         let mut graph = test_graph_with_paths();
+        // add some extra sequences
+        graph.append_handle(b"GGTCGTCTGG");
+        graph.append_handle(b"ATGT");
+        graph.append_handle(b"AAATGA");
+        graph.append_handle(b"TTTGTGTA");
+
+        let graph_2 = graph.clone();
 
         let path_names = vec![B("path1"), B("path2"), B("path3"), B("path4")];
         let path_ids = path_names
             .iter()
             .filter_map(|&n| graph.get_path_id(n))
             .collect::<Vec<_>>();
+        //
+        /* Paths before
+          steps path_1: 1  2  3  4
+          nodes path_1: 1+ 8+ 4+ 6+
 
-        for &id in path_ids.iter() {
-            // println!("Path {}", id.0);
-            // print_path_debug(&graph, id.0);
-            // println!();
-            print_path_data(&graph, id);
-        }
+          steps path_2: 1  2  3  4  5
+          nodes path_2: 5+ 2+ 8+ 4+ 6+
 
-        /*
-        println!("Path - [Head, Tail] - Steps (node ID)");
-        for &id in path_ids.iter() {
-            let (head, tail) = {
-                let p_r = graph.get_path_ref(id).unwrap();
-                (p_r.head, p_r.tail)
-            };
-            let head_tail = format!("[{}, {}]", head.pack(), tail.pack());
-            let steps = path_steps(&graph, id);
-            print!("{:4} - {:12} - ", id.0, head_tail);
-            // print!("{:4} - [{:>4}, {:<4}] - ", id.0, head.pack(), tail.pack());
-            for (x, s) in steps.into_iter().enumerate() {
-                if x != 0 {
-                    print!(", ");
-                }
-                print!("{}", s);
-            }
-            println!();
-        }
+          steps path_3: 1  2  3  4  5  6
+          nodes path_3: 1+ 2+ 8+ 4+ 9+ 6+
+
+          steps path_4: 1  2  3  4  5
+          nodes path_4: 5+ 7+ 3+ 9+ 6+
         */
+
+        let print_paths = |graph: &PackedGraph, ids: &[PathId]| {
+            for &id in ids {
+                print_path_data(graph, id);
+                println!();
+            }
+        };
+
+        print_paths(&graph, &path_ids);
+
+        println!("  ---  Deleting  segments  ---");
+
+        let step_ptr =
+            |ix: u64| -> StepPtr { StepPtr::from_one_based(ix as usize) };
+
+        let step_range = |l: u64, r: u64| -> (StepPtr, StepPtr) {
+            (
+                StepPtr::from_one_based(l as usize),
+                StepPtr::from_one_based(r as usize),
+            )
+        };
+
+        /* Remove ranges:
+
+            path_1: [1, 3)    - []
+            path_2: [2, 4)    - []
+            path_3: [4, null) - []
+            path_4: [1, null) - []
+        */
+        // let
+        let segment_ranges = vec![
+            step_range(1, 3),
+            step_range(2, 4),
+            (step_ptr(4), StepPtr::null()),
+            (step_ptr(1), StepPtr::null()),
+        ];
+
+        for (ix, &(from, to)) in segment_ranges.iter().enumerate() {
+            graph.path_rewrite_segment(path_ids[ix], from, to, &[]);
+        }
+
+        print_paths(&graph, &path_ids);
+
+        assert_eq!(path_steps_hnd(&graph, path_ids[0]), vec![8, 12]);
+        assert_eq!(path_steps_hnd(&graph, path_ids[1]), vec![10, 8, 12]);
+        assert_eq!(path_steps_hnd(&graph, path_ids[2]), vec![2, 4, 16]);
+        assert_eq!(path_steps_hnd(&graph, path_ids[3]), vec![]);
+
+        // make sure that a single-step range is treated as empty
+        graph.path_rewrite_segment(path_ids[1], step_ptr(2), step_ptr(2), &[]);
+        assert_eq!(path_steps_hnd(&graph, path_ids[1]), vec![10, 8, 12]);
+
+        /* Rewrite paths with:
+
+            path_1: [1, 3)    - [5+, 2+]
+            path_2: [2, 4)    - [7+, 3-, 10+, 12-]
+            path_3: [4, null) - [6+, 3+, 5-]
+            path_4: [1, null) - [3+, 6+, 2+, 4+]
+        */
+
+        println!("  ---  Rewriting segments  ---");
+
+        let mut graph = graph_2;
+
+        let new_segments = vec![
+            vec![hnd(5), hnd(2)],
+            vec![hnd(7), r_hnd(3), hnd(10), r_hnd(12)],
+            vec![hnd(6), hnd(3), r_hnd(5)],
+            vec_hnd(vec![3, 6, 2, 4]),
+        ];
+
+        for (ix, &(from, to)) in segment_ranges.iter().enumerate() {
+            graph.path_rewrite_segment(
+                path_ids[ix],
+                from,
+                to,
+                &new_segments[ix],
+            );
+        }
+
+        assert_eq!(path_steps_hnd(&graph, path_ids[0]), vec![10, 4, 8, 12]);
+        assert_eq!(
+            path_steps_hnd(&graph, path_ids[1]),
+            vec![10, 14, 7, 20, 25, 8, 12]
+        );
+        assert_eq!(
+            path_steps_hnd(&graph, path_ids[2]),
+            vec![2, 4, 16, 12, 6, 11]
+        );
+        assert_eq!(path_steps_hnd(&graph, path_ids[3]), vec![6, 12, 4, 8]);
+
+        // print_paths(&graph, &path_ids);
+        print_path_data(&graph, path_ids[1]);
+
+        println!("-------------");
+
+        // make sure that a single-step range is treated as empty, and
+        // the new range prepended
+        graph.path_rewrite_segment(
+            path_ids[1],
+            step_ptr(7),
+            step_ptr(7),
+            &vec_hnd(vec![1, 2, 3]),
+        );
+
+        assert_eq!(
+            path_steps_hnd(&graph, path_ids[1]),
+            vec![10, 14, 2, 4, 6, 7, 20, 25, 8, 12]
+        );
+        print_path_data(&graph, path_ids[1]);
     }
 
     #[test]

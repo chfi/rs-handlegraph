@@ -1332,7 +1332,6 @@ where
         new_segment: &[Handle],
     ) -> Option<(Self::StepIx, Self::StepIx, Vec<StepUpdate>)> {
         self.rewrite_segment_impl(from, to, new_segment)
-        // self.rewrite_segment_old(from, to, new_segment)
     }
 
     fn set_circularity(&mut self, circular: bool) {
