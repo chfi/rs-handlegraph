@@ -183,10 +183,22 @@ pub trait MutableGraphPaths: GraphPaths {
         index: Self::StepIx,
     ) -> Option<Self::StepIx>;
 
-    /// Remove all steps between the indices `from` and `to`
-    /// (inclusive) on `path`, and insert new steps on the `Handle`s
-    /// in `new_segment`. Returns a pair with the new step indices of
-    /// the first and last new handles.
+    /// Replace the steps starting from the step at `from` (inclusive)
+    /// until the step `to` (exclusive) with steps on the `Handle`s in
+    /// `new_segment`. Returns a pair where the first entry is the
+    /// pointer to the step corresponding to the first handle in
+    /// `new_segment`, and the second entry, the step corresponding to
+    /// the last handle.
+    ///
+    /// Depending on the graph implementation, if `to` denotes a step
+    /// beyond the path, all steps beginning at `from` will be removed
+    /// and replaced. If `new_segment` is empty, the range will simply
+    /// be deleted, contracting the path. In that case, which pointers
+    /// are returned depend on the implementation.
+    ///
+    /// The step `from` must come before `to` in the path, but it's up
+    /// to implementations to choose how to handle it if that's not
+    /// the case -- potentially panicking.
     fn path_rewrite_segment(
         &mut self,
         id: PathId,
