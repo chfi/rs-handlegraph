@@ -1,9 +1,11 @@
 use crate::{
     handle::{Edge, Handle, NodeId},
-    handlegraph::HandleGraphRef,
+    handlegraph::*,
     mutablehandlegraph::*,
     pathhandlegraph::*,
 };
+
+use crate::packedgraph::PackedGraph;
 
 use gfa::{
     gfa::{Line, Link, Orientation, Path, Segment, GFA},
@@ -75,14 +77,13 @@ where
     Ok(())
 }
 
-pub fn to_gfa<G>(graph: &G) -> GFA<usize, ()>
+pub fn packed_to_gfa(graph: &PackedGraph) -> GFA<usize, ()> {
+    to_gfa(graph)
+}
+
+pub fn to_gfa<G>(graph: G) -> GFA<usize, ()>
 where
-    G: HandleGraphRef
-        + GraphPaths
-        + IntoPathIds
-        + GraphPathNames
-        + GraphPathsRef,
-    G::PathRef: PathSteps,
+    G: HandleGraphRef + GraphPathsSteps + IntoPathIds + GraphPathNames,
 {
     let mut gfa = GFA::new();
 
@@ -108,9 +109,9 @@ where
 
     for edge in graph.edges() {
         let Edge(left, right) = edge;
-        let from_segment: usize = usize::from(left.id());
+        let from_segment = usize::from(left.id());
         let from_orient = orient(left.is_reverse());
-        let to_segment: usize = usize::from(right.id());
+        let to_segment = usize::from(right.id());
         let to_orient = orient(right.is_reverse());
         let overlap = vec![b'0', b'M'];
 
@@ -131,12 +132,10 @@ where
         let overlaps = Vec::new();
         let mut segment_names: Vec<Vec<u8>> = Vec::new();
 
-        let path = graph.get_path_ref(path_id).unwrap();
+        let steps = graph.path_steps(path_id).unwrap();
 
-        for step in path.steps() {
-            // for step in graph.steps_iter(path_id) {
+        for step in steps {
             let handle = step.handle();
-            // let handle = graph.handle_of_step(&step).unwrap();
             let segment: usize = handle.id().into();
             let orientation = orient(handle.is_reverse());
             segment_names.push(segment.to_string().into());
