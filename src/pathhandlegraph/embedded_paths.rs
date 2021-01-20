@@ -239,8 +239,14 @@ pub trait PathSequences: GraphPaths {
 /// A handlegraph that can produce references to specific paths.
 pub trait GraphPathsRef: GraphPaths {
     type PathRef: PathBase<StepIx = Self::StepIx>;
-
     fn get_path_ref(self, id: PathId) -> Option<Self::PathRef>;
+}
+
+pub trait GraphPathsSteps: GraphPathsRef {
+    type Step: super::path::PathStep;
+    type Steps: DoubleEndedIterator<Item = Self::Step>;
+
+    fn get_path_steps(self, id: PathId) -> Option<Self::Steps>;
 }
 
 pub trait GraphPathsRefMut: GraphPaths {

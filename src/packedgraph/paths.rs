@@ -5,6 +5,7 @@ use fnv::FnvHashMap;
 use crate::{
     handle::Handle,
     packed::{self, *},
+    packedgraph::index::list,
     pathhandlegraph::*,
 };
 
@@ -741,6 +742,19 @@ impl<'a> GraphPathsRef for &'a super::PackedGraph {
 
     fn get_path_ref(self, id: PathId) -> Option<Self::PathRef> {
         self.paths.path_ref(id)
+    }
+}
+
+impl<'a> GraphPathsSteps for &'a super::PackedGraph {
+    type Step = (StepPtr, PackedStep);
+    type Steps = list::Iter<'a, StepList>;
+
+    fn get_path_steps(self, id: PathId) -> Option<Self::Steps> {
+        let path = self.paths.paths.get(id.0 as usize)?;
+        let properties = self.paths.properties.get_record(id);
+        let head = properties.head;
+        let tail = properties.tail;
+        Some(path.iter(head, tail))
     }
 }
 
