@@ -107,10 +107,10 @@ where
         }
     };
 
-    for edge in graph.edges() {
-        let Edge(left, right) = edge;
+    for Edge(left, right) in graph.edges() {
         let from_segment = usize::from(left.id());
         let from_orient = orient(left.is_reverse());
+
         let to_segment = usize::from(right.id());
         let to_orient = orient(right.is_reverse());
         let overlap = vec![b'0', b'M'];
@@ -152,4 +152,67 @@ where
     }
 
     gfa
+}
+
+pub fn write_as_gfa<O: std::io::Write, G>(
+    graph: G,
+    stream: &mut O,
+) -> std::io::Result<()>
+where
+    G: HandleGraphRef + GraphPathsSteps + IntoPathIds + GraphPathNames,
+{
+    use bstr::ByteSlice;
+
+    // header
+    writeln!(stream, "H\tVN:Z:1.0")?;
+
+    for handle in graph.handles() {
+        let name = handle.id().0;
+        let sequence = graph.sequence_vec(handle.forward());
+        writeln!(stream, "S\t{}\t{}", name, sequence.as_bstr())?;
+    }
+
+    let fmt_orient = |rev: bool| {
+        if rev {
+            "-"
+        } else {
+            "+"
+        }
+    };
+
+    for Edge(left, right) in graph.edges() {
+        let from_segment = left.id().0;
+        let from_orient = fmt_orient(left.is_reverse());
+
+        let to_segment = right.id().0;
+        let to_orient = fmt_orient(right.is_reverse());
+
+        writeln!(
+            stream,
+            "L\t{}\t{}\t{}\t{}\t0M",
+            from_segment, from_orient, to_segment, to_orient
+        )?;
+    }
+
+    for path_id in graph.path_ids() {
+        let path_name: Vec<_> = graph.get_path_name(path_id).unwrap().collect();
+        write!(stream, "P\t{}\t", path_name.as_bstr())?;
+
+        let steps = graph.path_steps(path_id).unwrap();
+        for (ix, step) in steps.enumerate() {
+            if ix != 0 {
+                write!(stream, ",")?;
+            }
+            let handle = step.handle();
+
+            let seg = handle.id().0;
+            let orient = fmt_orient(handle.is_reverse());
+
+            write!(stream, "{}{}", seg, orient)?;
+        }
+
+        writeln!(stream, "\t*")?;
+    }
+
+    Ok(())
 }
