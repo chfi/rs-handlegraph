@@ -246,7 +246,14 @@ pub trait GraphPathsSteps: GraphPathsRef {
     type Step: super::path::PathStep;
     type Steps: DoubleEndedIterator<Item = Self::Step>;
 
-    fn get_path_steps(self, id: PathId) -> Option<Self::Steps>;
+    fn path_steps(self, id: PathId) -> Option<Self::Steps>;
+
+    fn path_steps_range(
+        self,
+        id: PathId,
+        from: Self::StepIx,
+        to: Self::StepIx,
+    ) -> Option<Self::Steps>;
 }
 
 pub trait GraphPathsRefMut: GraphPaths {

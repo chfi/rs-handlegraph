@@ -134,7 +134,7 @@ impl StepList {
         Some(step)
     }
 
-    fn get_step(&self, ix: StepPtr) -> Option<PackedStep> {
+    pub(crate) fn get_step(&self, ix: StepPtr) -> Option<PackedStep> {
         let handle = self.step_record(ix)?;
         let (prev, next) = self.link_record(ix)?;
         Some(PackedStep { handle, prev, next })
@@ -412,6 +412,7 @@ pub trait AsStepsMut: AsStepsRef {
 }
 
 /// Wrapper over a shared reference to a `StepList`
+#[derive(Debug, Clone, Copy)]
 pub struct StepListRef<'a>(&'a StepList);
 
 /// Wrapper over a mutable reference to a `StepList`
@@ -464,6 +465,7 @@ impl<'a> AsStepsMut for StepListMut<'a> {
 ///
 /// The parameter `T: AsStepsRef` lets us use this one type for both
 /// immutable and mutable path references.
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct PackedPath<T: AsStepsRef> {
     pub(crate) path_id: PathId,
     pub(crate) deleted_steps: usize,

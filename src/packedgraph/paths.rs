@@ -749,12 +749,39 @@ impl<'a> GraphPathsSteps for &'a super::PackedGraph {
     type Step = (StepPtr, PackedStep);
     type Steps = list::Iter<'a, StepList>;
 
-    fn get_path_steps(self, id: PathId) -> Option<Self::Steps> {
+    fn path_steps(self, id: PathId) -> Option<Self::Steps> {
         let path = self.paths.paths.get(id.0 as usize)?;
         let properties = self.paths.properties.get_record(id);
         let head = properties.head;
         let tail = properties.tail;
         Some(path.iter(head, tail))
+    }
+
+    fn path_steps_range(
+        self,
+        id: PathId,
+        from: Self::StepIx,
+        to: Self::StepIx,
+    ) -> Option<Self::Steps> {
+        let path = self.paths.paths.get(id.0 as usize)?;
+        let props = self.paths.properties.get_record(id);
+
+        let from = path.get_step(from).map(|_| from).unwrap_or(props.head);
+        let to = path.get_step(to).map(|_| to).unwrap_or(props.tail);
+
+        // let from = if path.get_step(from).is_none() {
+        //     props.head
+        // } else {
+        //     from
+        // };
+
+        // let to = if path.get_step(to).is_none() {
+        //     props.tail
+        // } else {
+        //     to
+        // };
+
+        Some(path.iter(from, to))
     }
 }
 
