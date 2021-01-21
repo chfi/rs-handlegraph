@@ -221,7 +221,7 @@ impl MutableHandles for HashGraph {
     fn divide_handle(
         &mut self,
         handle: Handle,
-        mut offsets: &[usize],
+        offsets: &[usize],
     ) -> Vec<Handle> {
         let mut result = vec![handle];
         let node_len = self.node_len(handle);

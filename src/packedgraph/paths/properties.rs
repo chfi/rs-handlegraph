@@ -41,6 +41,7 @@ impl Default for PathProperties {
 }
 
 impl PathProperties {
+    #[allow(dead_code)]
     pub(super) fn new_with_width(width: usize) -> Self {
         let heads = PagedIntVec::new_with_width(WIDE_PAGE_WIDTH, width);
         let tails = PagedIntVec::new_with_width(WIDE_PAGE_WIDTH, width);

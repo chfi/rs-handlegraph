@@ -614,7 +614,7 @@ impl PackedGraph {
 
                 refs_mut.for_each_with(sender, |s, path| {
                     let path_id = path.path_id;
-                    let updates = f(path_id, s, path);
+                    f(path_id, s, path);
                 });
             },
         );

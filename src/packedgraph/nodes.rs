@@ -75,6 +75,7 @@ impl Default for NodeIdIndexMap {
 }
 
 impl NodeIdIndexMap {
+    #[allow(dead_code)]
     pub(crate) fn with_width(width: usize) -> Self {
         let deque = PackedDeque::with_width(width);
         Self {

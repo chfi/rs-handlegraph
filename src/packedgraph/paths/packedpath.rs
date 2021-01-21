@@ -2,7 +2,7 @@ use std::num::NonZeroUsize;
 
 use fnv::FnvHashMap;
 
-use crossbeam_channel::{Receiver, Sender};
+use crossbeam_channel::Sender;
 
 use crate::{
     handle::{Handle, NodeId},

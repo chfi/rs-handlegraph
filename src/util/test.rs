@@ -1,5 +1,7 @@
+#![allow(dead_code)]
+#[allow(unused_imports)]
 use crate::{
-    handle::{Direction, Edge, Handle, NodeId},
+    handle::{Edge, Handle, NodeId},
     handlegraph::*,
     mutablehandlegraph::{
         AdditiveHandleGraph, MutableHandleGraph, MutableHandles,
