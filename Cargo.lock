@@ -204,6 +204,7 @@ dependencies = [
  "crossbeam-channel",
  "fnv",
  "gfa",
+ "log",
  "quickcheck",
  "rand",
  "rayon",

@@ -6,7 +6,6 @@ use crate::{
 };
 
 use crate::packedgraph::index::OneBasedIndex;
-use crate::packedgraph::paths::StepPtr;
 use crate::packedgraph::*;
 
 use fnv::{FnvHashMap, FnvHashSet};
@@ -17,13 +16,16 @@ use crate::disjoint::DisjointSets;
 
 use rayon::prelude::*;
 
+#[allow(unused_imports)]
+use log::{debug, error, info, trace};
+
 pub mod unchop;
 
 pub fn simple_components(
     graph: &PackedGraph,
     min_size: usize,
 ) -> Vec<Vec<Handle>> {
-    println!("in simple components");
+    debug!("in simple components");
     let mut bphf_data = Vec::with_capacity((1 + graph.node_count()) * 2);
 
     for handle in graph.handles() {
@@ -132,7 +134,6 @@ pub fn perfect_neighbors(
     let mut expected_next = 0usize;
 
     for (path_id, step_ptr) in graph.steps_on_handle(left).unwrap() {
-        // println!("left {}", left.0);
         let step =
             graph
                 .path_handle_at_step(path_id, step_ptr)
@@ -181,13 +182,7 @@ pub fn perfect_neighbors(
         }
     }
 
-    let observed_next = graph
-        .steps_on_handle(right)
-        .unwrap()
-        // .inspect(|_| {
-        // println!("right {}", right.0);
-        // })
-        .count();
+    let observed_next = graph.steps_on_handle(right).unwrap().count();
 
     observed_next == expected_next
 }
