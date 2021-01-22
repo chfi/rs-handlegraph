@@ -161,11 +161,20 @@ pub fn create_consensus_graph(
         |path: PathId, begin: StepPtr, end: StepPtr| -> usize {
             let mut step = begin;
             let mut len = 0;
-            while step != end {
 
             info!("get_path_seq_len - from {} to {}", begin.pack(), end.pack());
+            loop {
+                // while step != end {
                 let handle = smoothed.path_handle_at_step(path, step).unwrap();
                 len += smoothed.node_len(handle);
+                if let Some(next) = smoothed.path_next_step(path, step) {
+                    step = next;
+                } else {
+                    break;
+                }
+                if step == end {
+                    break;
+                }
             }
 
             info!("get_path_seq_len - len {}", len);
@@ -177,10 +186,19 @@ pub fn create_consensus_graph(
         |path: PathId, begin: StepPtr, end: StepPtr| -> Vec<u8> {
             let mut step = begin;
             let mut seq = Vec::new();
-            while step != end {
+            loop {
+                // while step != end {
                 let handle = smoothed.path_handle_at_step(path, step).unwrap();
                 seq.extend(smoothed.sequence(handle));
-                step = smoothed.path_next_step(path, step).unwrap();
+                // step = smoothed.path_next_step(path, step).unwrap();
+                if let Some(next) = smoothed.path_next_step(path, step) {
+                    step = next;
+                } else {
+                    break;
+                }
+                if step == end {
+                    break;
+                }
             }
 
             seq
@@ -261,9 +279,9 @@ pub fn create_consensus_graph(
 
                         link.end = step.0;
 
-                        info!("link {}", link.path.0);
-                        info!(" - begin {}", link.begin.pack());
-                        info!(" -  end  {}", link.end.pack());
+                        trace!("link {}", link.path.0);
+                        trace!(" - begin {}", link.begin.pack());
+                        trace!(" -  end  {}", link.end.pack());
 
                         link.length = get_path_seq_len(
                             link.path,
@@ -272,7 +290,7 @@ pub fn create_consensus_graph(
                                 .unwrap(),
                             link.end,
                         );
-                        info!("new link length: {}", link.length);
+                        trace!("new link length: {}", link.length);
 
                         let mut hasher = FnvHasher::default();
 
@@ -283,7 +301,7 @@ pub fn create_consensus_graph(
                                 .unwrap(),
                             link.end,
                         );
-                        info!("new link seq: {}", seq.as_bstr());
+                        trace!("new link seq: {}", seq.as_bstr());
 
                         let beg_h = smoothed
                             .path_handle_at_step(path_id, link.begin)
@@ -435,7 +453,7 @@ pub fn create_consensus_graph(
     let mut link_path_names: Vec<String> = Vec::new();
 
     for link in consensus_links.iter() {
-        info!("link length {}", link.length);
+        // trace!("link length {}", link.length);
         if link.length > 0 {
             let from_cons_name =
                 smoothed.get_path_name_vec(link.from_cons_path).unwrap();
@@ -448,9 +466,16 @@ pub fn create_consensus_graph(
                 link.rank
             );
 
-            let path_cons_graph = consensus_graph
-                .create_path(link_name.as_bytes(), false)
-                .unwrap();
+            let path_cons_graph =
+                consensus_graph.create_path(link_name.as_bytes(), false);
+
+            if path_cons_graph.is_none() {
+                continue;
+            }
+
+            let path_cons_graph = path_cons_graph.unwrap();
+
+            // if let Some(path_cons_garph
 
             link_path_names.push(link_name);
 
@@ -841,7 +866,15 @@ pub fn create_consensus_graph(
 
         loop {
             *node_coverage.get_mut(&id).unwrap() -= 1;
-            step = consensus_graph.path_next_step(link, step).unwrap();
+
+            if let Some(next) = smoothed.path_next_step(link, step) {
+                step = next;
+            } else {
+                break;
+            }
+
+            // step = consensus_graph.path_next_step(link, step).unwrap();
+
             id = consensus_graph
                 .path_handle_at_step(link, step)
                 .unwrap()
@@ -864,7 +897,14 @@ pub fn create_consensus_graph(
 
         loop {
             *node_coverage.get_mut(&id).unwrap() -= 1;
-            step = consensus_graph.path_prev_step(link, step).unwrap();
+
+            if let Some(next) = smoothed.path_prev_step(link, step) {
+                step = next;
+            } else {
+                break;
+            }
+
+            // step = consensus_graph.path_prev_step(link, step).unwrap();
             id = consensus_graph
                 .path_handle_at_step(link, step)
                 .unwrap()
@@ -877,7 +917,9 @@ pub fn create_consensus_graph(
             }
         }
 
-        let end = consensus_graph.path_next_step(link, step).unwrap();
+        let end = consensus_graph
+            .path_next_step(link, step)
+            .unwrap_or_else(|| consensus_graph.path_last_step(link).unwrap());
 
         let mut step = begin;
 
@@ -888,7 +930,13 @@ pub fn create_consensus_graph(
                 consensus_graph.path_handle_at_step(link, step).unwrap();
             new_path.push(handle);
 
-            step = consensus_graph.path_next_step(link, step).unwrap();
+            if let Some(next) = smoothed.path_next_step(link, step) {
+                step = next;
+            } else {
+                break;
+            }
+
+            // step = consensus_graph.path_next_step(link, step).unwrap();
 
             if step == end {
                 break;
@@ -916,13 +964,13 @@ pub fn create_consensus_graph(
         ) = to_create
             .into_iter()
             .enumerate()
-            .map(|(ix, (name, handles))| {
-                let path = consensus_graph
-                    .create_path(name.as_bytes(), false)
-                    .unwrap();
+            .filter_map(|(ix, (name, handles))| {
+                let path =
+                    consensus_graph.create_path(name.as_bytes(), false)?;
+
                 link_path_names_to_keep.push(name);
 
-                ((path, ix), handles)
+                Some(((path, ix), handles))
             })
             .unzip();
 
@@ -1284,7 +1332,11 @@ fn save_path_fragment(
         let handle = consensus.path_handle_at_step(link, q).unwrap();
         handles.push(handle);
 
-        q = consensus.path_next_step(link, q).unwrap();
+        if let Some(next) = consensus.path_next_step(link, q) {
+            q = next;
+        } else {
+            break;
+        }
 
         if q == step {
             break;
