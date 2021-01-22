@@ -5,6 +5,7 @@ use crate::{
     pathhandlegraph::*,
 };
 
+use crate::packed::*;
 use crate::packedgraph::{defragment::*, paths::StepPtr, *};
 
 use fnv::{FnvHashMap, FnvHashSet, FnvHasher};
@@ -161,10 +162,13 @@ pub fn create_consensus_graph(
             let mut step = begin;
             let mut len = 0;
             while step != end {
+
+            info!("get_path_seq_len - from {} to {}", begin.pack(), end.pack());
                 let handle = smoothed.path_handle_at_step(path, step).unwrap();
                 len += smoothed.node_len(handle);
-                step = smoothed.path_next_step(path, step).unwrap();
             }
+
+            info!("get_path_seq_len - len {}", len);
 
             len
         };
@@ -188,7 +192,10 @@ pub fn create_consensus_graph(
     let mut link_multiset: FnvHashMap<u64, FnvHashSet<LinkPath>> =
         FnvHashMap::default();
 
-    info!("building link multiset");
+    info!(
+        "building link multiset from {} non-consensus paths",
+        non_consensus_paths.len()
+    );
     for &path_id in non_consensus_paths.iter() {
         let mut link: Option<LinkPath> = None;
 
@@ -238,6 +245,7 @@ pub fn create_consensus_graph(
                         diff as usize
                     };
 
+                    info!("jump_len: {}", jump_len);
                     if Some(link.from_cons_path) == curr_consensus
                         && jump_len < consensus_jump_max
                     {
@@ -245,11 +253,17 @@ pub fn create_consensus_graph(
                         link.end = step.0;
                         link.length = 0;
                         link.is_reverse = step.handle().is_reverse();
+                    // info!("link branch 1");
                     } else {
                         // or it's different
+                        // info!("link branch 2");
                         link.to_cons_path = curr_consensus.unwrap();
 
                         link.end = step.0;
+
+                        info!("link {}", link.path.0);
+                        info!(" - begin {}", link.begin.pack());
+                        info!(" -  end  {}", link.end.pack());
 
                         link.length = get_path_seq_len(
                             link.path,
@@ -258,6 +272,7 @@ pub fn create_consensus_graph(
                                 .unwrap(),
                             link.end,
                         );
+                        info!("new link length: {}", link.length);
 
                         let mut hasher = FnvHasher::default();
 
@@ -268,6 +283,7 @@ pub fn create_consensus_graph(
                                 .unwrap(),
                             link.end,
                         );
+                        info!("new link seq: {}", seq.as_bstr());
 
                         let beg_h = smoothed
                             .path_handle_at_step(path_id, link.begin)
@@ -322,6 +338,12 @@ pub fn create_consensus_graph(
         }
     }
 
+    info!("link_multiset.len(): {}", link_multiset.len());
+    // info!("  {:>20} - {}", "hash", "set.len()");
+    // for (hash, set) in link_multiset.iter() {
+    //     info!("  {:20} - {}", hash, set.len());
+    // }
+
     let mut perfect_edges: Vec<(Handle, Handle)> = Vec::new();
 
     let mut consensus_links: Vec<LinkPath> = Vec::new();
@@ -364,6 +386,9 @@ pub fn create_consensus_graph(
         &mut perfect_edges,
     );
     info!("compute_best_link - done");
+
+    info!("consensus_links.len(): {}", consensus_links.len());
+    info!("perfect_edges.len(): {}", perfect_edges.len());
 
     let mut consensus_graph = PackedGraph::default();
 
@@ -410,6 +435,7 @@ pub fn create_consensus_graph(
     let mut link_path_names: Vec<String> = Vec::new();
 
     for link in consensus_links.iter() {
+        info!("link length {}", link.length);
         if link.length > 0 {
             let from_cons_name =
                 smoothed.get_path_name_vec(link.from_cons_path).unwrap();
@@ -449,6 +475,11 @@ pub fn create_consensus_graph(
             }
         }
     }
+
+    info!(
+        "created {} link paths in consensus graph",
+        link_path_names.len()
+    );
 
     info!("adding edges");
     // add the edges
@@ -639,6 +670,8 @@ pub fn create_consensus_graph(
         &links_by_start_end,
     );
 
+    info!("removing {} links", links_to_remove.len());
+
     for link in links_to_remove {
         consensus_graph.destroy_path(link);
     }
@@ -678,13 +711,17 @@ pub fn create_consensus_graph(
     }
 
     // remove coverage = 0 nodes
-    info!("empty handles");
     let empty_handles = consensus_graph
         .handles()
         .filter(|&handle| {
             consensus_graph.steps_on_handle(handle).unwrap().count() == 0
         })
         .collect::<Vec<_>>();
+
+    info!(
+        "removing {} handles with zero path coverage",
+        empty_handles.len()
+    );
 
     for handle in empty_handles {
         consensus_graph.remove_handle(handle);
@@ -760,6 +797,12 @@ pub fn create_consensus_graph(
             }
         }
     }
+
+    info!(
+        "removing {} edges, keeping {} edges",
+        edges_to_remove.len(),
+        edges_to_keep.len()
+    );
 
     for edge in edges_to_remove {
         consensus_graph.remove_edge(edge);
@@ -979,6 +1022,8 @@ pub fn create_consensus_graph(
     debug!("unchop 5");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 5");
+
+    consensus_graph.defragment();
 
     consensus_graph
 }
