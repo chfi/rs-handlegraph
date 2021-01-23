@@ -15,6 +15,9 @@ use rayon::prelude::*;
 
 use super::simple_components;
 
+#[allow(unused_imports)]
+use log::{debug, error, info, trace};
+
 /// Merge the handles in the provided slice to a single node, whose
 /// sequence is the concatenation of the handles' sequences
 /// left-to-right.

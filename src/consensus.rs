@@ -154,7 +154,7 @@ pub fn create_consensus_graph(
 
     let non_consensus_paths: Vec<PathId> = smoothed
         .path_ids()
-        .filter(|path_id| is_consensus[path_id])
+        .filter(|path_id| !is_consensus[path_id])
         .collect();
 
     let get_path_seq_len =
@@ -186,19 +186,10 @@ pub fn create_consensus_graph(
         |path: PathId, begin: StepPtr, end: StepPtr| -> Vec<u8> {
             let mut step = begin;
             let mut seq = Vec::new();
-            loop {
-                // while step != end {
+            while step != end {
                 let handle = smoothed.path_handle_at_step(path, step).unwrap();
                 seq.extend(smoothed.sequence(handle));
-                // step = smoothed.path_next_step(path, step).unwrap();
-                if let Some(next) = smoothed.path_next_step(path, step) {
-                    step = next;
-                } else {
-                    break;
-                }
-                if step == end {
-                    break;
-                }
+                step = smoothed.path_next_step(path, step).unwrap();
             }
 
             seq
@@ -217,6 +208,7 @@ pub fn create_consensus_graph(
     for &path_id in non_consensus_paths.iter() {
         let mut link: Option<LinkPath> = None;
 
+        info!("on non_consensus path {}", path_id.0);
         let path = smoothed.get_path_ref(path_id).unwrap();
 
         let mut last_seen_consensus: Option<PathId> = None;
@@ -275,7 +267,7 @@ pub fn create_consensus_graph(
                     } else {
                         // or it's different
                         // info!("link branch 2");
-                        link.to_cons_path = curr_consensus.unwrap();
+                        link.to_cons_path = curr_cons;
 
                         link.end = step.0;
 
@@ -622,8 +614,8 @@ pub fn create_consensus_graph(
 
     debug!("node_count()      = {}", consensus_graph.node_count());
     debug!("handles().count() = {}", consensus_graph.handles().count());
-    debug!("min node id: {}", consensus_graph.min_node_id().0);
-    debug!("max node id: {}", consensus_graph.max_node_id().0);
+    info!("min node id: {}", consensus_graph.min_node_id().0);
+    info!("max node id: {}", consensus_graph.max_node_id().0);
 
     debug!("unchop 1");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
