@@ -162,22 +162,18 @@ pub fn create_consensus_graph(
             let mut step = begin;
             let mut len = 0;
 
-            info!("get_path_seq_len - from {} to {}", begin.pack(), end.pack());
-            loop {
-                // while step != end {
+            while step != end {
                 let handle = smoothed.path_handle_at_step(path, step).unwrap();
                 len += smoothed.node_len(handle);
-                if let Some(next) = smoothed.path_next_step(path, step) {
-                    step = next;
-                } else {
-                    break;
-                }
-                if step == end {
-                    break;
-                }
+                step = smoothed.path_next_step(path, step).unwrap();
             }
 
-            info!("get_path_seq_len - len {}", len);
+            trace!(
+                "get_path_seq_len - from {} to {} - len {}",
+                begin.pack(),
+                end.pack(),
+                len
+            );
 
             len
         };
@@ -255,8 +251,7 @@ pub fn create_consensus_graph(
                         diff as usize
                     };
 
-                    info!("jump_len: {}", jump_len);
-                    if Some(link.from_cons_path) == curr_consensus
+                    if link.from_cons_path == curr_cons
                         && jump_len < consensus_jump_max
                     {
                         link.begin = step.0;
@@ -773,6 +768,9 @@ pub fn create_consensus_graph(
                 for other in
                     consensus_graph.neighbors(step.handle(), Direction::Right)
                 {
+                    if !consensus_graph.has_node(other.id()) {
+                        panic!("node {} doesn't exist in graph", other.id().0);
+                    }
                     let count =
                         consensus_graph.steps_on_handle(other).unwrap().count();
 

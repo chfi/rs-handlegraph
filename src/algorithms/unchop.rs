@@ -180,7 +180,7 @@ pub fn unchop(graph: &mut PackedGraph) {
         }
     }
 
-    ordered_handles.par_sort_by(|a, b| b.partial_cmp(a).unwrap());
+    ordered_handles.par_sort_by(|(a, _), (b, _)| b.partial_cmp(a).unwrap());
 
     let handle_order: Vec<Handle> =
         ordered_handles.into_iter().map(|(_, h)| h).collect();
