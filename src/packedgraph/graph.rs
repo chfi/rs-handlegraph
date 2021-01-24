@@ -23,6 +23,9 @@ use super::occurrences::OccurListIx;
 
 use super::{defragment::Defragment, paths};
 
+#[allow(unused_imports)]
+use log::{debug, error, info, trace};
+
 pub(crate) static NARROW_PAGE_WIDTH: usize = 256;
 pub(crate) static WIDE_PAGE_WIDTH: usize = 1024;
 
@@ -104,6 +107,7 @@ impl PackedGraph {
         }
     }
 
+    /*
     pub(super) fn transform_node_ids<F>(&mut self, transform: F)
     where
         F: Fn(NodeId) -> NodeId + Copy + Send + Sync,
@@ -120,6 +124,7 @@ impl PackedGraph {
             Vec::new()
         });
     }
+    */
 
     pub fn create_edges_iter<I>(&mut self, mut iter: I)
     where
@@ -301,6 +306,12 @@ impl PackedGraph {
         let rights =
             self.neighbors(handle, Direction::Right).collect::<Vec<_>>();
 
+        info!(
+            "removing handle {} with {} left and {} right neighbors",
+            handle.0,
+            lefts.len(),
+            rights.len()
+        );
 
         for prev in lefts {
             info!("remove_edge_from({}, {})", prev.0, handle.0);

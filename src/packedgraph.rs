@@ -44,6 +44,11 @@ use occurrences::OccurrencesIter;
 use paths::packedpath::StepPtr;
 use sequence::DecodeIter;
 
+#[allow(unused_imports)]
+use log::{debug, error, info, trace};
+
+use crate::packed::*;
+
 #[cfg(test)]
 pub(crate) mod quickcheck;
 
@@ -465,7 +470,35 @@ impl TransformNodeIds for PackedGraph {
     where
         F: Fn(NodeId) -> NodeId + Copy + Send + Sync,
     {
-        PackedGraph::transform_node_ids(self, transform);
+        // Create a new NodeIdIndexMap
+        info!("transforming nodes");
+        self.nodes.transform_node_ids(transform);
+
+        // Update the targets of all edges
+        info!("transforming edge targets");
+        // self.edges.transform_targets(transform);
+
+        let length = self.edges.record_count();
+
+        for ix in 0..length {
+            let tgt_ix = 2 * ix;
+            let handle: Handle = self.edges.record_vec.get_unpack(tgt_ix);
+            let n_id = handle.id();
+            if !n_id.is_zero() && self.has_node(n_id) {
+                self.edges
+                    .record_vec
+                    .set_pack(tgt_ix, Handle::from(transform(n_id)));
+            }
+        }
+
+        // Update the steps of all paths
+        info!("transforming paths");
+        self.with_all_paths_mut_ctx(|_, path_ref| {
+            path_ref.path.transform_steps(transform);
+            Vec::new()
+        });
+
+        // PackedGraph::transform_node_ids(self, transform);
     }
 
     fn apply_ordering(&mut self, order: &[Handle]) {

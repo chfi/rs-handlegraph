@@ -51,9 +51,9 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
     let mut left_neighbors: FnvHashSet<Handle> = FnvHashSet::default();
 
     for &other in neighbors.iter() {
-        if Some(other) == handles.last().copied() {
+        if other == right {
             left_neighbors.insert(new_handle);
-        } else if Some(other) == handles.first().copied().map(Handle::flip) {
+        } else if other == left.flip() {
             left_neighbors.insert(new_handle.flip());
         } else {
             left_neighbors.insert(other);
@@ -67,20 +67,19 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
     let mut right_neighbors: FnvHashSet<Handle> = FnvHashSet::default();
 
     for other in neighbors {
-        if Some(other) == handles.first().copied() {
-            // right_neighbors.insert(new_handle);
-        } else if Some(other) == handles.last().copied().map(Handle::flip) {
+        if other == left {
+        } else if other == right.flip() {
             right_neighbors.insert(new_handle.flip());
         } else {
             right_neighbors.insert(other);
         }
     }
 
-    for other in left_neighbors {
+    for &other in left_neighbors.iter() {
         graph.create_edge(Edge(other, new_handle));
     }
 
-    for other in right_neighbors {
+    for &other in right_neighbors.iter() {
         graph.create_edge(Edge(new_handle, other));
     }
 
@@ -129,6 +128,14 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
             .path_next_step(path_id, to)
             .unwrap_or_else(|| StepPtr::null());
         graph.path_rewrite_segment(path_id, from, to, &[new_seg]);
+    }
+
+    for other in left_neighbors {
+        graph.remove_edge(Edge(other, left));
+    }
+
+    for other in right_neighbors {
+        graph.remove_edge(Edge(right, other));
     }
 
     // remove the old nodes
