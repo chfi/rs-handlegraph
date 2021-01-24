@@ -286,11 +286,11 @@ impl MutableHandles for PackedGraph {
         handle: Handle,
         offsets: &[usize],
     ) -> Vec<Handle> {
-        let mut result = vec![handle];
-
         let node_len = self.node_len(handle);
 
-        let _fwd_handle = handle.forward();
+        let fwd_handle = handle.forward();
+
+        let mut result = vec![fwd_handle];
 
         let mut lengths = Vec::with_capacity(offsets.len() + 1);
 
@@ -366,12 +366,17 @@ impl MutableHandles for PackedGraph {
         // Update back references for the nodes connected to the
         // right-hand side of the original handle
 
+        // TODO handle self-edges
         // Get the edge lists with the back references
         let right_neighbors = self
             .neighbors(last_handle, Direction::Right)
             .map(|h| {
                 let g_ix = self.nodes.handle_record(h).unwrap();
-                self.nodes.get_edge_list(g_ix, Direction::Left)
+                if h.is_reverse() {
+                    self.nodes.get_edge_list(g_ix, Direction::Right)
+                } else {
+                    self.nodes.get_edge_list(g_ix, Direction::Left)
+                }
             })
             .collect::<Vec<_>>();
 
@@ -485,9 +490,9 @@ impl TransformNodeIds for PackedGraph {
             let handle: Handle = self.edges.record_vec.get_unpack(tgt_ix);
             let n_id = handle.id();
             if !n_id.is_zero() && self.has_node(n_id) {
-                self.edges
-                    .record_vec
-                    .set_pack(tgt_ix, Handle::from(transform(n_id)));
+                let new_handle =
+                    Handle::pack(transform(n_id), handle.is_reverse());
+                self.edges.record_vec.set_pack(tgt_ix, new_handle);
             }
         }
 
@@ -497,8 +502,6 @@ impl TransformNodeIds for PackedGraph {
             path_ref.path.transform_steps(transform);
             Vec::new()
         });
-
-        // PackedGraph::transform_node_ids(self, transform);
     }
 
     fn apply_ordering(&mut self, order: &[Handle]) {
