@@ -217,7 +217,7 @@ impl PackedGraph {
             .unwrap();
 
         if new_head != edge_list {
-            info!(
+            trace!(
                 "updating edge list head for {}, from {} to {}",
                 on.0,
                 edge_list.pack(),
@@ -227,56 +227,6 @@ impl PackedGraph {
         }
 
         Some(())
-    }
-
-    pub(super) fn remove_edge_impl(&mut self, edge: Edge) -> Option<()> {
-        unimplemented!();
-        /*
-        let Edge(left, right) = edge;
-
-        let left_gix = self.nodes.handle_record(left)?;
-
-        let right_gix = self.nodes.handle_record(right)?;
-
-        let left_edge_dir = if left.is_reverse() {
-            Direction::Left
-        } else {
-            Direction::Right
-        };
-
-        let right_edge_dir = if right.is_reverse() {
-            Direction::Right
-        } else {
-            Direction::Left
-        };
-
-        let left_edge_list = self.nodes.get_edge_list(left_gix, left_edge_dir);
-
-        let right_edge_list =
-            self.nodes.get_edge_list(right_gix, right_edge_dir);
-
-        // remove the edge from `left`'s edge list
-        let new_left_head = self
-            .edges
-            .iter_mut(left_edge_list)
-            .remove_record_with(|_, (handle, _)| handle.id() == right.id())?;
-
-        // remove the edge from `right`'s edge list
-        let new_right_head = self
-            .edges
-            .iter_mut(right_edge_list)
-            .remove_record_with(|_, (handle, _)| handle.id() == left.id())?;
-
-        // update `left`'s edge list header
-        self.nodes
-            .set_edge_list(left_gix, left_edge_dir, new_left_head);
-
-        // update `right`'s edge list header
-        self.nodes
-            .set_edge_list(right_gix, right_edge_dir, new_right_head);
-
-        Some(())
-            */
     }
 
     pub(super) fn remove_path_impl(&mut self, id: PathId) -> Option<()> {
@@ -320,17 +270,13 @@ impl PackedGraph {
             }
         }
 
-        // self.occurrences
-        //     .iter_mut(occur_head)
-        //     .remove_all_records_with(|_, _| true);
-
         // Remove the left and right edges of the node
         let lefts = self.neighbors(handle, Direction::Left).collect::<Vec<_>>();
 
         let rights =
             self.neighbors(handle, Direction::Right).collect::<Vec<_>>();
 
-        info!(
+        trace!(
             "removing handle {} with {} left and {} right neighbors",
             handle.0,
             lefts.len(),
@@ -338,12 +284,12 @@ impl PackedGraph {
         );
 
         for prev in lefts {
-            info!("remove_edge_from({}, {})", prev.0, handle.0);
+            trace!("remove_edge_from({}, {})", prev.0, handle.0);
             self.remove_edge_from(prev, handle);
         }
 
         for next in rights {
-            info!("remove_edge_from({}, {})", next.flip().0, handle.flip().0);
+            trace!("remove_edge_from({}, {})", next.flip().0, handle.flip().0);
             self.remove_edge_from(next.flip(), handle.flip());
         }
 

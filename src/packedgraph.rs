@@ -154,7 +154,6 @@ impl<'a> IntoNeighbors for &'a PackedGraph {
 }
 
 impl<'a> IntoSequences for &'a PackedGraph {
-    // type Sequence = PackedSeqIter<'a>;
     type Sequence = DecodeIter<'a>;
 
     #[inline]
@@ -262,15 +261,16 @@ impl SubtractiveHandleGraph for PackedGraph {
     }
 
     #[inline]
-    // fn remove_edge(&mut self, edge: Edge) -> bool {
-    //     self.remove_edge_impl(edge).is_some()
     fn remove_edge(&mut self, Edge(left, right): Edge) -> bool {
+        if !self.has_edge(left, right) {
+            return false;
+        }
+
         self.remove_edge_from(left, right);
 
         if left != right.flip() {
             self.remove_edge_from(right.flip(), left.flip());
         }
-        // self.remove_edge_impl(edge).is_some()
 
         true
     }
@@ -476,12 +476,11 @@ impl TransformNodeIds for PackedGraph {
         F: Fn(NodeId) -> NodeId + Copy + Send + Sync,
     {
         // Create a new NodeIdIndexMap
-        info!("transforming nodes");
+        debug!("transforming nodes");
         self.nodes.transform_node_ids(transform);
 
         // Update the targets of all edges
-        info!("transforming edge targets");
-        // self.edges.transform_targets(transform);
+        debug!("transforming edge targets");
 
         let length = self.edges.record_count();
 
@@ -497,7 +496,7 @@ impl TransformNodeIds for PackedGraph {
         }
 
         // Update the steps of all paths
-        info!("transforming paths");
+        debug!("transforming paths");
         self.with_all_paths_mut_ctx(|_, path_ref| {
             path_ref.path.transform_steps(transform);
             Vec::new()
