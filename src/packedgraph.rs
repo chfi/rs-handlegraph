@@ -204,7 +204,10 @@ impl AdditiveHandleGraph for PackedGraph {
 
     #[inline]
     fn create_edge(&mut self, Edge(left, right): Edge) {
-        if self.has_edge(left, right) {
+        if self
+            .neighbors(left, Direction::Right)
+            .any(|other| other == right)
+        {
             return;
         }
 
@@ -254,8 +257,17 @@ impl SubtractiveHandleGraph for PackedGraph {
     }
 
     #[inline]
-    fn remove_edge(&mut self, edge: Edge) -> bool {
-        self.remove_edge_impl(edge).is_some()
+    // fn remove_edge(&mut self, edge: Edge) -> bool {
+    //     self.remove_edge_impl(edge).is_some()
+    fn remove_edge(&mut self, Edge(left, right): Edge) -> bool {
+        self.remove_edge_from(left, right);
+
+        if left != right.flip() {
+            self.remove_edge_from(right.flip(), left.flip());
+        }
+        // self.remove_edge_impl(edge).is_some()
+
+        true
     }
 
     fn clear_graph(&mut self) {

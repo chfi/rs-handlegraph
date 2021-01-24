@@ -191,6 +191,32 @@ impl PackedGraph {
         }
     }
 
+    pub(crate) fn remove_edge_from(
+        &mut self,
+        on: Handle,
+        to: Handle,
+    ) -> Option<()> {
+        let edge_dir = if on.is_reverse() {
+            Direction::Left
+        } else {
+            Direction::Right
+        };
+
+        let gix = self.nodes.handle_record(on)?;
+
+        let edge_list = self.nodes.get_edge_list(gix, edge_dir);
+        let new_head = self
+            .edges
+            .iter_mut(edge_list)
+            .remove_record_with(|_, (h, _)| h == to)?;
+
+        if new_head != edge_list {
+            self.nodes.set_edge_list(gix, edge_dir, new_head);
+        }
+
+        Some(())
+    }
+
     pub(super) fn remove_edge_impl(&mut self, edge: Edge) -> Option<()> {
         let Edge(left, right) = edge;
 
@@ -275,16 +301,15 @@ impl PackedGraph {
         let rights =
             self.neighbors(handle, Direction::Right).collect::<Vec<_>>();
 
-        for other in lefts {
-            let edge = Edge::edge_handle(other, handle);
-            // let edge = Edge(other, handle);
-            self.remove_edge_impl(edge);
+
+        for prev in lefts {
+            info!("remove_edge_from({}, {})", prev.0, handle.0);
+            self.remove_edge_from(prev, handle);
         }
 
-        for other in rights {
-            let edge = Edge::edge_handle(handle, other);
-            // let edge = Edge(handle, other);
-            self.remove_edge_impl(edge);
+        for next in rights {
+            info!("remove_edge_from({}, {})", next.flip().0, handle.flip().0);
+            self.remove_edge_from(next.flip(), handle.flip());
         }
 
         self.nodes.clear_node_record(handle.id())?;
