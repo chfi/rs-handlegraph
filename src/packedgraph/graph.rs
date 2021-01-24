@@ -207,15 +207,22 @@ impl PackedGraph {
             Direction::Right
         };
 
-        let gix = self.nodes.handle_record(on)?;
+        let gix = self.nodes.handle_record(on).unwrap();
 
         let edge_list = self.nodes.get_edge_list(gix, edge_dir);
         let new_head = self
             .edges
             .iter_mut(edge_list)
-            .remove_record_with(|_, (h, _)| h == to)?;
+            .remove_record_with(|_, (h, _)| h == to)
+            .unwrap();
 
         if new_head != edge_list {
+            info!(
+                "updating edge list head for {}, from {} to {}",
+                on.0,
+                edge_list.pack(),
+                new_head.pack()
+            );
             self.nodes.set_edge_list(gix, edge_dir, new_head);
         }
 

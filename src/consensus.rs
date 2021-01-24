@@ -2,6 +2,7 @@ use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
     mutablehandlegraph::*,
+    packedgraph::index::OneBasedIndex,
     pathhandlegraph::*,
 };
 
@@ -344,10 +345,6 @@ pub fn create_consensus_graph(
     }
 
     info!("link_multiset.len(): {}", link_multiset.len());
-    // info!("  {:>20} - {}", "hash", "set.len()");
-    // for (hash, set) in link_multiset.iter() {
-    //     info!("  {:20} - {}", hash, set.len());
-    // }
 
     let mut perfect_edges: Vec<(Handle, Handle)> = Vec::new();
 
@@ -848,6 +845,15 @@ pub fn create_consensus_graph(
 
     for &link in link_paths.iter() {
         let mut step = consensus_graph.path_first_step(link).unwrap();
+        let head = step.clone();
+        let tail = consensus_graph.path_last_step(link).unwrap();
+
+        debug!(
+            "link path {} - head: {} - tail: {}",
+            link.0,
+            head.pack(),
+            tail.pack()
+        );
 
         let mut id = consensus_graph
             .path_handle_at_step(link, step)
@@ -855,56 +861,55 @@ pub fn create_consensus_graph(
             .id();
 
         loop {
+            if step == tail || *node_coverage.get(&id).unwrap() <= 1 {
+                break;
+            }
+
             *node_coverage.get_mut(&id).unwrap() -= 1;
 
-            if let Some(next) = smoothed.path_next_step(link, step) {
+            if let Some(next) = consensus_graph.path_next_step(link, step) {
                 step = next;
             } else {
                 break;
             }
 
-            // step = consensus_graph.path_next_step(link, step).unwrap();
-
             id = consensus_graph
                 .path_handle_at_step(link, step)
                 .unwrap()
                 .id();
-
-            if step == consensus_graph.path_last_step(link).unwrap()
-                || *node_coverage.get(&id).unwrap() <= 1
-            {
-                break;
-            }
         }
 
         let begin = step;
 
         let mut step = consensus_graph.path_last_step(link).unwrap();
+
         let mut id = consensus_graph
             .path_handle_at_step(link, step)
             .unwrap()
             .id();
 
         loop {
+            if step == begin || *node_coverage.get(&id).unwrap() <= 1 {
+                break;
+            }
+
             *node_coverage.get_mut(&id).unwrap() -= 1;
 
-            if let Some(next) = smoothed.path_prev_step(link, step) {
-                step = next;
+            if let Some(prev) = consensus_graph.path_prev_step(link, step) {
+                step = prev;
             } else {
                 break;
             }
 
-            // step = consensus_graph.path_prev_step(link, step).unwrap();
             id = consensus_graph
                 .path_handle_at_step(link, step)
                 .unwrap()
                 .id();
 
-            if step == consensus_graph.path_first_step(link).unwrap()
-                || *node_coverage.get(&id).unwrap() <= 1
-            {
-                break;
-            }
+            // if step == consensus_graph.path_first_step(link).unwrap()
+            // if step == head || *node_coverage.get(&id).unwrap() <= 1 {
+            //     break;
+            // }
         }
 
         let end = consensus_graph
@@ -916,30 +921,32 @@ pub fn create_consensus_graph(
         let mut new_path: Vec<Handle> = Vec::new();
 
         loop {
+            if step == end {
+                break;
+            }
+
             let handle =
                 consensus_graph.path_handle_at_step(link, step).unwrap();
             new_path.push(handle);
 
-            if let Some(next) = smoothed.path_next_step(link, step) {
+            if let Some(next) = consensus_graph.path_next_step(link, step) {
                 step = next;
             } else {
                 break;
             }
-
-            // step = consensus_graph.path_next_step(link, step).unwrap();
-
-            if step == end {
-                break;
-            }
         }
 
-        id = new_path.first().unwrap().id();
+        /* NB: [01/24/21]
+           the C++ implementation calls .front() on a potentially
+           empty vector, which is undefined behavior. It *probably*
+           leads to a segfault in practice, so if this isn't a problem
+           when running it, `new_path` should never be empty, and there
+           may be a problem with my implementation, as it *can* be empty.
+        */
 
-        if new_path.is_empty()
-            || new_path.len() == 1 && *node_coverage.get(&id).unwrap() > 1
-        {
-            *node_coverage.get_mut(&id).unwrap() -= 1;
-        } else {
+        if let &[h] = new_path.as_slice() {
+            *node_coverage.get_mut(&h.id()).unwrap() -= 1;
+        } else if !new_path.is_empty() {
             let name = consensus_graph.get_path_name_vec(link).unwrap();
             to_create.push((name, new_path));
         }
@@ -1374,6 +1381,10 @@ fn novelify(
             if !seen_nodes.contains(&step.handle().id()) {
                 let mut mark_ext = |other: Handle| {
                     let o_id = other.id();
+
+                    if consensus.steps_on_handle(other).is_none() {
+                        panic!("called steps_on_handle on node that doesn't exist: {}", other.id().0);
+                    }
 
                     if !reached_ext_nodes.contains(&o_id) {
                         reached_ext_nodes.insert(o_id);

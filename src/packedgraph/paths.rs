@@ -494,27 +494,6 @@ impl PackedGraphPaths {
 
         println!("\n ~~  END  PackedGraphPaths diagnostics ~~ \n");
     }
-
-    /*
-    pub(super) fn with_multipath_mut_ctx<'a, F>(
-        &'a mut self,
-        f: F,
-    ) -> Vec<(PathId, Vec<StepUpdate>)>
-    where
-        F: Fn(PathId, &mut PackedPathMut<'a>) -> Vec<StepUpdate>,
-    {
-        let mut mut_ctx = self.get_all_paths_mut_ctx();
-        let refs_mut = mut_ctx.iter_mut();
-
-        refs_mut
-            .map(|path| {
-                let path_id = path.path_id;
-                let steps = f(path_id, path);
-                (path_id, steps)
-            })
-            .collect::<Vec<_>>()
-    }
-    */
 }
 impl<'a> GraphPathNames for &'a super::PackedGraph {
     type PathName = packed::vector::IterView<'a, u8>;
@@ -531,8 +510,6 @@ impl<'a> GraphPathNames for &'a super::PackedGraph {
 }
 
 impl GraphPaths for super::PackedGraph {
-    // type Step = (StepPtr, PackedStep);
-
     type StepIx = StepPtr;
 
     #[inline]
@@ -566,7 +543,7 @@ impl GraphPaths for super::PackedGraph {
         index: Self::StepIx,
     ) -> Option<Handle> {
         let path = self.paths.path_ref(id)?;
-        let ix = index.to_zero_based()?;
+        let ix = index.to_record_start(1)?;
         let handle: Handle = path.path.steps.get_unpack(ix);
         Some(handle)
     }
