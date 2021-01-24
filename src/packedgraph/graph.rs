@@ -223,6 +223,8 @@ impl PackedGraph {
     }
 
     pub(super) fn remove_edge_impl(&mut self, edge: Edge) -> Option<()> {
+        unimplemented!();
+        /*
         let Edge(left, right) = edge;
 
         let left_gix = self.nodes.handle_record(left)?;
@@ -267,6 +269,7 @@ impl PackedGraph {
             .set_edge_list(right_gix, right_edge_dir, new_right_head);
 
         Some(())
+            */
     }
 
     pub(super) fn remove_path_impl(&mut self, id: PathId) -> Option<()> {
@@ -296,9 +299,23 @@ impl PackedGraph {
         }
 
         // Remove the occurrences
-        self.occurrences
-            .iter_mut(occur_head)
-            .remove_all_records_with(|_, _| true);
+        let occurs: Vec<_> = self
+            .occurrences
+            .iter(occur_head)
+            .map(|(ptr, _)| ptr)
+            .collect::<Vec<_>>();
+        for ptr in occurs {
+            if let Some(ix) = ptr.to_zero_based() {
+                self.occurrences.path_ids.set(ix, 0);
+                self.occurrences.node_occur_offsets.set(ix, 0);
+                self.occurrences.node_occur_next.set(ix, 0);
+                self.occurrences.removed_records += 1;
+            }
+        }
+
+        // self.occurrences
+        //     .iter_mut(occur_head)
+        //     .remove_all_records_with(|_, _| true);
 
         // Remove the left and right edges of the node
         let lefts = self.neighbors(handle, Direction::Left).collect::<Vec<_>>();

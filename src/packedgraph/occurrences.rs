@@ -32,7 +32,7 @@ pub struct NodeOccurrences {
     pub path_ids: PagedIntVec,
     pub node_occur_offsets: PagedIntVec,
     pub node_occur_next: PagedIntVec,
-    removed_records: usize,
+    pub removed_records: usize,
 }
 
 crate::impl_space_usage!(

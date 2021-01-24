@@ -243,7 +243,12 @@ impl PackedCollection for PackedIntVec {
 
     #[inline]
     fn get(&self, index: usize) -> u64 {
-        assert!(index < self.num_entries);
+        assert!(
+            index < self.num_entries,
+            "index out of bounds: {} not < {}",
+            index,
+            self.num_entries
+        );
         self.vector.get(index as u64)
     }
 

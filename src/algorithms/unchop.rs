@@ -138,6 +138,12 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
         graph.remove_edge(Edge(right, other));
     }
 
+    for window in handles.windows(2) {
+        if let [this, next] = *window {
+            graph.remove_edge(Edge(this, next));
+        }
+    }
+
     // remove the old nodes
     for &handle in handles.iter() {
         graph.remove_handle(handle);
