@@ -107,25 +107,6 @@ impl PackedGraph {
         }
     }
 
-    /*
-    pub(super) fn transform_node_ids<F>(&mut self, transform: F)
-    where
-        F: Fn(NodeId) -> NodeId + Copy + Send + Sync,
-    {
-        // Create a new NodeIdIndexMap
-        self.nodes.transform_node_ids(transform);
-
-        // Update the targets of all edges
-        self.edges.transform_targets(transform);
-
-        // Update the steps of all paths
-        self.with_all_paths_mut_ctx(|_, path_ref| {
-            path_ref.path.transform_steps(transform);
-            Vec::new()
-        });
-    }
-    */
-
     pub fn create_edges_iter<I>(&mut self, mut iter: I)
     where
         I: Iterator<Item = Edge>,
@@ -137,8 +118,6 @@ impl PackedGraph {
         let mut edge_vec_ix = 1 + (self.edges.record_vec.len() / 2);
 
         while let Some(Edge(left, right)) = iter.next() {
-            // let left_gix = self.nodes.handle_record(left).unwrap();
-            // let right_gix = self.nodes.handle_record(right).unwrap();
             let left_gix =
                 self.nodes.handle_record(left).unwrap_or_else(|| {
                     panic!("handle {} does not have a record", left.0)

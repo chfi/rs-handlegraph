@@ -746,18 +746,6 @@ impl<'a> GraphPathsSteps for &'a super::PackedGraph {
         let from = path.get_step(from).map(|_| from).unwrap_or(props.head);
         let to = path.get_step(to).map(|_| to).unwrap_or(props.tail);
 
-        // let from = if path.get_step(from).is_none() {
-        //     props.head
-        // } else {
-        //     from
-        // };
-
-        // let to = if path.get_step(to).is_none() {
-        //     props.tail
-        // } else {
-        //     to
-        // };
-
         Some(path.iter(from, to))
     }
 }
@@ -785,7 +773,6 @@ impl PathSequences for super::PackedGraph {
         for (ix, step) in path.steps() {
             let len = self.node_len(step.handle);
             if remaining < len {
-                // return Some((ix, step));
                 return Some(ix);
             }
             remaining -= len;

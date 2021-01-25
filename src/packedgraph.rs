@@ -133,17 +133,11 @@ impl<'a> IntoNeighbors for &'a PackedGraph {
         let g_ix = self.nodes.handle_record(handle).unwrap();
 
         let edge_list_ix = match (dir, handle.is_reverse()) {
-            (Dir::Left, true) => {
+            (Dir::Left, true) | (Dir::Right, false) => {
                 self.nodes.get_edge_list(g_ix, Direction::Right)
             }
-            (Dir::Left, false) => {
+            (Dir::Left, false) | (Dir::Right, true) => {
                 self.nodes.get_edge_list(g_ix, Direction::Left)
-            }
-            (Dir::Right, true) => {
-                self.nodes.get_edge_list(g_ix, Direction::Left)
-            }
-            (Dir::Right, false) => {
-                self.nodes.get_edge_list(g_ix, Direction::Right)
             }
         };
 
@@ -480,7 +474,6 @@ impl TransformNodeIds for PackedGraph {
         F: Fn(NodeId) -> NodeId + Copy + Send + Sync,
     {
         // Update the targets of all edges
-        debug!("transforming edge targets");
         let length = self.edges.record_count();
 
         for ix in 0..length {
@@ -495,11 +488,9 @@ impl TransformNodeIds for PackedGraph {
         }
 
         // Create a new NodeIdIndexMap
-        debug!("transforming nodes");
         self.nodes.transform_node_ids(transform);
 
         // Update the steps of all paths
-        debug!("transforming paths");
         self.with_all_paths_mut_ctx(|_, path_ref| {
             path_ref.path.transform_steps(transform);
             Vec::new()

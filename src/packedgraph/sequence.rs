@@ -229,16 +229,7 @@ impl Sequences {
         len: usize,
         reverse: bool,
     ) -> DecodeIter<'_> {
-        // let iter = DecodeIter::new(&self.sequences.vec, offset, len, reverse);
-        // iter
         self.sequences.iter(offset, len, reverse)
-        // let iter = self.sequences.iter_slice(offset, len);
-
-        // PackedSeqIter {
-        //     iter,
-        //     length: len,
-        //     reverse,
-        // }
     }
 
     #[inline]

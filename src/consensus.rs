@@ -2,6 +2,7 @@ use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
     mutablehandlegraph::*,
+    packedgraph::index::OneBasedIndex,
     pathhandlegraph::*,
 };
 
@@ -458,7 +459,18 @@ pub fn create_consensus_graph(
 
             let mut step = link.begin;
 
-            while step != link.end {
+            if link.begin == link.end {
+                info!("link path {}, from path {}, despite having length {}, has head {}, tail {}",
+                      path_cons_graph.0,
+                      link.path.0,
+                      link.length,
+                      link.begin.pack(),
+                      link.end.pack(),
+                      );
+            }
+
+            loop {
+                // while step != link.end {
                 let handle =
                     smoothed.path_handle_at_step(link.path, step).unwrap();
 
@@ -469,6 +481,9 @@ pub fn create_consensus_graph(
 
                 consensus_graph.path_append_step(path_cons_graph, handle);
 
+                if step == link.end {
+                    break;
+                }
                 step = smoothed.path_next_step(link.path, step).unwrap();
             }
         }
@@ -658,22 +673,27 @@ pub fn create_consensus_graph(
     links_by_start_end
         .par_sort_by(|a, b| (a.start, a.end).cmp(&(b.start, b.end)));
 
-    /*
-    info!("first 8 in links_by_start_end");
-    for (ix, &range) in links_by_start_end.iter().enumerate().take(8) {
-        info!(
-            "{} - {} - ({}, {})",
-            ix, range.path.0, range.start.0, range.end.0,
+    let count = 5;
+    debug!("first {} in links_by_start_end", count);
+    for (ix, link) in links_by_start_end.iter().enumerate().take(count) {
+        debug!(
+            "{} - path: {} - start: {} - end: {}",
+            ix, link.path.0, link.start.0, link.end.0,
         );
     }
-    info!("last 8 in links_by_start_end");
-    for (ix, &range) in links_by_start_end.iter().enumerate().rev().take(8) {
-        info!(
-            "{} - {} - ({}, {})",
-            ix, range.path.0, range.start.0, range.end.0,
+    debug!("last {} in links_by_start_end", count);
+    for (ix, link) in links_by_start_end.iter().enumerate().rev().take(count) {
+        debug!(
+            "{} - path: {} - start: {} - end: {}",
+            ix, link.path.0, link.start.0, link.end.0,
         );
     }
-    */
+
+    let empty_links = links_by_start_end
+        .iter()
+        .filter(|link| link.start == link.end)
+        .count();
+    debug!("links_by_start_end contains {} empty links", empty_links);
 
     let mut updated_links: Vec<(String, Vec<Handle>)> = Vec::new();
     let mut links_to_remove: Vec<PathId> = Vec::new();
@@ -689,6 +709,12 @@ pub fn create_consensus_graph(
     );
 
     info!("removing {} links", links_to_remove.len());
+
+    let empty_links = updated_links
+        .iter()
+        .filter(|link| link.1.is_empty())
+        .count();
+    debug!("updated_links contains {} empty links", empty_links);
 
     for link in links_to_remove {
         consensus_graph.destroy_path(link);
@@ -709,6 +735,9 @@ pub fn create_consensus_graph(
                     .unwrap();
 
                 trace!("link path {} - {} steps", name, handles.len());
+                if handles.is_empty() {
+                    info!("link path {} is empty", name);
+                }
                 link_path_names_to_keep.push(name);
 
                 ((path, ix), handles)
@@ -859,6 +888,10 @@ pub fn create_consensus_graph(
         let head = step.clone();
         let tail = consensus_graph.path_last_step(link).unwrap();
 
+        if head.is_null() || tail.is_null() {
+            continue;
+        }
+
         trace!(
             "link path {} - head: {} - tail: {}",
             link.0,
@@ -868,7 +901,13 @@ pub fn create_consensus_graph(
 
         let mut id = consensus_graph
             .path_handle_at_step(link, step)
-            .unwrap()
+            .unwrap_or_else(|| {
+                panic!("couldn't get the handle at step {} in path {} - head {} - tail {}",
+                       step.pack(),
+                       link.0,
+                       head.pack(),
+                       tail.pack(),);
+            })
             .id();
 
         while step != tail && *node_coverage.get(&id).unwrap() > 1 {
@@ -910,12 +949,15 @@ pub fn create_consensus_graph(
                 .id();
         }
 
-        let end = if let Some(end) = consensus_graph.path_next_step(link, step)
-        {
-            end
-        } else {
-            continue;
-        };
+        let end = consensus_graph
+            .path_next_step(link, step)
+            .unwrap_or_else(|| StepPtr::null());
+        // let end = if let Some(end) = consensus_graph.path_next_step(link, step)
+        // {
+        //     end
+        // } else {
+        //     continue;
+        // };
 
         let mut step = begin;
 
@@ -973,6 +1015,9 @@ pub fn create_consensus_graph(
                     name.as_bstr(),
                     handles.len()
                 );
+                if handles.is_empty() {
+                    info!("link path {} is empty", name.as_bstr());
+                }
                 link_path_names_to_keep.push(name);
 
                 Some(((path, ix), handles))
@@ -1325,9 +1370,13 @@ fn save_path_fragment(
 
     let mut q = first_novel;
 
-    while q != step {
+    // while q != step {
+    loop {
         let handle = consensus.path_handle_at_step(link, q).unwrap();
         handles.push(handle);
+        if q == step {
+            break;
+        }
         q = consensus.path_next_step(link, q).unwrap();
     }
 
