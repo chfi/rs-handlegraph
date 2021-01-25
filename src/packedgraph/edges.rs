@@ -154,10 +154,9 @@ impl EdgeLists {
     /// edges. Subtracts the number of removed records.
     #[inline]
     pub(crate) fn len(&self) -> usize {
-        let num_records = (self.record_vec.len() / EdgeVecIx::RECORD_WIDTH);
+        let num_records = self.record_vec.len() / EdgeVecIx::RECORD_WIDTH;
         let num_edges = (num_records + self.reversing_self_edge_records) / 2;
         num_edges - (self.removed_count / 2)
-        // num_edges - self.removed_count
     }
 
     #[inline]

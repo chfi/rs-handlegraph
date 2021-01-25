@@ -290,11 +290,19 @@ impl PackedGraph {
         for prev in lefts {
             trace!("remove_edge_from({}, {})", prev.0, handle.0);
             self.remove_edge_from(prev, handle);
+
+            if prev != handle.flip() {
+                self.remove_edge_from(handle.forward().flip(), prev.flip());
+            }
         }
 
         for next in rights {
             trace!("remove_edge_from({}, {})", next.flip().0, handle.flip().0);
             self.remove_edge_from(next.flip(), handle.flip());
+
+            if next != handle.flip() {
+                self.remove_edge_from(handle.forward(), next);
+            }
         }
 
         self.nodes.clear_node_record(handle.id())?;
