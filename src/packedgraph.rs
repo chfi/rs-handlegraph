@@ -475,13 +475,8 @@ impl TransformNodeIds for PackedGraph {
     where
         F: Fn(NodeId) -> NodeId + Copy + Send + Sync,
     {
-        // Create a new NodeIdIndexMap
-        debug!("transforming nodes");
-        self.nodes.transform_node_ids(transform);
-
         // Update the targets of all edges
         debug!("transforming edge targets");
-
         let length = self.edges.record_count();
 
         for ix in 0..length {
@@ -494,6 +489,10 @@ impl TransformNodeIds for PackedGraph {
                 self.edges.record_vec.set_pack(tgt_ix, new_handle);
             }
         }
+
+        // Create a new NodeIdIndexMap
+        debug!("transforming nodes");
+        self.nodes.transform_node_ids(transform);
 
         // Update the steps of all paths
         debug!("transforming paths");
