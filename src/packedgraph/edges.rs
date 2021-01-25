@@ -2,10 +2,7 @@ use std::num::NonZeroUsize;
 
 use fnv::FnvHashMap;
 
-use crate::{
-    handle::{Handle, NodeId},
-    packed::*,
-};
+use crate::{handle::Handle, packed::*};
 
 use super::{
     defragment::{self, Defragment},

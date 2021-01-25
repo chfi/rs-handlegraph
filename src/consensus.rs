@@ -655,10 +655,8 @@ pub fn create_consensus_graph(
     //     }
     // });
 
-    links_by_start_end.par_sort_by(|a, b| {
-        use std::cmp::Ordering;
-        (a.start, a.end).cmp(&(b.start, b.end))
-    });
+    links_by_start_end
+        .par_sort_by(|a, b| (a.start, a.end).cmp(&(b.start, b.end)));
 
     /*
     info!("first 8 in links_by_start_end");

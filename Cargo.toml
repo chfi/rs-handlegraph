@@ -1,6 +1,6 @@
 [package]
 name = "handlegraph"
-version = "0.7.0-alpha"
+version = "0.7.0-alpha.1"
 authors = ["Christian Fischer <christian@chfi.se>"]
 edition = "2018"
 license = "MIT"

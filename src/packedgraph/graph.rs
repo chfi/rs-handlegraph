@@ -3,7 +3,7 @@ use fnv::FnvHashSet;
 use rayon::prelude::*;
 
 use crate::{
-    handle::{Direction, Edge, Handle, NodeId},
+    handle::{Direction, Edge, Handle},
     handlegraph::IntoNeighbors,
     packed::traits::*,
     pathhandlegraph::PathId,
