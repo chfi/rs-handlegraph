@@ -67,6 +67,8 @@ pub struct EdgeLists {
     pub record_vec: PagedIntVec,
     pub removed_records: Vec<EdgeListIx>,
     pub removed_count: usize,
+    pub(crate) reversing_self_edge_records: usize,
+    pub(crate) removed_reversing_self_edge_records: usize,
 }
 
 crate::impl_space_usage!(EdgeLists, [record_vec, removed_records]);
@@ -141,6 +143,8 @@ impl Default for EdgeLists {
             record_vec: PagedIntVec::new(WIDE_PAGE_WIDTH),
             removed_records: Vec::new(),
             removed_count: 0,
+            reversing_self_edge_records: 0,
+            removed_reversing_self_edge_records: 0,
         }
     }
 }
@@ -150,8 +154,10 @@ impl EdgeLists {
     /// edges. Subtracts the number of removed records.
     #[inline]
     pub(crate) fn len(&self) -> usize {
-        let num_records = (self.record_vec.len() / EdgeVecIx::RECORD_WIDTH) / 2;
-        num_records - (self.removed_count / 2)
+        let num_records = (self.record_vec.len() / EdgeVecIx::RECORD_WIDTH);
+        let num_edges = (num_records + self.reversing_self_edge_records) / 2;
+        num_edges - (self.removed_count / 2)
+        // num_edges - self.removed_count
     }
 
     #[inline]
@@ -324,6 +330,9 @@ impl Defragment for EdgeLists {
         self.record_vec = new_record_vec;
         self.removed_records.clear();
         self.removed_count = 0;
+        self.reversing_self_edge_records -=
+            self.removed_reversing_self_edge_records;
+        self.removed_reversing_self_edge_records = 0;
 
         Some(id_map)
     }

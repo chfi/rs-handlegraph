@@ -208,10 +208,7 @@ impl AdditiveHandleGraph for PackedGraph {
 
     #[inline]
     fn create_edge(&mut self, Edge(left, right): Edge) {
-        if self
-            .neighbors(left, Direction::Right)
-            .any(|other| other == right)
-        {
+        if self.has_edge(left, right) {
             return;
         }
 
@@ -232,6 +229,9 @@ impl AdditiveHandleGraph for PackedGraph {
 
         let left_edge_list = self.nodes.get_edge_list(left_gix, left_edge_dir);
 
+        let right_edge_list =
+            self.nodes.get_edge_list(right_gix, right_edge_dir);
+
         // create the record for the edge from the left handle to the right
         let left_to_right = self.edges.append_record(right, left_edge_list);
 
@@ -240,8 +240,12 @@ impl AdditiveHandleGraph for PackedGraph {
         self.nodes
             .set_edge_list(left_gix, left_edge_dir, left_to_right);
 
-        let right_edge_list =
-            self.nodes.get_edge_list(right_gix, right_edge_dir);
+        // don't add a reversing self-edge twice
+        if left == right.flip() {
+            // if left_edge_list == right_edge_list {
+            self.edges.reversing_self_edge_records += 1;
+            return;
+        }
 
         // create the record for the edge from the right handle to the left
         let right_to_left =

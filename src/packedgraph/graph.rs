@@ -226,6 +226,10 @@ impl PackedGraph {
             self.nodes.set_edge_list(gix, edge_dir, new_head);
         }
 
+        if on == to.flip() {
+            self.edges.removed_reversing_self_edge_records += 1;
+        }
+
         Some(())
     }
 
