@@ -294,6 +294,71 @@ impl EdgeLists {
 impl Defragment for EdgeLists {
     type Updates = FnvHashMap<EdgeListIx, EdgeListIx>;
 
+    fn defragment(&mut self) -> Option<Self::Updates> {
+        let total_records = self.record_vec.len() / EdgeVecIx::RECORD_WIDTH;
+
+        let mut new_record_vec = PagedIntVec::new(WIDE_PAGE_WIDTH);
+        new_record_vec.reserve(self.len() * EdgeVecIx::RECORD_WIDTH);
+
+        let mut id_map_: FnvHashMap<EdgeListIx, EdgeListIx> =
+            FnvHashMap::default();
+
+        let mut next_ix = 0usize;
+        for ix in 0..total_records {
+            let old_ix = EdgeListIx::from_zero_based(ix);
+            let old_vec_ix = old_ix.to_record_ix(2, 0)?;
+            let handle = self.record_vec.get(old_vec_ix);
+            if handle != 0 {
+                if !id_map_.contains_key(&old_ix) {
+                    let new_ix = EdgeListIx::from_zero_based(next_ix);
+                    next_ix += 1;
+                    id_map_.insert(old_ix, new_ix);
+                }
+            } else {
+                if !id_map_.contains_key(&old_ix) {
+                    id_map_.insert(old_ix, EdgeListIx::null());
+                } else {
+                    log::info!("tried to replace edge index?");
+                }
+            }
+        }
+
+        for ix in 0..total_records {
+            let old_ix = EdgeListIx::from_zero_based(ix);
+            let old_vec_ix = old_ix.to_record_ix(2, 0)?;
+
+            let handle = self.record_vec.get(old_vec_ix);
+
+            if let Some(new_ix) = id_map_.get(&old_ix) {
+                if handle != 0 && !new_ix.is_null() {
+                    let old_next: EdgeListIx =
+                        self.record_vec.get_unpack(old_vec_ix + 1);
+
+                    if let Some(new_next) = id_map_.get(&old_next) {
+                        new_record_vec.append(handle);
+                        new_record_vec.append(new_next.pack());
+                    } else {
+                        new_record_vec.append(handle);
+                        new_record_vec.append(0);
+                    }
+                    // if new_ix.is_null() {
+                    //     panic!("this shouldn't happen!");
+                    // }
+                }
+            }
+        }
+
+        self.record_vec = new_record_vec;
+        self.removed_records.clear();
+        self.removed_count = 0;
+        self.reversing_self_edge_records -=
+            self.removed_reversing_self_edge_records;
+        self.removed_reversing_self_edge_records = 0;
+
+        Some(id_map_)
+    }
+
+    /*
     /// Defragments the edge list record vector and return a map
     /// describing how the indices of the still-existing records are
     /// transformed. Uses the `removed_records` vector, and empties it.
@@ -335,6 +400,7 @@ impl Defragment for EdgeLists {
 
         Some(id_map)
     }
+    */
 }
 
 #[cfg(test)]

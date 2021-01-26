@@ -271,8 +271,9 @@ impl PackedGraph {
             trace!("remove_edge_from({}, {})", prev.0, handle.0);
             self.remove_edge_from(prev, handle);
 
-            if prev != handle.flip() {
-                self.remove_edge_from(handle.forward().flip(), prev.flip());
+            self.edges.removed_count += 1;
+            if prev == handle.flip() {
+                self.edges.removed_reversing_self_edge_records += 1;
             }
         }
 
@@ -280,8 +281,9 @@ impl PackedGraph {
             trace!("remove_edge_from({}, {})", next.flip().0, handle.flip().0);
             self.remove_edge_from(next.flip(), handle.flip());
 
-            if next != handle.flip() {
-                self.remove_edge_from(handle.forward(), next);
+            self.edges.removed_count += 1;
+            if next == handle.flip() {
+                self.edges.removed_reversing_self_edge_records += 1;
             }
         }
 
