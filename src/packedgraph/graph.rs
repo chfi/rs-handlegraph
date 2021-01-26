@@ -1,10 +1,11 @@
-use fnv::FnvHashSet;
+use fnv::{FnvHashMap, FnvHashSet};
 
 use rayon::prelude::*;
 
 use crate::{
-    handle::{Direction, Edge, Handle},
+    handle::{Direction, Edge, Handle, NodeId},
     handlegraph::IntoNeighbors,
+    mutablehandlegraph::*,
     packed::traits::*,
     pathhandlegraph::PathId,
 };
@@ -650,5 +651,23 @@ impl PackedGraph {
                 });
             },
         );
+    }
+
+    pub fn compact_ids(&mut self) {
+        let mut seen_nodes: FnvHashMap<NodeId, NodeId> = FnvHashMap::default();
+        let mut next_id = 1u64;
+
+        let id_fun = move |node_in: NodeId| -> NodeId {
+            if let Some(new_id) = seen_nodes.get(&node_in) {
+                *new_id
+            } else {
+                let new_id = NodeId::from(next_id);
+                next_id += 1;
+                seen_nodes.insert(node_in, new_id);
+                new_id
+            }
+        };
+
+        self.transform_node_ids_mut(id_fun);
     }
 }

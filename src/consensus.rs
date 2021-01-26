@@ -1121,6 +1121,8 @@ pub fn create_consensus_graph(
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 5");
 
+
+    consensus_graph.compact_ids();
     consensus_graph.defragment();
 
     consensus_graph
