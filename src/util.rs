@@ -1,6 +1,8 @@
 #[cfg(test)]
 pub mod test;
 
+pub mod validate;
+
 pub mod dna {
 
     const fn comp_base_impl(base: u8) -> u8 {
