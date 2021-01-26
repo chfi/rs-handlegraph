@@ -190,11 +190,11 @@ impl PackedGraph {
         let gix = self.nodes.handle_record(on).unwrap();
 
         let edge_list = self.nodes.get_edge_list(gix, edge_dir);
+
         let new_head = self
             .edges
             .iter_mut(edge_list)
-            .remove_record_with(|_, (h, _)| h == to)
-            .unwrap();
+            .remove_record_with(|_, (h, _)| h == to)?;
 
         if new_head != edge_list {
             trace!(
@@ -271,9 +271,8 @@ impl PackedGraph {
             trace!("remove_edge_from({}, {})", prev.0, handle.0);
             self.remove_edge_from(prev, handle);
 
-            self.edges.removed_count += 1;
-            if prev == handle.flip() {
-                self.edges.removed_reversing_self_edge_records += 1;
+            if prev != handle.flip() {
+                self.remove_edge_from(handle.forward().flip(), prev.flip());
             }
         }
 
@@ -281,9 +280,8 @@ impl PackedGraph {
             trace!("remove_edge_from({}, {})", next.flip().0, handle.flip().0);
             self.remove_edge_from(next.flip(), handle.flip());
 
-            self.edges.removed_count += 1;
-            if next == handle.flip() {
-                self.edges.removed_reversing_self_edge_records += 1;
+            if next != handle.flip() {
+                self.remove_edge_from(handle.forward(), next);
             }
         }
 

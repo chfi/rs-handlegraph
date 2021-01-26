@@ -104,7 +104,7 @@ impl<'a, T: PackedListMut> IterMut<'a, T> {
             if tail == rec_ptr {
                 self.tail_ptr = T::ListPtr::null();
             }
-            self.list.remove_next(prev_ptr);
+            self.list.remove_next(prev_ptr)?;
             Some(head)
         }
     }
