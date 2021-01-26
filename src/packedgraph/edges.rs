@@ -150,6 +150,48 @@ impl Default for EdgeLists {
 }
 
 impl EdgeLists {
+    pub fn log_len(&self) {
+        use log::info;
+
+        let num_records = self.record_vec.len() / EdgeVecIx::RECORD_WIDTH;
+        info!("num_records: {}", num_records);
+        let del_records = self.removed_count;
+
+        let num_rev_self = self.reversing_self_edge_records;
+        let del_rev_self = self.removed_reversing_self_edge_records;
+
+        info!("Edges - total   record count    {}", num_records);
+        info!("Edges - deleted record count    {}", del_records);
+        info!("Edges - total   rev. self edges {}", num_rev_self);
+        info!("Edges - deleted rev. self edges {}", del_rev_self);
+        info!(
+            "Edges - removed_records.len()   {}",
+            self.removed_records.len()
+        );
+    }
+
+    // pub fn missing_records(&self) -> Vec<(EdgeListIx, Handle)> {
+    // }
+    pub fn empty_records(&self) -> Vec<EdgeListIx> {
+        let mut res = Vec::new();
+
+        let records = self.record_count();
+        for i in 0..records {
+            let ix = i * 2;
+            let hi = ix;
+            let ni = ix + 1;
+
+            let handle = self.record_vec.get(hi);
+            let next = self.record_vec.get(ni);
+            if handle == 0 {
+                let edge_ix = EdgeListIx::from_zero_based(i);
+                res.push(edge_ix);
+            }
+        }
+
+        res
+    }
+
     /// Returns the number of edge records, i.e. the total number of
     /// edges. Subtracts the number of removed records.
     #[inline]

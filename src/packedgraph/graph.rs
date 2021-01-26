@@ -672,4 +672,191 @@ impl PackedGraph {
 
         self.transform_node_ids_mut(id_fun);
     }
+
+    pub fn trace_edge_status(&self) {
+        use crate::handlegraph::IntoEdges;
+        use crate::handlegraph::IntoHandles;
+
+        let length = self.edges.record_count();
+        let edge_count = self.edges.len();
+        let edge_iter_count = self.edges().count();
+
+        let mut missing = 0;
+        let mut missing_and_zero = 0;
+        let mut good = 0;
+
+        for ix in 0..length {
+            let tgt_ix = 2 * ix;
+            let handle: Handle = self.edges.record_vec.get_unpack(tgt_ix);
+            let n_id = handle.id();
+
+            if n_id.is_zero() && !self.has_node(n_id) {
+                missing_and_zero += 1;
+            }
+
+            if !self.has_node(n_id) && !n_id.is_zero() {
+                missing += 1;
+            } else if !n_id.is_zero() && self.has_node(n_id) {
+                good += 1;
+            }
+        }
+
+        info!("edge count:           {}", edge_count);
+        info!("edge iter count:      {}", edge_iter_count);
+        info!("edge count * 2:       {}", edge_count * 2);
+        info!("record count:         {}", length);
+        info!("deleted records:      {}", self.edges.removed_count);
+        info!("");
+        info!("missing & zero edges: {}", missing_and_zero);
+        info!("missing edge targets: {}", missing);
+        info!("good edges:           {}", good);
+        info!("------------------------------------");
+    }
+
+    // pub fn neighbors_trace<'a>(&'a self, handle: Handle, dir: Direction) -> super::iter::EdgeListHandleIterTrace<'a> {
+    pub fn neighbors_trace<'a>(
+        &'a self,
+        handle: Handle,
+        dir: Direction,
+    ) -> super::iter::EdgeListHandleIterTrace<'a> {
+        use crate::handlegraph::IntoHandles;
+        use Direction as Dir;
+        if !self.has_node(handle.id()) {
+            panic!(
+                "tried to get neighbors of node {} which doesn't exist",
+                handle.id().0
+            );
+        }
+        let g_ix = self.nodes.handle_record(handle).unwrap();
+
+        let edge_list_ix = match (dir, handle.is_reverse()) {
+            (Dir::Left, true) | (Dir::Right, false) => {
+                self.nodes.get_edge_list(g_ix, Direction::Right)
+            }
+            (Dir::Left, false) | (Dir::Right, true) => {
+                self.nodes.get_edge_list(g_ix, Direction::Left)
+            }
+        };
+
+        let iter = self.edges.iter(edge_list_ix);
+
+        super::iter::EdgeListHandleIterTrace::new(iter, dir == Dir::Left)
+    }
+
+    pub fn neighbors_trace_continue<'a>(
+        &'a self,
+        handle: Handle,
+        dir: Direction,
+        visited: FnvHashSet<EdgeListIx>,
+    ) -> super::iter::EdgeListHandleIterTrace<'a> {
+        use crate::handlegraph::IntoHandles;
+        use Direction as Dir;
+        if !self.has_node(handle.id()) {
+            panic!(
+                "tried to get neighbors of node {} which doesn't exist",
+                handle.id().0
+            );
+        }
+        let g_ix = self.nodes.handle_record(handle).unwrap();
+
+        let edge_list_ix = match (dir, handle.is_reverse()) {
+            (Dir::Left, true) | (Dir::Right, false) => {
+                self.nodes.get_edge_list(g_ix, Direction::Right)
+            }
+            (Dir::Left, false) | (Dir::Right, true) => {
+                self.nodes.get_edge_list(g_ix, Direction::Left)
+            }
+        };
+
+        let iter = self.edges.iter(edge_list_ix);
+
+        super::iter::EdgeListHandleIterTrace::new_continue(
+            iter,
+            dir == Dir::Left,
+            visited,
+        )
+    }
+
+    pub fn visitable_edges(&self) -> FnvHashSet<EdgeListIx> {
+        use crate::handlegraph::IntoHandles;
+        let mut visited: FnvHashSet<EdgeListIx> = FnvHashSet::default();
+
+        for handle in self.handles() {
+            self.neighbors_edge_ixs(handle, &mut visited);
+        }
+
+        visited
+    }
+
+    pub fn zero_edges_partition(
+        &self,
+    ) -> (FnvHashSet<EdgeListIx>, FnvHashSet<EdgeListIx>) {
+        let mut zero: FnvHashSet<EdgeListIx> = FnvHashSet::default();
+        let mut non_zero: FnvHashSet<EdgeListIx> = FnvHashSet::default();
+
+        let total_records = self.edges.record_vec.len() / 2;
+
+        for ix in 0..total_records {
+            let edge_ix = EdgeListIx::from_zero_based(ix);
+            let edge_vec_ix = edge_ix.to_record_ix(2, 0).unwrap();
+            let handle = self.edges.record_vec.get(edge_vec_ix);
+
+            if handle == 0 {
+                zero.insert(edge_ix);
+            } else {
+                non_zero.insert(edge_ix);
+            }
+        }
+
+        (non_zero, zero)
+    }
+
+    pub fn neighbors_edge_ixs(
+        &self,
+        handle: Handle,
+        visited: &mut FnvHashSet<EdgeListIx>,
+    ) {
+        use crate::handlegraph::IntoHandles;
+        use Direction as Dir;
+        if !self.has_node(handle.id()) {
+            panic!(
+                "tried to get neighbors of node {} which doesn't exist",
+                handle.id().0
+            );
+        }
+        let g_ix = self.nodes.handle_record(handle).unwrap();
+
+        let edge_list_ix = if handle.is_reverse() {
+            self.nodes.get_edge_list(g_ix, Direction::Right)
+        } else {
+            self.nodes.get_edge_list(g_ix, Direction::Left)
+        };
+
+        let iter = self.edges.iter(edge_list_ix);
+
+        let visited_pre = visited.len();
+
+        super::iter::EdgeListHandleIterTrace::visit_now(iter, true, visited);
+
+        let visited_left = visited.len();
+
+        let edge_list_ix = if handle.is_reverse() {
+            self.nodes.get_edge_list(g_ix, Direction::Left)
+        } else {
+            self.nodes.get_edge_list(g_ix, Direction::Right)
+        };
+
+        let iter = self.edges.iter(edge_list_ix);
+
+        super::iter::EdgeListHandleIterTrace::visit_now(iter, false, visited);
+
+        let visited_right = visited.len();
+
+        // debug!(
+        //     "new neighbors {} and {} - total {}",
+        //     visited_left - visited_pre,
+        //     visited_right - visited_left,
+        //     visited_right
+        // );
+    }
 }

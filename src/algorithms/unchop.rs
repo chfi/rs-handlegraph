@@ -153,6 +153,9 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
 }
 
 pub fn unchop(graph: &mut PackedGraph) {
+    info!("start of unchop edges");
+    graph.trace_edge_status();
+
     let node_rank: FnvHashMap<NodeId, usize> = graph
         .handles()
         .enumerate()
@@ -177,6 +180,12 @@ pub fn unchop(graph: &mut PackedGraph) {
         })
         .collect();
 
+    info!("");
+
+    info!("------ unchop before concat_nodes, edges");
+    graph.trace_edge_status();
+    info!("");
+
     for comp in components.iter() {
         if comp.len() >= 2 {
             let rank_sum: f64 =
@@ -193,13 +202,19 @@ pub fn unchop(graph: &mut PackedGraph) {
         }
     }
 
+    info!("------ unchop after concat_nodes, edges");
+    graph.trace_edge_status();
+    info!("");
+
     ordered_handles.par_sort_by(|(a, _), (b, _)| b.partial_cmp(a).unwrap());
     // ordered_handles.par_sort_by(|(a, _), (b, _)| a.partial_cmp(b).unwrap());
 
     let handle_order: Vec<Handle> =
         ordered_handles.into_iter().map(|(_, h)| h).collect();
 
+    info!("end of unchop edges");
     graph.apply_ordering(&handle_order);
+    info!("------------------------------------");
 }
 
 #[cfg(test)]

@@ -36,12 +36,15 @@ pub fn simple_components(
 
     let disj_set = DisjointSets::new(bphf_data.len() + 1);
 
+    debug!("building disjoint set structure");
+    debug!("adding nodes");
     graph.handles_par().for_each(|handle| {
         let h_i = bphf.hash(&handle.0);
         let h_j = bphf.hash(&handle.flip().0);
         disj_set.unite(h_i, h_j);
     });
 
+    debug!("adding edges");
     graph.edges_par().for_each(|Edge(from, to)| {
         if from.id() != to.id()
             && graph.degree(from, Direction::Right) == 1
@@ -57,6 +60,7 @@ pub fn simple_components(
     let mut simple_components: FnvHashMap<u64, Vec<Handle>> =
         FnvHashMap::default();
 
+    debug!("filling simple_components");
     for handle in graph.handles() {
         let a_id = disj_set.find(bphf.hash(&handle.0));
         simple_components
