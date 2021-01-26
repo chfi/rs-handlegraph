@@ -85,6 +85,12 @@ pub trait TransformNodeIds {
     where
         F: Fn(NodeId) -> NodeId + Copy + Send + Sync;
 
+    /// Reassign all node IDs in the graph using the provided
+    /// `transform` closure, which can hold and mutate local state.
+    fn transform_node_ids_mut<F>(&mut self, transform: F)
+    where
+        F: FnMut(NodeId) -> NodeId;
+
     /// Reassign the node IDs using the provided ordering. `order`
     /// must have one element for each node in the graph, and the node
     /// IDs will be used to index the slice.

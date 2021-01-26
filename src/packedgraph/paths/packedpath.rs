@@ -104,7 +104,7 @@ impl StepList {
     }
 
     #[inline]
-    pub(super) fn storage_len(&self) -> usize {
+    pub(crate) fn storage_len(&self) -> usize {
         self.steps.len()
     }
 
@@ -225,9 +225,9 @@ impl StepList {
         list::IterMut::new_double(self, head, tail)
     }
 
-    pub(crate) fn transform_steps<F>(&mut self, transform: F)
+    pub(crate) fn transform_steps<F>(&mut self, mut transform: F)
     where
-        F: Fn(NodeId) -> NodeId,
+        F: FnMut(NodeId) -> NodeId,
     {
         let length = self.storage_len();
 

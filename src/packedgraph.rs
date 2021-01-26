@@ -497,6 +497,33 @@ impl TransformNodeIds for PackedGraph {
         });
     }
 
+    fn transform_node_ids_mut<F>(&mut self, mut transform: F)
+    where
+        F: FnMut(NodeId) -> NodeId,
+    {
+        // Update the targets of all edges
+        let length = self.edges.record_count();
+
+        for ix in 0..length {
+            let tgt_ix = 2 * ix;
+            let handle: Handle = self.edges.record_vec.get_unpack(tgt_ix);
+            let n_id = handle.id();
+            if !n_id.is_zero() && self.has_node(n_id) {
+                let new_handle =
+                    Handle::pack(transform(n_id), handle.is_reverse());
+                self.edges.record_vec.set_pack(tgt_ix, new_handle);
+            }
+        }
+
+        // Create a new NodeIdIndexMap
+        self.nodes.transform_node_ids(&mut transform);
+
+        // Update the steps of all paths
+        for path in self.paths.paths.iter_mut() {
+            path.transform_steps(&mut transform);
+        }
+    }
+
     fn apply_ordering(&mut self, order: &[Handle]) {
         assert!(order.len() == self.node_count());
 

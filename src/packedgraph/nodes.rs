@@ -315,9 +315,9 @@ impl NodeRecords {
         }
     }
 
-    pub(super) fn transform_node_ids<F>(&mut self, new_id_fn: F)
+    pub(super) fn transform_node_ids<F>(&mut self, mut new_id_fn: F)
     where
-        F: Fn(NodeId) -> NodeId,
+        F: FnMut(NodeId) -> NodeId,
     {
         let mut new_index_map = NodeIdIndexMap::default();
         new_index_map.deque.reserve(self.node_count());
