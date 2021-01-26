@@ -5,7 +5,7 @@ use fnv::FnvHashMap;
 use crate::{handle::Handle, packed::*};
 
 use super::{
-    defragment::{self, Defragment},
+    defragment::Defragment,
     graph::WIDE_PAGE_WIDTH,
     list::{self, PackedList, PackedListMut},
     OneBasedIndex, RecordIndex,
@@ -170,8 +170,6 @@ impl EdgeLists {
         );
     }
 
-    // pub fn missing_records(&self) -> Vec<(EdgeListIx, Handle)> {
-    // }
     pub fn empty_records(&self) -> Vec<EdgeListIx> {
         let mut res = Vec::new();
 
@@ -179,10 +177,8 @@ impl EdgeLists {
         for i in 0..records {
             let ix = i * 2;
             let hi = ix;
-            let ni = ix + 1;
 
             let handle = self.record_vec.get(hi);
-            let next = self.record_vec.get(ni);
             if handle == 0 {
                 let edge_ix = EdgeListIx::from_zero_based(i);
                 res.push(edge_ix);

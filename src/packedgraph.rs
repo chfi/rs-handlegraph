@@ -38,7 +38,7 @@ pub use graph::PackedGraph;
 
 use edges::{EdgeListIx, EdgeLists};
 use index::{list, OneBasedIndex, RecordIndex};
-use iter::{EdgeListHandleIter, EdgeListHandleIterTrace};
+use iter::EdgeListHandleIter;
 use nodes::IndexMapIter;
 use occurrences::OccurrencesIter;
 use paths::packedpath::StepPtr;
@@ -475,38 +475,18 @@ impl TransformNodeIds for PackedGraph {
     {
         // Update the targets of all edges
         let length = self.edges.record_count();
-        let edge_count = self.edges.len();
-
-        let mut missing = 0;
-        let mut missing_and_zero = 0;
-        let mut good = 0;
 
         for ix in 0..length {
             let tgt_ix = 2 * ix;
             let handle: Handle = self.edges.record_vec.get_unpack(tgt_ix);
             let n_id = handle.id();
 
-            if n_id.is_zero() && !self.has_node(n_id) {
-                missing_and_zero += 1;
-            }
-
-            if !self.has_node(n_id) && !n_id.is_zero() {
-                missing += 1;
-                self.edges.record_vec.set(tgt_ix, 0);
-            } else if !n_id.is_zero() && self.has_node(n_id) {
-                good += 1;
-
+            if !n_id.is_zero() && self.has_node(n_id) {
                 let new_handle =
                     Handle::pack(transform(n_id), handle.is_reverse());
                 self.edges.record_vec.set_pack(tgt_ix, new_handle);
             }
         }
-
-        info!("edge count:           {}", edge_count);
-        info!("record count:         {}", length);
-        info!("missing & zero edges: {}", missing_and_zero);
-        info!("missing edge targets: {}", missing);
-        info!("good edges:           {}", good);
 
         // Create a new NodeIdIndexMap
         self.nodes.transform_node_ids(transform);
@@ -529,10 +509,10 @@ impl TransformNodeIds for PackedGraph {
             let tgt_ix = 2 * ix;
             let handle: Handle = self.edges.record_vec.get_unpack(tgt_ix);
             let n_id = handle.id();
-            // if !n_id.is_zero() && self.has_node(n_id) {
-            if !self.has_node(n_id) {
-                self.edges.record_vec.set(tgt_ix, 0);
-            } else if !n_id.is_zero() {
+            // if !self.has_node(n_id) {
+            //     self.edges.record_vec.set(tgt_ix, 0);
+            // }
+            if !n_id.is_zero() {
                 let new_handle =
                     Handle::pack(transform(n_id), handle.is_reverse());
                 self.edges.record_vec.set_pack(tgt_ix, new_handle);

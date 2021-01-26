@@ -815,7 +815,7 @@ impl PackedGraph {
         visited: &mut FnvHashSet<EdgeListIx>,
     ) {
         use crate::handlegraph::IntoHandles;
-        use Direction as Dir;
+
         if !self.has_node(handle.id()) {
             panic!(
                 "tried to get neighbors of node {} which doesn't exist",
@@ -832,11 +832,7 @@ impl PackedGraph {
 
         let iter = self.edges.iter(edge_list_ix);
 
-        let visited_pre = visited.len();
-
         super::iter::EdgeListHandleIterTrace::visit_now(iter, true, visited);
-
-        let visited_left = visited.len();
 
         let edge_list_ix = if handle.is_reverse() {
             self.nodes.get_edge_list(g_ix, Direction::Left)
@@ -847,14 +843,5 @@ impl PackedGraph {
         let iter = self.edges.iter(edge_list_ix);
 
         super::iter::EdgeListHandleIterTrace::visit_now(iter, false, visited);
-
-        let visited_right = visited.len();
-
-        // debug!(
-        //     "new neighbors {} and {} - total {}",
-        //     visited_left - visited_pre,
-        //     visited_right - visited_left,
-        //     visited_right
-        // );
     }
 }

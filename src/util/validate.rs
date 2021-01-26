@@ -1,16 +1,14 @@
 use crate::{
-    handle::{Direction, Edge, Handle, NodeId},
+    handle::{Direction, Edge},
     handlegraph::*,
-    mutablehandlegraph::*,
     packedgraph::index::OneBasedIndex,
     pathhandlegraph::*,
 };
 
 use crate::packed::*;
-use crate::packedgraph::{defragment::*, paths::StepPtr, *};
+use crate::packedgraph::*;
 
-use fnv::{FnvHashMap, FnvHashSet, FnvHasher};
-use std::hash::{Hash, Hasher};
+use fnv::FnvHashSet;
 
 #[allow(unused_imports)]
 use log::{debug, error, info, trace};
@@ -91,7 +89,7 @@ pub fn validate(graph: &PackedGraph) {
         }
     }
 
-    // assert_eq!(edges_count, graph.edge_count());
+    assert_eq!(edges_count, graph.edge_count());
 
     assert_eq!(nodes_len, nodes_set.len());
 
