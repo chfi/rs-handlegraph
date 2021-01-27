@@ -459,18 +459,7 @@ pub fn create_consensus_graph(
 
             let mut step = link.begin;
 
-            if link.begin == link.end {
-                info!("link path {}, from path {}, despite having length {}, has head {}, tail {}",
-                      path_cons_graph.0,
-                      link.path.0,
-                      link.length,
-                      link.begin.pack(),
-                      link.end.pack(),
-                      );
-            }
-
-            loop {
-                // while step != link.end {
+            while step != link.end {
                 let handle =
                     smoothed.path_handle_at_step(link.path, step).unwrap();
 
@@ -481,9 +470,6 @@ pub fn create_consensus_graph(
 
                 consensus_graph.path_append_step(path_cons_graph, handle);
 
-                if step == link.end {
-                    break;
-                }
                 step = smoothed.path_next_step(link.path, step).unwrap();
             }
         }
@@ -661,17 +647,21 @@ pub fn create_consensus_graph(
 
     // links_by_start_end.par_sort_by(|a, b| {
     //     use std::cmp::Ordering;
-    //     if a.start < b.end {
-    //         Ordering::Less
-    //     } else if a.start == b.end && a.end > b.end {
+    //     if a.start < b.end || a.start == b.end && a.end > b.end {
     //         Ordering::Less
     //     } else {
     //         Ordering::Greater
     //     }
     // });
 
-    links_by_start_end
-        .par_sort_by(|a, b| (a.start, a.end).cmp(&(b.start, b.end)));
+    // links_by_start_end
+    //     .par_sort_by(|a, b| (b.start, b.end).cmp(&(a.start, a.end)));
+
+    links_by_start_end.par_sort_by(|a, b| {
+        let adiff = a.end.0 - a.start.0;
+        let bdiff = b.end.0 - b.start.0;
+        bdiff.cmp(&adiff)
+    });
 
     let count = 5;
     debug!("first {} in links_by_start_end", count);
@@ -997,6 +987,7 @@ pub fn create_consensus_graph(
         }
     }
 
+    /*
     let mut link_path_names_to_keep: Vec<Vec<u8>> = Vec::new();
 
     {
@@ -1042,18 +1033,19 @@ pub fn create_consensus_graph(
     for &link in link_paths.iter() {
         consensus_graph.destroy_path(link);
     }
+    */
 
     debug!("unchop 4");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 4");
 
-    link_paths.clear();
+    // link_paths.clear();
 
-    link_paths.extend(
-        link_path_names_to_keep
-            .iter()
-            .filter_map(|name| consensus_graph.get_path_id(name)),
-    );
+    // link_paths.extend(
+    //     link_path_names_to_keep
+    //         .iter()
+    //         .filter_map(|name| consensus_graph.get_path_id(name)),
+    // );
 
     {
         let is_degree_1_tip = |handle: Handle| -> bool {
@@ -1120,7 +1112,6 @@ pub fn create_consensus_graph(
     debug!("unchop 5");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 5");
-
 
     consensus_graph.compact_ids();
     consensus_graph.defragment();
@@ -1278,10 +1269,6 @@ fn compute_best_link(
                 }
 
                 step = next;
-
-                if step == link.end {
-                    break;
-                }
             }
 
             if has_perfect_link {
