@@ -1,6 +1,6 @@
 [package]
 name = "handlegraph"
-version = "0.7.0-alpha.1"
+version = "0.7.0-alpha.2"
 authors = ["Christian Fischer <christian@chfi.se>"]
 edition = "2018"
 license = "MIT"
@@ -12,7 +12,7 @@ categories = ["science"]
 
 
 [dependencies]
-gfa = "0.9"
+gfa = "0.10.0-alpha.0"
 fnv = "1.0"
 succinct = "0.5"
 rayon = "1.5"
