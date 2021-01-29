@@ -120,6 +120,7 @@ pub fn create_consensus_graph(
     consensus_path_names: &[Vec<u8>],
     consensus_jump_max: usize,
 ) -> PackedGraph {
+    info!("consensus_jump_max: {}", consensus_jump_max);
     info!("using {} consensus paths", consensus_path_names.len());
     let consensus_paths: Vec<PathId> = consensus_path_names
         .iter()
@@ -433,28 +434,27 @@ pub fn create_consensus_graph(
 
     info!("adding link paths not in consensus paths");
     // add link paths not in the consensus paths
-    let mut link_path_names: Vec<String> = Vec::new();
+    let mut link_path_names: Vec<Vec<u8>> = Vec::new();
 
     for link in consensus_links.iter() {
         if link.length > 0 {
-            let from_cons_name =
-                smoothed.get_path_name_vec(link.from_cons_path).unwrap();
-            let to_cons_name =
-                smoothed.get_path_name_vec(link.to_cons_path).unwrap();
-            let link_name = format!(
-                "Link_{}_{}_{}",
-                from_cons_name.as_bstr(),
-                to_cons_name.as_bstr(),
-                link.rank
-            );
+            let mut link_name = Vec::with_capacity(128);
 
-            let path_cons_graph = match consensus_graph
-                .create_path(link_name.as_bytes(), false)
-            {
-                Some(path_id) => path_id,
-                None => continue,
-            };
+            link_name.extend(b"Link_");
+            link_name
+                .extend(smoothed.get_path_name(link.from_cons_path).unwrap());
+            link_name.push(b'_');
+            link_name
+                .extend(smoothed.get_path_name(link.to_cons_path).unwrap());
+            link_name.extend(link.rank.to_string().bytes());
 
+            let path_cons_graph =
+                match consensus_graph.create_path(&link_name, false) {
+                    Some(path_id) => path_id,
+                    None => continue,
+                };
+
+            link_name.shrink_to_fit();
             link_path_names.push(link_name);
 
             let mut step = link.begin;
@@ -685,7 +685,7 @@ pub fn create_consensus_graph(
         .count();
     debug!("links_by_start_end contains {} empty links", empty_links);
 
-    let mut updated_links: Vec<(String, Vec<Handle>)> = Vec::new();
+    let mut updated_links: Vec<(Vec<u8>, Vec<Handle>)> = Vec::new();
     let mut links_to_remove: Vec<PathId> = Vec::new();
 
     info!("novelify");
@@ -710,7 +710,7 @@ pub fn create_consensus_graph(
         consensus_graph.destroy_path(link);
     }
 
-    let mut link_path_names_to_keep: Vec<String> = Vec::new();
+    let mut link_path_names_to_keep: Vec<Vec<u8>> = Vec::new();
 
     {
         let (link_path_ids, link_path_steps): (
@@ -724,9 +724,13 @@ pub fn create_consensus_graph(
                     .create_path(name.as_bytes(), false)
                     .unwrap();
 
-                trace!("link path {} - {} steps", name, handles.len());
+                trace!(
+                    "link path {} - {} steps",
+                    name.as_bstr(),
+                    handles.len()
+                );
                 if handles.is_empty() {
-                    info!("link path {} is empty", name);
+                    info!("link path {} is empty", name.as_bstr());
                 }
                 link_path_names_to_keep.push(name);
 
@@ -1345,21 +1349,22 @@ fn compute_best_link(
 
 fn save_path_fragment(
     consensus: &PackedGraph,
-    updated_links: &mut Vec<(String, Vec<Handle>)>,
+    updated_links: &mut Vec<(Vec<u8>, Vec<Handle>)>,
     link: PathId,
     save_rank: &mut usize,
     first_novel: StepPtr,
     step: StepPtr,
 ) {
-    let path_name = consensus.get_path_name_vec(link).unwrap();
-    let string = format!("{}_{}", path_name.as_bstr(), save_rank);
+    let mut new_name = consensus.get_path_name_vec(link).unwrap();
+    new_name.push(b'_');
+    new_name.extend(save_rank.to_string().bytes());
+
     *save_rank += 1;
 
     let mut handles = Vec::new();
 
     let mut q = first_novel;
 
-    // while q != step {
     loop {
         let handle = consensus.path_handle_at_step(link, q).unwrap();
         handles.push(handle);
@@ -1369,13 +1374,13 @@ fn save_path_fragment(
         q = consensus.path_next_step(link, q).unwrap();
     }
 
-    updated_links.push((string, handles));
+    updated_links.push((new_name, handles));
 }
 
 fn novelify(
     consensus: &PackedGraph,
     consensus_paths_set: &FnvHashSet<PathId>,
-    updated_links: &mut Vec<(String, Vec<Handle>)>,
+    updated_links: &mut Vec<(Vec<u8>, Vec<Handle>)>,
     links_to_remove: &mut Vec<PathId>,
     consensus_jump_max: usize,
     group: &[LinkRange],
