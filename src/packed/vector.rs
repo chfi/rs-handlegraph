@@ -274,6 +274,7 @@ pub struct Iter<'a> {
 }
 
 impl<'a> Iter<'a> {
+    #[inline]
     fn new(iter: succinct::int_vec::Iter<'a, u64>, num_entries: usize) -> Self {
         let left_ix = 0;
         let right_ix = num_entries;
@@ -284,20 +285,24 @@ impl<'a> Iter<'a> {
         }
     }
 
+    #[inline]
     fn offset_new(
         mut iter: succinct::int_vec::Iter<'a, u64>,
         offset: usize,
         length: usize,
     ) -> Self {
         let drop_right = iter.len() - (offset + length);
-        for _ in 0..drop_right {
-            iter.next_back();
+
+        if drop_right > 0 {
+            iter.nth_back(drop_right - 1);
         }
+        if offset > 0 {
+            iter.nth(offset - 1);
+        }
+
         let left_ix = offset;
         let right_ix = offset + length;
-        for _ in 0..offset {
-            iter.next();
-        }
+
         Self {
             iter,
             left_ix,
@@ -305,6 +310,7 @@ impl<'a> Iter<'a> {
         }
     }
 
+    #[inline]
     pub fn view<T: PackedElement>(self) -> IterView<'a, T> {
         IterView::new(self)
     }

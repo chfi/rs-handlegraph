@@ -121,6 +121,7 @@ impl Defragment for PackedPathNames {
 }
 
 impl PackedPathNames {
+    #[inline]
     pub(crate) fn add_name(&mut self, name: &[u8]) -> PathId {
         let path_id = PathId(self.lengths.len() as u64);
 
@@ -136,6 +137,7 @@ impl PackedPathNames {
         path_id
     }
 
+    #[inline]
     pub(super) fn remove_id(&mut self, id: PathId) -> Option<()> {
         let name = self.name_iter(id)?.collect::<Vec<_>>();
         let _id = self.name_id_map.remove(&name);
@@ -149,6 +151,7 @@ impl PackedPathNames {
         Some(())
     }
 
+    #[inline]
     pub(super) fn name_iter(
         &self,
         id: PathId,
@@ -495,6 +498,7 @@ impl PackedGraphPaths {
         println!("\n ~~  END  PackedGraphPaths diagnostics ~~ \n");
     }
 }
+
 impl<'a> GraphPathNames for &'a super::PackedGraph {
     type PathName = packed::vector::IterView<'a, u8>;
 
