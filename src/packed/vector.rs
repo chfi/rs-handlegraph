@@ -104,10 +104,6 @@ impl PackedIntVec {
             }
 
             new_vec.resize(size as u64, 0);
-            // for ix in self.num_entries..size {
-            //     new_vec.push(0);
-            // new_vec.set(ix as u64, 0);
-            // }
 
             std::mem::swap(&mut self.vector, &mut new_vec);
             self.width = width;
@@ -123,20 +119,14 @@ impl PackedIntVec {
     pub fn reserve_with_width(&mut self, size: usize, width: usize) {
         if width > self.width {
             let size = size.max(self.vector.len() as usize);
-            //     IntVector::with_fill(width, size as u64, 0);
             let mut new_vec: IntVector<u64> =
                 IntVector::with_capacity(width, size as u64);
 
             for ix in 0..(self.num_entries as u64) {
                 new_vec.push(self.vector.get(ix));
-                // new_vec.set(ix, self.vector.get(ix));
             }
 
             new_vec.resize(size as u64, 0);
-            // for ix in self.num_entries..size {
-            //     new_vec.push(0);
-            // new_vec.set(ix as u64, 0);
-            // }
             std::mem::swap(&mut self.vector, &mut new_vec);
             self.width = width;
         } else {
@@ -269,20 +259,16 @@ impl PackedCollection for PackedIntVec {
 
 pub struct Iter<'a> {
     iter: succinct::int_vec::Iter<'a, u64>,
-    left_ix: usize,
-    right_ix: usize,
+    ix: usize,
+    end: usize,
 }
 
 impl<'a> Iter<'a> {
     #[inline]
     fn new(iter: succinct::int_vec::Iter<'a, u64>, num_entries: usize) -> Self {
-        let left_ix = 0;
-        let right_ix = num_entries;
-        Self {
-            iter,
-            left_ix,
-            right_ix,
-        }
+        let ix = 0;
+        let end = num_entries;
+        Self { iter, ix, end }
     }
 
     #[inline]
@@ -291,23 +277,14 @@ impl<'a> Iter<'a> {
         offset: usize,
         length: usize,
     ) -> Self {
-        let drop_right = iter.len() - (offset + length);
-
-        if drop_right > 0 {
-            iter.nth_back(drop_right - 1);
-        }
         if offset > 0 {
             iter.nth(offset - 1);
         }
 
-        let left_ix = offset;
-        let right_ix = offset + length;
+        let ix = offset;
+        let end = offset + length;
 
-        Self {
-            iter,
-            left_ix,
-            right_ix,
-        }
+        Self { iter, ix, end }
     }
 
     #[inline]
@@ -321,9 +298,9 @@ impl<'a> Iterator for Iter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<u64> {
-        if self.left_ix < self.right_ix {
+        if self.ix < self.end {
             let item = self.iter.next();
-            self.left_ix += 1;
+            self.ix += 1;
             item
         } else {
             None
@@ -332,8 +309,8 @@ impl<'a> Iterator for Iter<'a> {
 
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let lower = if self.left_ix < self.right_ix {
-            self.right_ix - self.left_ix
+        let lower = if self.ix < self.end {
+            self.end - self.ix
         } else {
             0
         };
@@ -343,8 +320,8 @@ impl<'a> Iterator for Iter<'a> {
 
     #[inline]
     fn count(self) -> usize {
-        if self.left_ix < self.right_ix {
-            self.right_ix - self.left_ix
+        if self.ix < self.end {
+            self.end - self.ix
         } else {
             0
         }
@@ -352,8 +329,8 @@ impl<'a> Iterator for Iter<'a> {
 
     #[inline]
     fn last(mut self) -> Option<u64> {
-        if self.left_ix < self.right_ix {
-            self.iter.nth(self.right_ix - self.left_ix)
+        if self.ix < self.end {
+            self.iter.nth(self.end - self.ix)
         } else {
             None
         }
@@ -361,30 +338,8 @@ impl<'a> Iterator for Iter<'a> {
 
     #[inline]
     fn nth(&mut self, n: usize) -> Option<u64> {
-        if self.left_ix + n < self.right_ix {
+        if self.ix + n < self.end {
             self.iter.nth(n)
-        } else {
-            None
-        }
-    }
-}
-
-impl<'a> DoubleEndedIterator for Iter<'a> {
-    #[inline]
-    fn next_back(&mut self) -> Option<u64> {
-        if self.right_ix > self.left_ix {
-            self.right_ix += 1;
-            self.iter.next_back()
-        } else {
-            None
-        }
-    }
-
-    #[inline]
-    fn nth_back(&mut self, n: usize) -> Option<u64> {
-        if self.right_ix > self.left_ix + n {
-            self.right_ix += n;
-            self.iter.nth_back(n)
         } else {
             None
         }
@@ -423,12 +378,6 @@ impl<'a, T: PackedElement> Iterator for IterView<'a, T> {
     }
     fn nth(&mut self, n: usize) -> Option<Self::Item> {
         self.iter.nth(n).map(T::unpack)
-    }
-}
-
-impl<'a, T: PackedElement> DoubleEndedIterator for IterView<'a, T> {
-    fn next_back(&mut self) -> Option<Self::Item> {
-        self.iter.next_back().map(T::unpack)
     }
 }
 
