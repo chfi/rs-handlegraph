@@ -400,6 +400,10 @@ pub fn create_consensus_graph(
     info!("adding consensus paths");
     // add consensus paths to consensus graph
 
+    let mut cons_path_name_map: FnvHashMap<PathId, Vec<u8>> =
+        FnvHashMap::default();
+    cons_path_name_map.reserve(consensus_paths.len());
+
     for &path_id in consensus_paths.iter() {
         let path_name = smoothed.get_path_name_vec(path_id).unwrap();
 
@@ -407,6 +411,7 @@ pub fn create_consensus_graph(
             consensus_graph.create_path(&path_name, false).unwrap();
 
         path_map.insert(new_path_id, path_id);
+        cons_path_name_map.insert(path_id, path_name);
 
         let path_ref = smoothed.get_path_ref(path_id).unwrap();
 
@@ -442,10 +447,10 @@ pub fn create_consensus_graph(
 
             link_name.extend(b"Link_");
             link_name
-                .extend(smoothed.get_path_name(link.from_cons_path).unwrap());
+                .extend(cons_path_name_map.get(&link.from_cons_path).unwrap());
             link_name.push(b'_');
             link_name
-                .extend(smoothed.get_path_name(link.to_cons_path).unwrap());
+                .extend(cons_path_name_map.get(&link.from_cons_path).unwrap());
             link_name.extend(link.rank.to_string().bytes());
 
             let path_cons_graph =
@@ -534,7 +539,7 @@ pub fn create_consensus_graph(
     info!("validating");
     for path_id in smoothed.path_ids().filter(|p| consensus_paths.contains(&p))
     {
-        let path_name = smoothed.get_path_name_vec(path_id).unwrap();
+        let path_name = cons_path_name_map.get(&path_id).unwrap();
 
         if consensus_graph.get_path_id(&path_name).is_none() {
             panic!(
@@ -615,7 +620,6 @@ pub fn create_consensus_graph(
         .iter()
         .filter_map(|name| {
             let path_id = consensus_graph.get_path_id(name.as_bytes())?;
-
             consensus_paths.push(path_id);
             Some(path_id)
         })
