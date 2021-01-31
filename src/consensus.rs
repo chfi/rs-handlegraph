@@ -118,6 +118,7 @@ pub struct LinkRange {
 pub fn create_consensus_graph(
     smoothed: &PackedGraph,
     consensus_path_names: &[Vec<u8>],
+    consensus_jump_limit: usize,
     consensus_jump_max: usize,
 ) -> PackedGraph {
     info!("consensus_jump_max: {}", consensus_jump_max);
@@ -366,6 +367,7 @@ pub fn create_consensus_graph(
                 compute_best_link(
                     smoothed,
                     consensus_jump_max,
+                    consensus_jump_limit,
                     &curr_links,
                     &mut consensus_links,
                     &mut perfect_edges,
@@ -383,6 +385,7 @@ pub fn create_consensus_graph(
     compute_best_link(
         smoothed,
         consensus_jump_max,
+        consensus_jump_limit,
         &curr_links,
         &mut consensus_links,
         &mut perfect_edges,
@@ -1171,6 +1174,51 @@ fn novel_seq_len(
     novel_bp
 }
 
+fn largest_novel_gap(
+    graph: &PackedGraph,
+    seen_nodes: &mut FnvHashSet<NodeId>,
+    path: PathId,
+    begin: StepPtr,
+    end: StepPtr,
+) -> usize {
+    let mut novel_bp = 0usize;
+    let mut largest_gap = 0usize;
+
+    let mut step = begin;
+
+    while step != end {
+        let handle = graph.path_handle_at_step(path, step).unwrap();
+        let id = handle.id();
+
+        if !seen_nodes.contains(&id) {
+            novel_bp += graph.node_len(handle);
+            seen_nodes.insert(id);
+        } else {
+            largest_gap = novel_bp.max(largest_gap);
+            novel_bp = 0;
+        }
+
+        step = graph.path_next_step(path, step).unwrap();
+    }
+
+    largest_gap
+}
+
+fn get_step_count(
+    graph: &PackedGraph,
+    path: PathId,
+    begin: StepPtr,
+    end: StepPtr,
+) -> usize {
+    let mut step_count = 0;
+    let mut step = begin;
+    while step != end {
+        step_count += 1;
+        step = graph.path_next_step(path, step).unwrap();
+    }
+    step_count
+}
+
 fn mark_seen_nodes(
     graph: &PackedGraph,
     seen_nodes: &mut FnvHashSet<NodeId>,
@@ -1195,6 +1243,7 @@ fn mark_seen_nodes(
 fn compute_best_link(
     graph: &PackedGraph,
     consensus_jump_max: usize,
+    consensus_jump_limit: usize,
     links: &[&LinkPath],
     consensus_links: &mut Vec<LinkPath>,
     perfect_edges: &mut Vec<(Handle, Handle)>,
@@ -1323,7 +1372,8 @@ fn compute_best_link(
         if link.hash == best_hash {
             continue;
         }
-        let novel_bp: usize = novel_seq_len(
+
+        let largest_gap: usize = largest_novel_gap(
             graph,
             &mut seen_nodes,
             link.path,
@@ -1331,7 +1381,14 @@ fn compute_best_link(
             link.end,
         );
 
-        if link.jump_len >= consensus_jump_max || novel_bp >= consensus_jump_max
+        let step_count = get_step_count(graph, link.path, link.begin, link.end);
+
+        let gap_over_step = (largest_gap as f64) / (step_count as f64);
+
+        if (link.jump_len >= consensus_jump_max
+            && link.jump_len < consensus_jump_limit
+            && (link.length == 0 || (gap_over_step > 1.0)))
+            || largest_gap >= consensus_jump_max
         {
             let mut link = link.to_owned();
 
