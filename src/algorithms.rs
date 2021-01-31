@@ -1,5 +1,5 @@
 use crate::{
-    handle::{Direction, Edge, Handle},
+    handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
     pathhandlegraph::*,
 };
@@ -25,6 +25,7 @@ pub fn simple_components(
     min_size: usize,
 ) -> Vec<Vec<Handle>> {
     debug!("in simple components");
+
     let mut bphf_data = Vec::with_capacity((1 + graph.node_count()) * 2);
 
     for handle in graph.handles() {
@@ -37,23 +38,51 @@ pub fn simple_components(
     let disj_set = DisjointSets::new(bphf_data.len() + 1);
 
     debug!("building disjoint set structure");
-    debug!("adding nodes");
-    graph.handles_par().for_each(|handle| {
+    debug!("adding nodes - count {}", graph.node_count());
+
+    graph.handles().for_each(|handle| {
         let h_i = bphf.hash(&handle.0);
         let h_j = bphf.hash(&handle.flip().0);
         disj_set.unite(h_i, h_j);
+
+        if graph.degree(handle, Direction::Left) == 1 {
+            for prev in graph.neighbors(handle, Direction::Left) {
+                if graph.degree(prev, Direction::Right) == 1
+                    && perfect_neighbors(graph, prev, handle)
+                {
+                    let from = bphf.hash(&prev.0);
+                    let to = bphf.hash(&handle.0);
+                    disj_set.unite(from, to);
+                }
+            }
+        }
+
+        if graph.degree(handle, Direction::Right) == 1 {
+            for next in graph.neighbors(handle, Direction::Right) {
+                if graph.degree(next, Direction::Left) == 1
+                    && perfect_neighbors(graph, handle, next)
+                {
+                    let from = bphf.hash(&handle.0);
+                    let to = bphf.hash(&next.0);
+                    disj_set.unite(from, to);
+                }
+            }
+        }
     });
 
-    debug!("adding edges");
+    debug!("adding edges - count {}", graph.edge_count());
+
     graph.edges_par().for_each(|Edge(from, to)| {
         if from.id() != to.id()
             && graph.degree(from, Direction::Right) == 1
             && graph.degree(to, Direction::Left) == 1
-            && perfect_neighbors(graph, from, to)
         {
-            let from = bphf.hash(&from.0);
-            let to = bphf.hash(&to.0);
-            disj_set.unite(from, to);
+            let is_perfect = perfect_neighbors(graph, from, to);
+            if is_perfect {
+                let from = bphf.hash(&from.0);
+                let to = bphf.hash(&to.0);
+                disj_set.unite(from, to);
+            }
         }
     });
 
@@ -69,6 +98,13 @@ pub fn simple_components(
             .push(handle);
     }
 
+    let pred_in_comp =
+        |graph: &PackedGraph, h: Handle, comp: &FnvHashSet<NodeId>| -> bool {
+            graph
+                .neighbors(h, Direction::Left)
+                .all(|prev| comp.contains(&prev.id()))
+        };
+
     let mut handle_components: Vec<Vec<Handle>> = Vec::new();
 
     for comp in simple_components.values_mut() {
@@ -76,50 +112,43 @@ pub fn simple_components(
             continue;
         }
 
-        comp.sort_by(|a, b| b.cmp(a));
-
-        let comp_set: FnvHashSet<Handle> = comp.iter().copied().collect();
+        let comp_set: FnvHashSet<NodeId> =
+            comp.iter().map(|h| h.id()).collect();
 
         let mut handle = *comp.first().unwrap();
-        let base = handle;
-        let mut has_prev: bool;
 
-        loop {
-            has_prev = graph.degree(handle, Direction::Left) == 1;
-            let mut prev = handle;
+        {
+            let mut c_iter = comp.iter().take_while(|&&h| {
+                graph.degree(h, Direction::Left) == 1
+                    && pred_in_comp(&graph, h, &comp_set)
+            });
 
-            if has_prev {
-                prev = graph.neighbors(handle, Direction::Left).next().unwrap();
-            }
-
-            if handle != prev && prev != base && comp_set.contains(&prev) {
-                handle = prev;
-            } else {
-                break;
+            while let Some(h) = c_iter.next() {
+                handle = *h;
             }
         }
 
-        let base = handle;
-        let mut has_next: bool;
+        if handle == *comp.last().unwrap() {
+            handle = *comp.first().unwrap();
+        }
 
         let mut sorted_comp: Vec<Handle> = Vec::new();
 
         loop {
             sorted_comp.push(handle);
-            has_next = graph.degree(handle, Direction::Right) == 1;
-            let mut next = handle;
 
-            if has_next {
-                next =
-                    graph.neighbors(handle, Direction::Right).next().unwrap();
+            if let Some(next) = graph.neighbors(handle, Direction::Right).next()
+            {
+                if comp_set.contains(&next.id()) {
+                    handle = next;
+                }
             }
 
-            if handle != next && next != base && comp_set.contains(&next) {
-                handle = next;
-            } else {
+            if sorted_comp.len() >= comp.len() {
                 break;
             }
         }
+        assert!(sorted_comp.len() == comp.len());
 
         if sorted_comp.len() >= min_size {
             handle_components.push(sorted_comp);
