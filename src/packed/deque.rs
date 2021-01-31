@@ -237,17 +237,27 @@ impl PackedCollection for PackedDeque {
 }
 
 pub struct Iter<'a> {
-    deque: &'a PackedDeque,
-    index: usize,
+    deque_vec: &'a PackedIntVec,
+    start_ix: usize,
+    cur_ix: usize,
     len: usize,
+    diff: usize,
+    ix_gte_diff: bool,
+    finished: bool,
 }
 
 impl<'a> Iter<'a> {
     fn new(deque: &'a PackedDeque) -> Self {
+        let diff = deque.vector.len() - deque.start_ix;
+
         Self {
-            deque,
-            index: 0,
+            deque_vec: &deque.vector,
+            cur_ix: 0,
+            start_ix: deque.start_ix,
             len: deque.len(),
+            diff,
+            ix_gte_diff: false,
+            finished: false,
         }
     }
 }
@@ -257,13 +267,25 @@ impl<'a> Iterator for Iter<'a> {
 
     #[inline]
     fn next(&mut self) -> Option<u64> {
-        if self.index < self.len {
-            let item = self.deque.get(self.index);
-            self.index += 1;
-            Some(item)
-        } else {
-            None
+        if self.finished {
+            return None;
         }
+
+        let cur_ix = self.cur_ix;
+        self.cur_ix += 1;
+
+        let ix = if !self.ix_gte_diff {
+            if self.cur_ix == self.diff {
+                self.ix_gte_diff = true;
+            }
+            cur_ix + self.start_ix
+        } else {
+            cur_ix - self.diff
+        };
+
+        self.finished |= self.cur_ix == self.len;
+
+        Some(self.deque_vec.get(ix))
     }
 }
 

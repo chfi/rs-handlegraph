@@ -33,6 +33,7 @@ impl<'a, I> NodeIdRefHandles<'a, I>
 where
     I: Iterator<Item = &'a NodeId> + 'a,
 {
+    #[inline]
     pub fn new(iter: I) -> Self {
         Self { iter }
     }
@@ -65,6 +66,7 @@ impl<I> NodeIdHandles<I>
 where
     I: Iterator<Item = NodeId>,
 {
+    #[inline]
     pub fn new(iter: I) -> Self {
         Self { iter }
     }
@@ -98,6 +100,7 @@ impl<I> HandleEdgesIter<I>
 where
     I: Iterator<Item = Handle>,
 {
+    #[inline]
     fn new(handle: Handle, left: I, right: I) -> Self {
         Self {
             handle,
@@ -106,6 +109,7 @@ where
         }
     }
 
+    #[inline]
     fn next_left_edge(&mut self) -> Option<Edge> {
         let left_neighbors = self.left_neighbors.as_mut()?;
         loop {
@@ -122,6 +126,7 @@ where
         }
     }
 
+    #[inline]
     fn next_right_edge(&mut self) -> Option<Edge> {
         let right_neighbors = self.right_neighbors.as_mut()?;
         loop {
@@ -149,9 +154,11 @@ where
             return None;
         }
 
-        let next = self.next_right_edge();
-        if next.is_some() {
-            return next;
+        if self.right_neighbors.is_some() {
+            let next = self.next_right_edge();
+            if next.is_some() {
+                return next;
+            }
         }
 
         let next = self.next_left_edge();
@@ -178,24 +185,28 @@ where
     neighbors: Option<HandleEdgesIter<G::Neighbors>>,
     handles: G::Handles,
     graph: G,
+    finished: bool,
 }
 
 impl<G> EdgesIter<G>
 where
     G: IntoNeighbors + IntoHandles + Copy,
 {
+    #[inline]
     pub fn new(graph: G) -> Self {
         let handles = graph.handles();
         let mut edges_iter = Self {
             graph,
             handles,
             neighbors: None,
+            finished: false,
         };
 
         edges_iter.has_next_handle();
         edges_iter
     }
 
+    #[inline]
     fn has_next_handle(&mut self) -> bool {
         if self.neighbors.is_some() {
             true
@@ -217,7 +228,11 @@ where
 {
     type Item = Edge;
 
+    #[inline]
     fn next(&mut self) -> Option<Edge> {
+        if self.finished == true {
+            return None;
+        }
         loop {
             let neighbors = self.neighbors.as_mut()?;
             let next_edge = neighbors.next();
@@ -227,6 +242,7 @@ where
                 self.neighbors = None;
             }
             if !self.has_next_handle() {
+                self.finished = true;
                 return None;
             }
         }
@@ -256,6 +272,7 @@ impl<'a, I> NeighborIter<'a, I>
 where
     I: Iterator<Item = &'a Handle>,
 {
+    #[inline]
     pub fn new(iter: I, flip: bool) -> Self {
         Self { flip, iter }
     }
@@ -297,6 +314,7 @@ where
     I: Iterator<Item = u8>,
     I: DoubleEndedIterator,
 {
+    #[inline]
     pub fn new(iter: I, reversing: bool) -> Self {
         Self { iter, reversing }
     }
@@ -309,6 +327,7 @@ where
 {
     type Item = u8;
 
+    #[inline]
     fn next(&mut self) -> Option<u8> {
         if self.reversing {
             self.iter.next_back().map(crate::util::dna::comp_base)

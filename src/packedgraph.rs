@@ -96,6 +96,7 @@ impl<'a> IntoHandles for &'a PackedGraph {
 impl<'a> IntoHandlesPar for &'a PackedGraph {
     type HandlesPar = rayon::iter::IterBridge<NodeIdHandles<IndexMapIter<'a>>>;
 
+    #[inline]
     fn handles_par(self) -> Self::HandlesPar {
         self.handles().par_bridge()
     }
@@ -113,6 +114,7 @@ impl<'a> IntoEdges for &'a PackedGraph {
 impl<'a> IntoEdgesPar for &'a PackedGraph {
     type EdgesPar = rayon::iter::IterBridge<EdgesIter<&'a PackedGraph>>;
 
+    #[inline]
     fn edges_par(self) -> Self::EdgesPar {
         self.edges().par_bridge()
     }
@@ -168,6 +170,7 @@ impl<'a> IntoSequences for &'a PackedGraph {
 
 impl<'a> IntoNodeOccurrences for &'a PackedGraph {
     type Occurrences = OccurrencesIter<'a>;
+    #[inline]
     fn steps_on_handle(self, handle: Handle) -> Option<Self::Occurrences> {
         let occ_ix = self.nodes.handle_occur_record(handle)?;
         let iter = self.occurrences.iter(occ_ix);
