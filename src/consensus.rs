@@ -652,23 +652,23 @@ pub fn create_consensus_graph(
         })
         .collect::<Vec<_>>();
 
-    // links_by_start_end.par_sort_by(|a, b| {
-    //     use std::cmp::Ordering;
-    //     if a.start < b.end || a.start == b.end && a.end > b.end {
-    //         Ordering::Less
-    //     } else {
-    //         Ordering::Greater
-    //     }
-    // });
+    links_by_start_end.par_sort_unstable_by(|a, b| {
+        use std::cmp::Ordering;
+        if a.start < b.end || a.start == b.end && a.end > b.end {
+            Ordering::Less
+        } else {
+            Ordering::Greater
+        }
+    });
 
     // links_by_start_end
-    //     .par_sort_by(|a, b| (b.start, b.end).cmp(&(a.start, a.end)));
+    //     .par_sort_unstable_by(|a, b| (b.start, b.end).cmp(&(a.start, a.end)));
 
-    links_by_start_end.par_sort_by(|a, b| {
-        let adiff = a.end.0 - a.start.0;
-        let bdiff = b.end.0 - b.start.0;
-        bdiff.cmp(&adiff)
-    });
+    // links_by_start_end.par_sort_unstable_by(|a, b| {
+    //     let adiff = a.end.0 - a.start.0;
+    //     let bdiff = b.end.0 - b.start.0;
+    //     bdiff.cmp(&adiff)
+    // });
 
     let count = 5;
     debug!("first {} in links_by_start_end", count);
@@ -706,12 +706,6 @@ pub fn create_consensus_graph(
     );
 
     info!("removing {} links", links_to_remove.len());
-
-    let empty_links = updated_links
-        .iter()
-        .filter(|link| link.1.is_empty())
-        .count();
-    debug!("updated_links contains {} empty links", empty_links);
 
     for link in links_to_remove {
         consensus_graph.destroy_path(link);
@@ -760,18 +754,12 @@ pub fn create_consensus_graph(
         );
     }
 
-    // remove coverage = 0 nodes
     let empty_handles = consensus_graph
         .handles()
         .filter(|&handle| {
             consensus_graph.steps_on_handle(handle).unwrap().count() == 0
         })
         .collect::<Vec<_>>();
-
-    info!(
-        "removing {} handles with zero path coverage",
-        empty_handles.len()
-    );
 
     for handle in empty_handles {
         consensus_graph.remove_handle(handle);
@@ -1108,17 +1096,6 @@ pub fn create_consensus_graph(
 
     // TODO optimize
     consensus_graph.defragment();
-
-    let empty_handles = consensus_graph
-        .handles()
-        .filter(|&handle| {
-            consensus_graph.steps_on_handle(handle).unwrap().count() == 0
-        })
-        .collect::<Vec<_>>();
-
-    for handle in empty_handles {
-        consensus_graph.remove_handle(handle);
-    }
 
     debug!("unchop 5");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
