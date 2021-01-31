@@ -112,6 +112,60 @@ pub fn simple_components(
             continue;
         }
 
+        let comp_set: FnvHashSet<Handle> = comp.iter().copied().collect();
+
+        let mut handle = *comp.first().unwrap();
+        let base = handle;
+        let mut has_prev: bool;
+
+        loop {
+            has_prev = graph.degree(handle, Direction::Left) == 1;
+            let mut prev = handle;
+
+            if has_prev {
+                prev = graph.neighbors(handle, Direction::Left).next().unwrap();
+            }
+
+            if handle != prev && prev != base && comp_set.contains(&prev) {
+                handle = prev;
+            } else {
+                break;
+            }
+        }
+
+        let base = handle;
+        let mut has_next: bool;
+
+        let mut sorted_comp: Vec<Handle> = Vec::new();
+
+        loop {
+            sorted_comp.push(handle);
+            has_next = graph.degree(handle, Direction::Right) == 1;
+            let mut next = handle;
+
+            if has_next {
+                next =
+                    graph.neighbors(handle, Direction::Right).next().unwrap();
+            }
+
+            if handle != next && next != base && comp_set.contains(&next) {
+                handle = next;
+            } else {
+                break;
+            }
+        }
+
+        if sorted_comp.len() >= min_size {
+            handle_components.push(sorted_comp);
+        }
+    }
+
+    /*
+    for comp in simple_components.values_mut() {
+        if comp.len() < min_size {
+            continue;
+        }
+
         let comp_set: FnvHashSet<NodeId> =
             comp.iter().map(|h| h.id()).collect();
 
@@ -154,6 +208,7 @@ pub fn simple_components(
             handle_components.push(sorted_comp);
         }
     }
+    */
 
     handle_components
 }
