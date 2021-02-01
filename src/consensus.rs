@@ -1038,14 +1038,6 @@ pub fn create_consensus_graph(
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 4");
 
-    // link_paths.clear();
-
-    // link_paths.extend(
-    //     link_path_names_to_keep
-    //         .iter()
-    //         .filter_map(|name| consensus_graph.get_path_id(name)),
-    // );
-
     {
         let is_degree_1_tip = |handle: Handle| -> bool {
             let deg_fwd = consensus_graph.degree(handle, Direction::Right);
@@ -1092,6 +1084,17 @@ pub fn create_consensus_graph(
                 consensus_graph.path_rewrite_segment(path, step, step, &[]);
             }
         }
+    }
+
+    let empty_handles = consensus_graph
+        .handles()
+        .filter(|&handle| {
+            consensus_graph.steps_on_handle(handle).unwrap().count() == 0
+        })
+        .collect::<Vec<_>>();
+
+    for handle in empty_handles {
+        consensus_graph.remove_handle(handle);
     }
 
     // TODO optimize
