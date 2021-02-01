@@ -120,6 +120,20 @@ pub fn create_consensus_graph(
     consensus_jump_max: usize,
     consensus_jump_limit: usize,
 ) -> PackedGraph {
+    let write_progress_gfas = true;
+
+    let mut progress_gfa_id = 0usize;
+    let mut write_gfa = move |graph: &PackedGraph| {
+        info!("writing in-progress gfa...");
+        let file_name = format!("cons_progress_{}.gfa", progress_gfa_id);
+        let mut file = std::fs::File::create(&file_name).unwrap();
+
+        crate::conversion::write_as_gfa(graph, &mut file).unwrap();
+        info!("wrote in-progress gfa to file: {}", file_name);
+
+        progress_gfa_id += 1;
+    };
+
     info!("consensus_jump_max: {}", consensus_jump_max);
     info!("using {} consensus paths", consensus_path_names.len());
     let consensus_paths: Vec<PathId> = consensus_path_names
@@ -604,6 +618,8 @@ pub fn create_consensus_graph(
         consensus_graph.create_edges_iter(edges.iter().copied());
     }
 
+    // write_gfa(&consensus_graph);
+
     debug!("node_count()      = {}", consensus_graph.node_count());
     debug!("handles().count() = {}", consensus_graph.handles().count());
     info!("min node id: {}", consensus_graph.min_node_id().0);
@@ -613,6 +629,9 @@ pub fn create_consensus_graph(
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 1");
 
+    if write_progress_gfas {
+        write_gfa(&consensus_graph);
+    }
     // consensus_graph.compact_ids();
     // consensus_graph.defragment();
 
@@ -744,9 +763,17 @@ pub fn create_consensus_graph(
         consensus_graph.remove_handle(handle);
     }
 
+    if write_progress_gfas {
+        write_gfa(&consensus_graph);
+    }
+
     debug!("unchop 2");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 2");
+
+    if write_progress_gfas {
+        write_gfa(&consensus_graph);
+    }
 
     // consensus_graph.compact_ids();
     // consensus_graph.defragment();
@@ -831,9 +858,17 @@ pub fn create_consensus_graph(
         consensus_graph.remove_edge(edge);
     }
 
+    if write_progress_gfas {
+        write_gfa(&consensus_graph);
+    }
+
     debug!("unchop 3");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 3");
+
+    if write_progress_gfas {
+        write_gfa(&consensus_graph);
+    }
 
     let empty_handles = consensus_graph
         .handles()
@@ -849,6 +884,10 @@ pub fn create_consensus_graph(
     // TODO optimize
     // consensus_graph.compact_ids();
     consensus_graph.defragment();
+
+    if write_progress_gfas {
+        write_gfa(&consensus_graph);
+    }
 
     debug!("unchop 4");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
