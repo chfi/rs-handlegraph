@@ -791,16 +791,16 @@ pub fn create_consensus_graph(
                 + consensus_graph.node_len(step.handle());
 
             if consensus_graph.degree(step.handle(), Direction::Right) > 1 {
-                for other in
+                for next in
                     consensus_graph.neighbors(step.handle(), Direction::Right)
                 {
-                    if !consensus_graph.has_node(other.id()) {
-                        panic!("node {} doesn't exist in graph", other.id().0);
+                    if !consensus_graph.has_node(next.id()) {
+                        panic!("node {} doesn't exist in graph", next.id().0);
                     }
                     let count =
-                        consensus_graph.steps_on_handle(other).unwrap().count();
+                        consensus_graph.steps_on_handle(next).unwrap().count();
 
-                    let edge = Edge(step.handle(), other);
+                    let edge = Edge(step.handle(), next);
 
                     if edges_to_keep.contains(&edge) {
                         // ok?
@@ -810,7 +810,7 @@ pub fn create_consensus_graph(
                         let mut ok = false;
 
                         for occur in
-                            consensus_graph.steps_on_handle(other).unwrap()
+                            consensus_graph.steps_on_handle(next).unwrap()
                         {
                             // in_path
                             if occur.0 == path_id {
@@ -853,239 +853,6 @@ pub fn create_consensus_graph(
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 3");
 
-    let mut link_paths = link_paths;
-    link_paths.clear();
-
-    for name in link_path_names_to_keep.iter() {
-        if let Some(path_id) = consensus_graph.get_path_id(name.as_bytes()) {
-            link_paths.push(path_id);
-        }
-    }
-
-    let mut node_coverage: FnvHashMap<NodeId, usize> = consensus_graph
-        .handles()
-        .map(|handle| {
-            let cov = consensus_graph.steps_on_handle(handle).unwrap().count();
-            (handle.id(), cov)
-        })
-        .collect();
-
-    let mut to_create: Vec<(Vec<u8>, Vec<Handle>)> = Vec::new();
-
-    for &link in link_paths.iter() {
-        let mut step = consensus_graph.path_first_step(link).unwrap();
-        let head = step.clone();
-        let tail = consensus_graph.path_last_step(link).unwrap();
-
-        if head.is_null() || tail.is_null() {
-            continue;
-        }
-
-        trace!(
-            "link path {} - head: {} - tail: {}",
-            link.0,
-            head.pack(),
-            tail.pack()
-        );
-
-        let mut id = consensus_graph
-            .path_handle_at_step(link, step)
-            .unwrap_or_else(|| {
-                panic!("couldn't get the handle at step {} in path {} - head {} - tail {}",
-                       step.pack(),
-                       link.0,
-                       head.pack(),
-                       tail.pack(),);
-            })
-            .id();
-
-        while step != tail && *node_coverage.get(&id).unwrap() > 1 {
-            *node_coverage.get_mut(&id).unwrap() -= 1;
-
-            if let Some(next) = consensus_graph.path_next_step(link, step) {
-                step = next;
-            } else {
-                break;
-            }
-
-            id = consensus_graph
-                .path_handle_at_step(link, step)
-                .unwrap()
-                .id();
-        }
-
-        let begin = step;
-
-        let mut step = consensus_graph.path_last_step(link).unwrap();
-
-        let mut id = consensus_graph
-            .path_handle_at_step(link, step)
-            .unwrap()
-            .id();
-
-        while step != begin && *node_coverage.get(&id).unwrap() > 1 {
-            *node_coverage.get_mut(&id).unwrap() -= 1;
-
-            if let Some(prev) = consensus_graph.path_prev_step(link, step) {
-                step = prev;
-            } else {
-                break;
-            }
-
-            id = consensus_graph
-                .path_handle_at_step(link, step)
-                .unwrap()
-                .id();
-        }
-
-        let end = consensus_graph
-            .path_next_step(link, step)
-            .unwrap_or_else(|| StepPtr::null());
-        // let end = if let Some(end) = consensus_graph.path_next_step(link, step)
-        // {
-        //     end
-        // } else {
-        //     continue;
-        // };
-
-        let mut step = begin;
-
-        let mut new_path: Vec<Handle> = Vec::new();
-
-        loop {
-            if step == end {
-                break;
-            }
-
-            let handle =
-                consensus_graph.path_handle_at_step(link, step).unwrap();
-            new_path.push(handle);
-
-            if let Some(next) = consensus_graph.path_next_step(link, step) {
-                step = next;
-            } else {
-                break;
-            }
-        }
-
-        /* NB: [01/24/21]
-           the C++ implementation calls .front() on a potentially
-           empty vector, which is undefined behavior. It *probably*
-           leads to a segfault in practice, so if this isn't a problem
-           when running it, `new_path` should never be empty, and there
-           may be a problem with my implementation, as it *can* be empty.
-        */
-
-        if new_path.is_empty() {
-            continue;
-        } else if let &[h] = new_path.as_slice() {
-            *node_coverage.get_mut(&h.id()).unwrap() -= 1;
-        } else if !new_path.is_empty() {
-            let name = consensus_graph.get_path_name_vec(link).unwrap();
-            to_create.push((name, new_path));
-        }
-    }
-
-    /*
-    let mut link_path_names_to_keep: Vec<Vec<u8>> = Vec::new();
-
-    {
-        let (link_path_ids, link_path_steps): (
-            FnvHashMap<PathId, usize>,
-            Vec<Vec<Handle>>,
-        ) = to_create
-            .into_iter()
-            .enumerate()
-            .filter_map(|(ix, (name, handles))| {
-                let path =
-                    consensus_graph.create_path(name.as_bytes(), false)?;
-
-                trace!(
-                    "link path {} - {} steps",
-                    name.as_bstr(),
-                    handles.len()
-                );
-                if handles.is_empty() {
-                    info!("link path {} is empty", name.as_bstr());
-                }
-                link_path_names_to_keep.push(name);
-
-                Some(((path, ix), handles))
-            })
-            .unzip();
-
-        consensus_graph.with_all_paths_mut_ctx_chn(
-            |cons_path_id, cons_path_ref| {
-                if let Some(ix) = link_path_ids.get(&cons_path_id) {
-                    let handles = &link_path_steps[*ix];
-                    handles
-                        .iter()
-                        .map(|&h| cons_path_ref.append_step(h))
-                        .collect()
-                } else {
-                    Vec::new()
-                }
-            },
-        );
-    }
-
-    for &link in link_paths.iter() {
-        consensus_graph.destroy_path(link);
-    }
-    */
-
-    debug!("unchop 4");
-    crate::algorithms::unchop::unchop(&mut consensus_graph);
-    debug!("after unchop 4");
-
-    {
-        let is_degree_1_tip = |handle: Handle| -> bool {
-            let deg_fwd = consensus_graph.degree(handle, Direction::Right);
-            let deg_rev = consensus_graph.degree(handle, Direction::Left);
-
-            (deg_fwd == 0 || deg_rev == 0) && (deg_fwd + deg_rev == 1)
-        };
-
-        let mut link_tips: Vec<Handle> = Vec::new();
-
-        for &path in link_paths.iter() {
-            let h_first = consensus_graph
-                .path_first_step(path)
-                .and_then(|step| {
-                    consensus_graph.path_handle_at_step(path, step)
-                })
-                .unwrap();
-
-            if is_degree_1_tip(h_first)
-                && consensus_graph.node_len(h_first) < consensus_jump_max
-            {
-                link_tips.push(h_first);
-            }
-
-            let h_last = consensus_graph
-                .path_last_step(path)
-                .and_then(|step| {
-                    consensus_graph.path_handle_at_step(path, step)
-                })
-                .unwrap();
-
-            if is_degree_1_tip(h_last)
-                && consensus_graph.node_len(h_first) < consensus_jump_max
-            {
-                link_tips.push(h_last);
-            }
-        }
-
-        for tip in link_tips {
-            let to_destroy: Vec<(PathId, StepPtr)> =
-                consensus_graph.steps_on_handle(tip).unwrap().collect();
-
-            for (path, step) in to_destroy {
-                consensus_graph.path_rewrite_segment(path, step, step, &[]);
-            }
-        }
-    }
-
     let empty_handles = consensus_graph
         .handles()
         .filter(|&handle| {
@@ -1100,9 +867,9 @@ pub fn create_consensus_graph(
     // TODO optimize
     consensus_graph.defragment();
 
-    debug!("unchop 5");
+    debug!("unchop 4");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
-    debug!("after unchop 5");
+    debug!("after unchop 4");
 
     consensus_graph.compact_ids();
     consensus_graph.defragment();
