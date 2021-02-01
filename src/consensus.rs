@@ -2,7 +2,6 @@ use crate::{
     handle::{Direction, Edge, Handle, NodeId},
     handlegraph::*,
     mutablehandlegraph::*,
-    packedgraph::index::OneBasedIndex,
     pathhandlegraph::*,
 };
 
@@ -118,8 +117,8 @@ pub struct LinkRange {
 pub fn create_consensus_graph(
     smoothed: &PackedGraph,
     consensus_path_names: &[Vec<u8>],
-    consensus_jump_limit: usize,
     consensus_jump_max: usize,
+    consensus_jump_limit: usize,
 ) -> PackedGraph {
     info!("consensus_jump_max: {}", consensus_jump_max);
     info!("using {} consensus paths", consensus_path_names.len());
@@ -501,7 +500,10 @@ pub fn create_consensus_graph(
             let prev_h = prev.handle();
             let curr_h = step.handle();
 
-            edges.insert(Edge(prev_h, curr_h));
+            let edge = Edge(prev_h, curr_h);
+            if !consensus_graph.has_edge(prev_h, curr_h) {
+                edges.insert(edge);
+            }
             prev = step;
         }
     }
@@ -611,6 +613,9 @@ pub fn create_consensus_graph(
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 1");
 
+    // consensus_graph.compact_ids();
+    // consensus_graph.defragment();
+
     let link_paths = link_path_names
         .iter()
         .filter_map(|name| consensus_graph.get_path_id(name.as_bytes()))
@@ -627,9 +632,6 @@ pub fn create_consensus_graph(
             Some(path_id)
         })
         .collect();
-
-    // remove paths that are contained in others
-    // and add less than consensus_jump_max bp of sequence
 
     info!("links_by_start_end - {} links", link_paths.len());
     let mut links_by_start_end = link_paths
@@ -652,7 +654,8 @@ pub fn create_consensus_graph(
         })
         .collect::<Vec<_>>();
 
-    links_by_start_end.par_sort_unstable_by(|a, b| {
+    // links_by_start_end.par_sort_unstable_by(|a, b| {
+    links_by_start_end.par_sort_by(|a, b| {
         use std::cmp::Ordering;
         if a.start < b.end || a.start == b.end && a.end > b.end {
             Ordering::Less
@@ -668,29 +671,8 @@ pub fn create_consensus_graph(
     //     let adiff = a.end.0 - a.start.0;
     //     let bdiff = b.end.0 - b.start.0;
     //     bdiff.cmp(&adiff)
+    //     // adiff.cmp(&bdiff)
     // });
-
-    let count = 5;
-    debug!("first {} in links_by_start_end", count);
-    for (ix, link) in links_by_start_end.iter().enumerate().take(count) {
-        debug!(
-            "{} - path: {} - start: {} - end: {}",
-            ix, link.path.0, link.start.0, link.end.0,
-        );
-    }
-    debug!("last {} in links_by_start_end", count);
-    for (ix, link) in links_by_start_end.iter().enumerate().rev().take(count) {
-        debug!(
-            "{} - path: {} - start: {} - end: {}",
-            ix, link.path.0, link.start.0, link.end.0,
-        );
-    }
-
-    let empty_links = links_by_start_end
-        .iter()
-        .filter(|link| link.start == link.end)
-        .count();
-    debug!("links_by_start_end contains {} empty links", empty_links);
 
     let mut updated_links: Vec<(Vec<u8>, Vec<Handle>)> = Vec::new();
     let mut links_to_remove: Vec<PathId> = Vec::new();
@@ -710,8 +692,6 @@ pub fn create_consensus_graph(
     for link in links_to_remove {
         consensus_graph.destroy_path(link);
     }
-
-    let mut link_path_names_to_keep: Vec<Vec<u8>> = Vec::new();
 
     {
         let (link_path_ids, link_path_steps): (
@@ -733,7 +713,6 @@ pub fn create_consensus_graph(
                 if handles.is_empty() {
                     info!("link path {} is empty", name.as_bstr());
                 }
-                link_path_names_to_keep.push(name);
 
                 ((path, ix), handles)
             })
@@ -768,6 +747,9 @@ pub fn create_consensus_graph(
     debug!("unchop 2");
     crate::algorithms::unchop::unchop(&mut consensus_graph);
     debug!("after unchop 2");
+
+    // consensus_graph.compact_ids();
+    // consensus_graph.defragment();
 
     // remove edges connecting the same path w/ a gap less than consensus_jump_max
     let mut edges_to_remove: FnvHashSet<Edge> = FnvHashSet::default();
@@ -865,6 +847,7 @@ pub fn create_consensus_graph(
     }
 
     // TODO optimize
+    // consensus_graph.compact_ids();
     consensus_graph.defragment();
 
     debug!("unchop 4");
@@ -893,32 +876,6 @@ fn end_in_vector(graph: &PackedGraph, handle: Handle) -> usize {
     } else {
         offset + len
     }
-}
-
-fn novel_seq_len(
-    graph: &PackedGraph,
-    seen_nodes: &mut FnvHashSet<NodeId>,
-    path: PathId,
-    begin: StepPtr,
-    end: StepPtr,
-) -> usize {
-    let mut novel_bp = 0usize;
-
-    let mut step = begin;
-
-    while step != end {
-        let handle = graph.path_handle_at_step(path, step).unwrap();
-        let id = handle.id();
-
-        if !seen_nodes.contains(&id) {
-            novel_bp += graph.node_len(handle);
-            seen_nodes.insert(id);
-        }
-
-        step = graph.path_next_step(path, step).unwrap();
-    }
-
-    novel_bp
 }
 
 fn largest_novel_gap(

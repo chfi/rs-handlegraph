@@ -98,13 +98,6 @@ pub fn simple_components(
             .push(handle);
     }
 
-    let pred_in_comp =
-        |graph: &PackedGraph, h: Handle, comp: &FnvHashSet<NodeId>| -> bool {
-            graph
-                .neighbors(h, Direction::Left)
-                .all(|prev| comp.contains(&prev.id()))
-        };
-
     let mut handle_components: Vec<Vec<Handle>> = Vec::new();
 
     for comp in simple_components.values_mut() {
@@ -161,6 +154,13 @@ pub fn simple_components(
     }
 
     /*
+    let pred_in_comp =
+        |graph: &PackedGraph, h: Handle, comp: &FnvHashSet<NodeId>| -> bool {
+            graph
+                .neighbors(h, Direction::Left)
+                .all(|prev| comp.contains(&prev.id()))
+        };
+
     for comp in simple_components.values_mut() {
         if comp.len() < min_size {
             continue;
