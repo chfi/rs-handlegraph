@@ -37,10 +37,12 @@ pub fn simple_components(
 
     let disj_set = DisjointSets::new(bphf_data.len() + 1);
 
-    debug!("building disjoint set structure");
-    debug!("adding nodes - count {}", graph.node_count());
-
-    graph.handles().for_each(|handle| {
+    debug!(
+        "building disjoint set structure for {} nodes",
+        graph.node_count()
+    );
+    let t = std::time::Instant::now();
+    graph.handles_par().for_each(|handle| {
         let h_i = bphf.hash(&handle.0);
         let h_j = bphf.hash(&handle.flip().0);
         disj_set.unite(h_i, h_j);
@@ -69,27 +71,16 @@ pub fn simple_components(
             }
         }
     });
-
-    debug!("adding edges - count {}", graph.edge_count());
-
-    graph.edges_par().for_each(|Edge(from, to)| {
-        if from.id() != to.id()
-            && graph.degree(from, Direction::Right) == 1
-            && graph.degree(to, Direction::Left) == 1
-        {
-            let is_perfect = perfect_neighbors(graph, from, to);
-            if is_perfect {
-                let from = bphf.hash(&from.0);
-                let to = bphf.hash(&to.0);
-                disj_set.unite(from, to);
-            }
-        }
-    });
+    debug!(
+        "disjoint set populated in {:.3} ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
 
     let mut simple_components: FnvHashMap<u64, Vec<Handle>> =
         FnvHashMap::default();
 
     debug!("filling simple_components");
+    let t = std::time::Instant::now();
     for handle in graph.handles() {
         let a_id = disj_set.find(bphf.hash(&handle.0));
         simple_components
@@ -97,9 +88,15 @@ pub fn simple_components(
             .or_default()
             .push(handle);
     }
+    debug!(
+        "filled {} simple components in {:.3} ms",
+        simple_components.len(),
+        t.elapsed().as_secs_f64() * 1000.0
+    );
 
     let mut handle_components: Vec<Vec<Handle>> = Vec::new();
 
+    let t = std::time::Instant::now();
     for comp in simple_components.values_mut() {
         if comp.len() < min_size {
             continue;
@@ -152,6 +149,11 @@ pub fn simple_components(
             handle_components.push(sorted_comp);
         }
     }
+
+    debug!(
+        "sorted components in {:.3} ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
 
     /*
     let pred_in_comp =

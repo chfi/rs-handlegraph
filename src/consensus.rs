@@ -214,7 +214,7 @@ pub fn create_consensus_graph(
     // we're emulating a multiset by having the key be the hash field
     // of the link path, and then the value a hashset, where
     // LinkPath's Hash impl is the derived one
-    let mut link_multiset: Vec<LinkPath> = Vec::new();
+    let mut link_candidates: Vec<LinkPath> = Vec::new();
 
     info!(
         "building link multiset from {} non-consensus paths",
@@ -352,16 +352,17 @@ pub fn create_consensus_graph(
                         std::mem::swap(&mut new_link, link);
 
                         // append the link
-                        link_multiset.push(new_link);
+                        link_candidates.push(new_link);
                     }
                 }
             }
         }
     }
 
-    info!("link_multiset.len(): {}", link_multiset.len());
+    info!("link candidates found: {}", link_candidates.len());
 
-    link_multiset.sort_by(|a, b| {
+    let t = std::time::Instant::now();
+    link_candidates.sort_by(|a, b| {
         use std::cmp::Ordering;
 
         let a_from = a.from_cons_path.0;
@@ -386,6 +387,11 @@ pub fn create_consensus_graph(
         return Ordering::Greater;
     });
 
+    info!(
+        "sorted link candidates in {:.2} ms",
+        t.elapsed().as_secs_f64() * 1000.0
+    );
+
     let mut perfect_edges: Vec<(Handle, Handle)> = Vec::new();
 
     let mut consensus_links: Vec<LinkPath> = Vec::new();
@@ -394,9 +400,9 @@ pub fn create_consensus_graph(
     let mut curr_from_cons_path: Option<PathId> = None;
     let mut curr_to_cons_path: Option<PathId> = None;
 
-    info!("iterating link_multiset");
+    info!("iterating link_candidates");
 
-    for link_path in link_multiset.iter() {
+    for link_path in link_candidates.iter() {
         if curr_links.is_empty() {
             curr_from_cons_path = Some(link_path.from_cons_path);
             curr_to_cons_path = Some(link_path.to_cons_path);
@@ -465,7 +471,7 @@ pub fn create_consensus_graph(
             let handle = step.handle();
 
             if !consensus_graph.has_node(handle.id()) {
-                let seq = smoothed.sequence_vec(handle.forward());
+                let seq = smoothed.sequence_vec(handle);
                 consensus_graph.create_handle(&seq, handle.id());
             }
         }
