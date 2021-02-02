@@ -1,5 +1,5 @@
 use crate::{
-    handle::{Direction, Edge, Handle, NodeId},
+    handle::{Direction, Handle},
     handlegraph::*,
     pathhandlegraph::*,
 };
@@ -279,6 +279,8 @@ pub fn perfect_neighbors(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use crate::handle::{Edge, Handle};
 
     use crate::mutablehandlegraph::*;
 

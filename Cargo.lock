@@ -182,9 +182,9 @@ dependencies = [
 
 [[package]]
 name = "gfa"
-version = "0.10.0-alpha.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "795cf5f69490f815ed4e057d955a59afe254d0812798b9b7ea85d656726bce80"
+checksum = "dc91d0e20bb75d015851e7a95c9bcf006d4e16472132bc02e1d873e9b6a94dc1"
 dependencies = [
  "anyhow",
  "bstr",
@@ -198,7 +198,7 @@ dependencies = [
 
 [[package]]
 name = "handlegraph"
-version = "0.7.0-alpha.2"
+version = "0.7.0-alpha.3"
 dependencies = [
  "anyhow",
  "boomphf",
