@@ -193,7 +193,7 @@ pub fn unchop(graph: &mut PackedGraph) {
         }
     }
 
-    ordered_handles.par_sort_by(|a, b| a.partial_cmp(b).unwrap());
+    ordered_handles.par_sort_by(|a, b| b.partial_cmp(a).unwrap());
 
     let handle_order: Vec<Handle> =
         ordered_handles.into_iter().map(|(_, h)| h).collect();
@@ -323,23 +323,6 @@ mod tests {
                 .unwrap()
         };
 
-        let p1_steps = get_steps(&graph, path_1);
-        let p2_steps = get_steps(&graph, path_2);
-
-        assert_eq!(p1_steps, vec_hnd(vec![1, 2, 3, 4]));
-        assert_eq!(p2_steps, vec_hnd(vec![1, 5, 6, 4]));
-
-        for i in 1..=6 {
-            assert!(graph.has_node(i));
-        }
-
-        println!("Path 1: {:?}", p1_steps);
-        println!("Path 2: {:?}", p2_steps);
-
-        println!(" unchopping ");
-
-        unchop(&mut graph);
-
         let get_handle = |graph: &PackedGraph, id: u64| {
             let lefts = graph
                 .neighbors(hnd(id), Direction::Left)
@@ -352,18 +335,46 @@ mod tests {
             (lefts, id, rights)
         };
 
+        let p1_steps = get_steps(&graph, path_1);
+        let p2_steps = get_steps(&graph, path_2);
+
+        assert_eq!(p1_steps, vec_hnd(vec![1, 2, 3, 4]));
+        assert_eq!(p2_steps, vec_hnd(vec![1, 5, 6, 4]));
+
+        for i in 1..=6 {
+            println!("node {}: {:?}", i, get_handle(&graph, i as u64));
+            assert!(graph.has_node(i));
+        }
+
+        println!("Path 1: {:?}", p1_steps);
+        println!("Path 2: {:?}", p2_steps);
+
+        println!(" unchopping ");
+
+        unchop(&mut graph);
+
+        for h in graph.handles() {
+            let i = h.id().0;
+            println!("node {}: {:?}", i, get_handle(&graph, i as u64));
+        }
+
+        let p1_steps = get_steps(&graph, path_1);
+        let p2_steps = get_steps(&graph, path_2);
+
+        println!("Path 1: {:?}", p1_steps);
+        println!("Path 2: {:?}", p2_steps);
+
+        println!("node 8: {:?}", get_handle(&graph, 8));
+        println!("node 4: {:?}", get_handle(&graph, 4));
+        println!("node 7: {:?}", get_handle(&graph, 7));
+        println!("node 1: {:?}", get_handle(&graph, 1));
+
         assert_eq!(get_handle(&graph, 8), (vec![], 8, vec![1, 7]));
         assert_eq!(get_handle(&graph, 4), (vec![1, 7], 4, vec![]));
         assert_eq!(get_handle(&graph, 7), (vec![8], 7, vec![4]));
         assert_eq!(get_handle(&graph, 1), (vec![8], 1, vec![4]));
 
-        let p1_steps = get_steps(&graph, path_1);
-        let p2_steps = get_steps(&graph, path_2);
-
         assert_eq!(p1_steps, vec_hnd(vec![8, 7, 4]));
         assert_eq!(p2_steps, vec_hnd(vec![8, 1, 4]));
-
-        println!("Path 1: {:?}", p1_steps);
-        println!("Path 2: {:?}", p2_steps);
     }
 }
