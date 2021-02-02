@@ -153,10 +153,10 @@ fn concat_nodes(graph: &mut PackedGraph, handles: &[Handle]) -> Option<Handle> {
 }
 
 pub fn unchop(graph: &mut PackedGraph) {
-    let node_rank: FnvHashMap<NodeId, usize> = graph
+    let node_rank: FnvHashMap<NodeId, f64> = graph
         .handles()
         .enumerate()
-        .map(|(rank, handle)| (handle.id(), rank))
+        .map(|(rank, handle)| (handle.id(), rank as f64))
         .collect();
 
     let components = simple_components(graph, 2);
@@ -170,7 +170,7 @@ pub fn unchop(graph: &mut PackedGraph) {
         .handles_par()
         .filter_map(|handle| {
             if !to_merge.contains(&handle.id()) {
-                Some((node_rank[&handle.id()] as f64, handle))
+                Some((node_rank[&handle.id()], handle))
             } else {
                 None
             }
@@ -179,8 +179,7 @@ pub fn unchop(graph: &mut PackedGraph) {
 
     for comp in components.iter() {
         if comp.len() >= 2 {
-            let rank_sum: f64 =
-                comp.iter().map(|h| node_rank[&h.id()] as f64).sum();
+            let rank_sum: f64 = comp.iter().map(|h| node_rank[&h.id()]).sum();
 
             let rank_v = rank_sum / (comp.len() as f64);
 
@@ -188,7 +187,7 @@ pub fn unchop(graph: &mut PackedGraph) {
             ordered_handles.push((rank_v, n));
         } else {
             for &handle in comp.iter() {
-                ordered_handles.push((node_rank[&handle.id()] as f64, handle));
+                ordered_handles.push((node_rank[&handle.id()], handle));
             }
         }
     }

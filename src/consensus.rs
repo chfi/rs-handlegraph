@@ -18,7 +18,8 @@ use bstr::ByteSlice;
 #[allow(unused_imports)]
 use log::{debug, error, info, trace};
 
-#[derive(Debug, Clone, Hash)]
+// #[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct LinkPath {
     pub from_cons_path: PathId,
     pub to_cons_path: PathId,
@@ -54,6 +55,7 @@ impl LinkPath {
     }
 }
 
+/*
 impl PartialEq for LinkPath {
     fn eq(&self, other: &Self) -> bool {
         let self_from = &self.from_cons_path;
@@ -106,6 +108,7 @@ impl PartialOrd for LinkPath {
         }
     }
 }
+*/
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct LinkRange {
@@ -135,6 +138,8 @@ pub fn create_consensus_graph(
     };
 
     info!("consensus_jump_max: {}", consensus_jump_max);
+    info!("consensus_jump_limit: {}", consensus_jump_limit);
+
     info!("using {} consensus paths", consensus_path_names.len());
     let consensus_paths: Vec<PathId> = consensus_path_names
         .iter()
