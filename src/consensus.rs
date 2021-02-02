@@ -123,7 +123,7 @@ pub fn create_consensus_graph(
     consensus_jump_max: usize,
     consensus_jump_limit: usize,
 ) -> PackedGraph {
-    let write_progress_gfas = true;
+    let write_progress_gfas = false;
 
     let mut progress_gfa_id = 0usize;
     let mut write_gfa = move |graph: &PackedGraph| {
@@ -214,8 +214,7 @@ pub fn create_consensus_graph(
     // we're emulating a multiset by having the key be the hash field
     // of the link path, and then the value a hashset, where
     // LinkPath's Hash impl is the derived one
-    let mut link_multiset: FnvHashMap<u64, FnvHashSet<LinkPath>> =
-        FnvHashMap::default();
+    let mut link_multiset: Vec<LinkPath> = Vec::new();
 
     info!(
         "building link multiset from {} non-consensus paths",
@@ -302,19 +301,19 @@ pub fn create_consensus_graph(
                         let mut hasher = FnvHasher::default();
 
                         let seq = get_path_seq(
-                            path_id,
+                            link.path,
                             smoothed
-                                .path_next_step(path_id, link.begin)
+                                .path_next_step(link.path, link.begin)
                                 .unwrap(),
                             link.end,
                         );
                         trace!("new link seq: {}", seq.as_bstr());
 
                         let beg_h = smoothed
-                            .path_handle_at_step(path_id, link.begin)
+                            .path_handle_at_step(link.path, link.begin)
                             .unwrap();
                         let end_h = smoothed
-                            .path_handle_at_step(path_id, link.end)
+                            .path_handle_at_step(link.path, link.end)
                             .unwrap();
 
                         let handle_str = format!(
@@ -353,10 +352,7 @@ pub fn create_consensus_graph(
                         std::mem::swap(&mut new_link, link);
 
                         // append the link
-                        link_multiset
-                            .entry(new_link.hash)
-                            .or_default()
-                            .insert(new_link);
+                        link_multiset.push(new_link);
                     }
                 }
             }
@@ -364,6 +360,31 @@ pub fn create_consensus_graph(
     }
 
     info!("link_multiset.len(): {}", link_multiset.len());
+
+    link_multiset.sort_by(|a, b| {
+        use std::cmp::Ordering;
+
+        let a_from = a.from_cons_path.0;
+        let a_to = a.to_cons_path.0;
+
+        let b_from = b.from_cons_path.0;
+        let b_to = b.to_cons_path.0;
+
+        if a_from < b_from {
+            return Ordering::Less;
+        }
+
+        if a_from == b_from
+            && (a_to < b_to
+                || (a_to == b_to
+                    && (a.length < b.length
+                        || (a.length == b.length && a.hash < b.hash))))
+        {
+            return Ordering::Less;
+        }
+
+        return Ordering::Greater;
+    });
 
     let mut perfect_edges: Vec<(Handle, Handle)> = Vec::new();
 
@@ -374,30 +395,34 @@ pub fn create_consensus_graph(
     let mut curr_to_cons_path: Option<PathId> = None;
 
     info!("iterating link_multiset");
-    for link_path_set in link_multiset.values() {
-        for link_path in link_path_set.iter() {
-            if curr_links.is_empty() {
-                curr_from_cons_path = Some(link_path.from_cons_path);
-                curr_to_cons_path = Some(link_path.to_cons_path);
-            } else if curr_from_cons_path != Some(link_path.from_cons_path)
-                || curr_to_cons_path != Some(link_path.to_cons_path)
-            {
-                compute_best_link(
-                    smoothed,
-                    consensus_jump_max,
-                    consensus_jump_limit,
-                    &curr_links,
-                    &mut consensus_links,
-                    &mut perfect_edges,
-                );
 
-                curr_links.clear();
-                curr_from_cons_path = Some(link_path.from_cons_path);
-                curr_to_cons_path = Some(link_path.to_cons_path);
-            }
-            curr_links.push(link_path);
+    for link_path in link_multiset.iter() {
+        if curr_links.is_empty() {
+            curr_from_cons_path = Some(link_path.from_cons_path);
+            curr_to_cons_path = Some(link_path.to_cons_path);
+        } else if curr_from_cons_path != Some(link_path.from_cons_path)
+            || curr_to_cons_path != Some(link_path.to_cons_path)
+        {
+            compute_best_link(
+                smoothed,
+                consensus_jump_max,
+                consensus_jump_limit,
+                &curr_links,
+                &mut consensus_links,
+                &mut perfect_edges,
+            );
+
+            curr_links.clear();
+            curr_from_cons_path = Some(link_path.from_cons_path);
+            curr_to_cons_path = Some(link_path.to_cons_path);
         }
+        curr_links.push(link_path);
     }
+
+    info!(
+        "before last compute_best_link, curr_links: {}",
+        curr_links.len()
+    );
 
     info!("compute_best_link");
     compute_best_link(
@@ -471,13 +496,17 @@ pub fn create_consensus_graph(
                 .extend(cons_path_name_map.get(&link.from_cons_path).unwrap());
             link_name.push(b'_');
             link_name
-                .extend(cons_path_name_map.get(&link.from_cons_path).unwrap());
+                .extend(cons_path_name_map.get(&link.to_cons_path).unwrap());
+            link_name.push(b'_');
             link_name.extend(link.rank.to_string().bytes());
 
             let path_cons_graph =
                 match consensus_graph.create_path(&link_name, false) {
                     Some(path_id) => path_id,
-                    None => continue,
+                    None => {
+                        eprintln!("link already existed!");
+                        continue;
+                    }
                 };
 
             link_name.shrink_to_fit();
@@ -624,6 +653,10 @@ pub fn create_consensus_graph(
     }
 
     // write_gfa(&consensus_graph);
+
+    if write_progress_gfas {
+        write_gfa(&consensus_graph);
+    }
 
     debug!("node_count()      = {}", consensus_graph.node_count());
     debug!("handles().count() = {}", consensus_graph.handles().count());
