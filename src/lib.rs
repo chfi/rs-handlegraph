@@ -61,3 +61,5 @@ pub mod util;
 
 pub mod algorithms;
 pub mod consensus;
+
+pub mod path_position;
