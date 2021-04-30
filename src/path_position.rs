@@ -1,25 +1,16 @@
-use std::num::NonZeroUsize;
-
-use fnv::FnvHashMap;
-
-use crossbeam_channel::Sender;
-
 use crate::{
     handle::{Handle, NodeId},
     handlegraph::IntoSequences,
     packed::*,
-    packedgraph::PackedGraph,
+    packedgraph::{index::OneBasedIndex, paths::StepPtr, PackedGraph},
     pathhandlegraph::{
-        GraphPaths, GraphPathsSteps, IntoPathIds, MutPath, PathBase, PathId,
-        PathStep, PathSteps,
+        GraphPaths, GraphPathsSteps, IntoNodeOccurrences, IntoPathIds, PathId,
     },
 };
 
-use crate::packedgraph::{
-    graph::NARROW_PAGE_WIDTH,
-    index::list::{self, PackedDoubleList, PackedList, PackedListMut},
-    paths::packedpath::{PackedStep, StepList},
-};
+use crate::packedgraph::graph::NARROW_PAGE_WIDTH;
+
+use fnv::FnvHashMap;
 
 pub struct PathPositionMap {
     pub(crate) paths: Vec<PathPositionIndex>,
@@ -49,6 +40,27 @@ impl PathPositionMap {
         }
 
         Self { paths }
+    }
+
+    pub fn handle_positions(
+        &self,
+        graph: &PackedGraph,
+        handle: Handle,
+    ) -> Option<FnvHashMap<PathId, (StepPtr, usize)>> {
+        let steps = graph.steps_on_handle(handle)?;
+
+        let mut res: FnvHashMap<PathId, (StepPtr, usize)> =
+            FnvHashMap::default();
+
+        for (path_id, step_ix) in steps {
+            let path = self.paths.get(path_id.0 as usize)?;
+            let ix = step_ix.to_zero_based()?;
+            let pos = path.step_positions.get(ix);
+
+            res.insert(path_id, (step_ix, pos as usize));
+        }
+
+        Some(res)
     }
 }
 
