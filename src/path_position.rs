@@ -46,21 +46,69 @@ impl PathPositionMap {
         &self,
         graph: &PackedGraph,
         handle: Handle,
-    ) -> Option<FnvHashMap<PathId, (StepPtr, usize)>> {
+    ) -> Option<Vec<(PathId, StepPtr, usize)>> {
         let steps = graph.steps_on_handle(handle)?;
 
-        let mut res: FnvHashMap<PathId, (StepPtr, usize)> =
-            FnvHashMap::default();
+        let mut res: Vec<(PathId, StepPtr, usize)> = Vec::new();
 
         for (path_id, step_ix) in steps {
             let path = self.paths.get(path_id.0 as usize)?;
             let ix = step_ix.to_zero_based()?;
             let pos = path.step_positions.get(ix);
 
-            res.insert(path_id, (step_ix, pos as usize));
+            res.push((path_id, step_ix, pos as usize));
         }
 
         Some(res)
+    }
+
+    pub fn handle_positions_iter<'a>(
+        &'a self,
+        graph: &'a PackedGraph,
+        handle: Handle,
+    ) -> Option<impl Iterator<Item = (PathId, StepPtr, usize)> + 'a> {
+        let steps = graph.steps_on_handle(handle)?;
+
+        let paths = &self.paths;
+
+        let iter = steps.filter_map(move |(path_id, step_ix)| {
+            let path = paths.get(path_id.0 as usize)?;
+            let ix = step_ix.to_zero_based()?;
+            let pos = path.step_positions.get(ix);
+
+            Some((path_id, step_ix, pos as usize))
+        });
+
+        Some(iter)
+    }
+
+    pub fn handles_positions<I>(
+        &self,
+        graph: &PackedGraph,
+        handles: I,
+    ) -> FnvHashMap<Handle, Vec<(PathId, StepPtr, usize)>>
+    where
+        I: Iterator<Item = Handle>,
+    {
+        let mut res: FnvHashMap<Handle, Vec<(PathId, StepPtr, usize)>> =
+            FnvHashMap::default();
+
+        let mut buf: Vec<(PathId, StepPtr, usize)> = Vec::new();
+
+        for handle in handles {
+            buf.clear();
+            if let Some(positions) = self.handle_positions_iter(graph, handle) {
+                buf.extend(positions);
+
+                if !buf.is_empty() {
+                    let mut pos_vec = buf.clone();
+                    pos_vec.shrink_to_fit(); // not sure if needed
+                    res.insert(handle, pos_vec);
+                }
+            }
+        }
+
+        res
     }
 }
 
