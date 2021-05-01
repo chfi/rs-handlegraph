@@ -21,7 +21,10 @@ impl PathPositionMap {
         let mut paths: Vec<PathPositionIndex> =
             Vec::with_capacity(graph.path_count());
 
-        for path_id in graph.path_ids() {
+        let mut path_ids = graph.path_ids().collect::<Vec<_>>();
+        path_ids.sort();
+
+        for path_id in path_ids {
             let mut path_index = PathPositionIndex::default();
 
             let mut pos_offset = 0usize;
