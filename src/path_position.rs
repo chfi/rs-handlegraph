@@ -1,5 +1,5 @@
 use crate::{
-    handle::{Handle, NodeId},
+    handle::Handle,
     handlegraph::IntoSequences,
     packed::*,
     packedgraph::{index::OneBasedIndex, paths::StepPtr, PackedGraph},
