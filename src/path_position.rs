@@ -27,7 +27,7 @@ impl PathPositionMap {
         for path_id in path_ids {
             let mut path_index = PathPositionIndex::default();
 
-            let mut pos_offset = 0usize;
+            let mut pos_offset = 1usize;
 
             if let Some(steps) = graph.path_steps(path_id) {
                 for (_step_ix, step) in steps {
@@ -43,6 +43,18 @@ impl PathPositionMap {
         }
 
         Self { paths }
+    }
+
+    pub fn path_step_position(
+        &self,
+        path: PathId,
+        step: StepPtr,
+    ) -> Option<usize> {
+        let path_indices = self.paths.get(path.0 as usize)?;
+
+        let step_ix = step.to_zero_based()?;
+
+        Some(path_indices.step_positions.get(step_ix) as usize)
     }
 
     pub fn handle_positions(
