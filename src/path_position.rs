@@ -12,6 +12,7 @@ use crate::packedgraph::graph::NARROW_PAGE_WIDTH;
 
 use fnv::FnvHashMap;
 
+#[derive(Debug, Clone)]
 pub struct PathPositionMap {
     pub(crate) paths: Vec<PathPositionIndex>,
 }
@@ -127,6 +128,7 @@ impl PathPositionMap {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct PathPositionIndex {
     pub(crate) step_positions: RobustPagedIntVec,
 }
