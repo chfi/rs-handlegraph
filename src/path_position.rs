@@ -18,6 +18,11 @@ pub struct PathPositionMap {
 }
 
 impl PathPositionMap {
+    /// Build a `PathPositionMap` index from a `PackedGraph`.
+    ///
+    /// IMPORTANT: Assumes that each path in the graph has been
+    /// constructed by appending steps in order, and that no steps
+    /// have been deleted!
     pub fn index_paths(graph: &PackedGraph) -> Self {
         let mut paths: Vec<PathPositionIndex> =
             Vec::with_capacity(graph.path_count());
@@ -29,6 +34,7 @@ impl PathPositionMap {
             let mut path_index = PathPositionIndex::default();
 
             let mut pos_offset = 1usize;
+            let mut last_step_offset = 0usize;
 
             if let Some(steps) = graph.path_steps(path_id) {
                 for (_step_ix, step) in steps {
@@ -36,9 +42,13 @@ impl PathPositionMap {
 
                     path_index.step_positions.append(pos_offset as u64);
 
+                    last_step_offset = pos_offset;
                     pos_offset += seq_len;
                 }
             }
+
+            path_index.last_step_offset = last_step_offset;
+            path_index.base_len = pos_offset;
 
             paths.push(path_index);
         }
@@ -56,6 +66,57 @@ impl PathPositionMap {
         let step_ix = step.to_zero_based()?;
 
         Some(path_indices.step_positions.get(step_ix) as usize)
+    }
+
+    pub fn find_step_at_base(
+        &self,
+        path: PathId,
+        base_pos: usize,
+    ) -> Option<StepPtr> {
+        let path_indices = self.paths.get(path.0 as usize)?;
+
+        if base_pos >= path_indices.last_step_offset {
+            if base_pos > path_indices.base_len {
+                return None;
+            } else {
+                return Some(StepPtr::from_zero_based(
+                    path_indices.step_positions.len(),
+                ));
+            }
+        }
+
+        let step_count = path_indices.step_positions.len();
+
+        let steps = &path_indices.step_positions;
+
+        let mut left = 0;
+        let mut right = step_count - 1;
+        let mut mid;
+
+        loop {
+            if left > right {
+                return None;
+            }
+
+            mid = (left + right) / 2;
+
+            let at_mid = steps.get(mid) as usize;
+            let at_next = if mid == step_count {
+                path_indices.base_len
+            } else {
+                steps.get(mid + 1) as usize
+            };
+
+            if at_mid < base_pos {
+                left = mid + 1;
+            } else if at_next > base_pos {
+                right = mid - 1;
+            } else {
+                break;
+            }
+        }
+
+        Some(StepPtr::from_zero_based(mid))
     }
 
     pub fn handle_positions(
@@ -131,12 +192,16 @@ impl PathPositionMap {
 #[derive(Debug, Clone)]
 pub struct PathPositionIndex {
     pub(crate) step_positions: RobustPagedIntVec,
+    pub(crate) base_len: usize,
+    pub(crate) last_step_offset: usize,
 }
 
 impl std::default::Default for PathPositionIndex {
     fn default() -> Self {
         Self {
             step_positions: RobustPagedIntVec::new(NARROW_PAGE_WIDTH),
+            base_len: 0usize,
+            last_step_offset: 0usize,
         }
     }
 }
