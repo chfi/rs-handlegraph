@@ -56,6 +56,11 @@ impl PathPositionMap {
         Self { paths }
     }
 
+    pub fn path_base_len(&self, path: PathId) -> Option<usize> {
+        let path_indices = self.paths.get(path.0 as usize)?;
+        Some(path_indices.base_len)
+    }
+
     pub fn path_step_position(
         &self,
         path: PathId,
