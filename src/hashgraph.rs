@@ -183,33 +183,53 @@ impl AdditiveHandleGraph for HashGraph {
     }
 
     fn create_edge(&mut self, Edge(left, right): Edge) {
+        /*
         let add_edge = {
-            let left_node = self
-                .graph
-                .get(&left.id())
-                .expect("Node doesn't exist for the given handle");
+            if left != right.flip() {
+                let left_node = self
+                    .graph
+                    .get(&left.id())
+                    .expect("Node doesn't exist for the given handle");
 
-            None == left_node.right_edges.iter().find(|&&h| h == right)
-        };
-
-        if add_edge {
-            let left_node = self
-                .graph
-                .get_mut(&left.id())
-                .expect("Node doesn't exist for the given handle");
-            if left.is_reverse() {
-                left_node.left_edges.push(right);
+                None == left_node
+                    .right_edges
+                    .iter()
+                    .find(|&&h| h == right.flip())
             } else {
+                let left_node = self
+                    .graph
+                    .get(&left.id())
+                    .expect("Node doesn't exist for the given handle");
+
+                None == left_node.right_edges.iter().find(|&&h| h == right)
+            }
+        };
+        */
+
+        let left_node = self
+            .graph
+            .get_mut(&left.id())
+            .expect("Node doesn't exist for the given handle");
+        if left.is_reverse() {
+            if !left_node.left_edges.contains(&right) {
+                left_node.left_edges.push(right);
+            }
+        } else {
+            if !left_node.right_edges.contains(&right) {
                 left_node.right_edges.push(right);
             }
-            if left != right.flip() {
-                let right_node = self
-                    .graph
-                    .get_mut(&right.id())
-                    .expect("Node doesn't exist for the given handle");
-                if right.is_reverse() {
+        }
+        if left != right.flip() {
+            let right_node = self
+                .graph
+                .get_mut(&right.id())
+                .expect("Node doesn't exist for the given handle");
+            if right.is_reverse() {
+                if !right_node.right_edges.contains(&left.flip()) {
                     right_node.right_edges.push(left.flip());
-                } else {
+                }
+            } else {
+                if !right_node.left_edges.contains(&left.flip()) {
                     right_node.left_edges.push(left.flip());
                 }
             }
