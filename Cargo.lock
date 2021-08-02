@@ -200,7 +200,7 @@ dependencies = [
 
 [[package]]
 name = "handlegraph"
-version = "0.7.0-alpha.7"
+version = "0.7.0-alpha.9"
 dependencies = [
  "anyhow",
  "boomphf",
