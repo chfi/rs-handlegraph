@@ -53,6 +53,7 @@ pub trait PackedListMut: PackedList {
 }
 
 /// An iterator through linked lists represented using PackedList
+#[derive(Clone)]
 pub struct Iter<'a, T: PackedList> {
     list: &'a T,
     head_ptr: T::ListPtr,

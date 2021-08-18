@@ -253,6 +253,7 @@ impl PackedListMut for NodeOccurrences {
     }
 }
 
+#[derive(Clone)]
 pub struct OccurrencesIter<'a> {
     list_iter: list::Iter<'a, NodeOccurrences>,
 }

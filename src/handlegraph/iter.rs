@@ -22,6 +22,7 @@ use super::{IntoHandles, IntoNeighbors};
 /// Iterator adapter to create an Iterator over `Handle`s from an
 /// iterator over &NodeId, in a way that can be used as the `Handles`
 /// type in implementations of [`IntoHandles`](super::IntoHandles).
+#[derive(Clone)]
 pub struct NodeIdRefHandles<'a, I>
 where
     I: Iterator<Item = &'a NodeId> + 'a,
@@ -55,6 +56,7 @@ where
 /// Iterator adapter to create an Iterator over `Handle`s from an
 /// iterator over NodeId, in a way that can be used as the `Handles`
 /// type in implementations of [`IntoHandles`](super::IntoHandles).
+#[derive(Clone)]
 pub struct NodeIdHandles<I>
 where
     I: Iterator<Item = NodeId>,
@@ -87,6 +89,7 @@ where
 
 /// Utility struct for iterating through the edges of a single handle,
 /// for use with [`super::EdgesIter`].
+#[derive(Clone)]
 struct HandleEdgesIter<I>
 where
     I: Iterator<Item = Handle>,
@@ -178,6 +181,7 @@ impl<I> std::iter::FusedIterator for HandleEdgesIter<I> where
 /// Utility struct for iterating over all edges of a graph that
 /// already supports iteration over all handles, and the neighbors of
 /// each handle.
+#[derive(Clone)]
 pub struct EdgesIter<G>
 where
     G: IntoNeighbors + IntoHandles + Copy,
@@ -260,6 +264,7 @@ impl<G> std::iter::FusedIterator for EdgesIter<G> where
 ///
 /// Useful for ensuring that handles produced by a
 /// [`super::IntoNeighbors`] implementation are oriented correctly.
+#[derive(Clone)]
 pub struct NeighborIter<'a, I>
 where
     I: Iterator<Item = &'a Handle>,
@@ -300,6 +305,7 @@ where
 /// reverse complement, depending on how the iterator is configured.
 ///
 /// Useful for implementing [`super::IntoSequences`].
+#[derive(Clone)]
 pub struct SequenceIter<I>
 where
     I: Iterator<Item = u8>,

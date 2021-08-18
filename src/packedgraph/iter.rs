@@ -6,6 +6,7 @@ use super::{index::list, EdgeLists};
 use fnv::FnvHashSet;
 
 /// Iterator for stepping through an edge list, returning Handles.
+#[derive(Clone)]
 pub struct EdgeListHandleIter<'a> {
     edge_list_iter: list::Iter<'a, EdgeLists>,
     flip: bool,

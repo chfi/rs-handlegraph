@@ -257,6 +257,7 @@ impl PackedCollection for PackedIntVec {
     }
 }
 
+#[derive(Clone)]
 pub struct Iter<'a> {
     iter: succinct::int_vec::Iter<'a, u64>,
     ix: usize,
@@ -346,6 +347,7 @@ impl<'a> Iterator for Iter<'a> {
     }
 }
 
+#[derive(Clone)]
 pub struct IterView<'a, T: PackedElement> {
     iter: Iter<'a>,
     _element: std::marker::PhantomData<T>,

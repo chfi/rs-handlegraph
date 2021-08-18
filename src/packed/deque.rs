@@ -236,6 +236,7 @@ impl PackedCollection for PackedDeque {
     }
 }
 
+#[derive(Clone, Copy)]
 pub struct Iter<'a> {
     deque_vec: &'a PackedIntVec,
     start_ix: usize,

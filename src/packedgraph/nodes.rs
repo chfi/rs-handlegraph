@@ -191,6 +191,7 @@ impl NodeIdIndexMap {
     }
 }
 
+#[derive(Clone)]
 pub struct IndexMapIter<'a> {
     iter: std::iter::Enumerate<packed::deque::Iter<'a>>,
     min_id: u64,
