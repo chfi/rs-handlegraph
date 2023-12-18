@@ -28,7 +28,7 @@ where
 
     for link in gfa.links.iter() {
         let left = Handle::new(link.from_segment, link.from_orient);
-        let right = Handle::new(link.from_segment, link.from_orient);
+        let right = Handle::new(link.to_segment, link.to_orient);
         graph.create_edge(Edge(left, right));
     }
 
